@@ -1,10 +1,10 @@
-# 🦇 batOps 
+# 🦇 batOps 🚀
 
 .dotfiles como Cinturão de Utilidades do Guardião DevOps
 
 > Enquanto um cinturão de ferramentas DevOps representa um conjunto técnico de soluções, o cinturão de utilidades simboliza a postura estratégica e multifuncional do verdadeiro guardião da cultura DevOps — alguém que não apenas executa, mas protege, promove e adapta práticas que sustentam a colaboração, a automação e a entrega contínua.
 
-**batOps** é um kit completo de `.dotfiles` que transforma seu ambiente de desenvolvimento em um verdadeiro **cinturão de utilidades DevOps**. Integrando Windows e Linux via WSL, o projeto oferece scripts, aliases e ferramentas que ajudam você a enfrentar qualquer desafio técnico com agilidade, inteligência e estilo. 🦇🚀👊
+**🦇 batOps 🚀** é um kit completo de `.dotfiles` que transforma seu ambiente de desenvolvimento em um verdadeiro **cinturão de utilidades DevOps**. Integrando Windows e Linux via WSL, o projeto oferece scripts, aliases e ferramentas que ajudam você a enfrentar qualquer desafio técnico com agilidade, inteligência e estilo. 
 
 ---
 
