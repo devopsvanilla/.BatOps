@@ -1,16 +1,16 @@
 #!/bin/bash
 
 ################################################################################
-# Script para limpeza de logs do Morpheus Data Enterprise
+# Script para limpeza de logs do Morpheus Data Enterprise (Versão Segura)
 ################################################################################
 #
 # DESCRIÇÃO:
 #   Este script limpa os logs do sistema Morpheus Data Enterprise de forma
-#   segura, mantendo os arquivos de log ativos (current) vazios e removendo
-#   logs arquivados antigos.
+#   segura, removendo apenas arquivos arquivados e mantendo os arquivos
+#   ativos (current) intactos para evitar corrupção do supervise.
 #
 # AUTOR: Script automatizado
-# VERSÃO: 1.0
+# VERSÃO: 2.0 - Versão Segura
 # DATA: 2025-09-12
 #
 ################################################################################
@@ -40,34 +40,47 @@
 ################################################################################
 #
 # Limpar todos os logs:
-#   sudo ./morpheus-log-cleanup.sh --all
+#   sudo ./morpheus-log-cleanup-safe.sh --all
 #
 # Apenas logs de sistema:
-#   sudo ./morpheus-log-cleanup.sh --system-only
+#   sudo ./morpheus-log-cleanup-safe.sh --system-only
 #
 # Visualizar o que seria limpo:
-#   sudo ./morpheus-log-cleanup.sh --all --dry-run
+#   sudo ./morpheus-log-cleanup-safe.sh --all --dry-run
 #
 # Limpeza forçada sem confirmação:
-#   sudo ./morpheus-log-cleanup.sh --all --force
+#   sudo ./morpheus-log-cleanup-safe.sh --all --force
 #
 ################################################################################
-# LOGS LIMPOS:
+# LOGS LIMPOS (MODO SEGURO):
 ################################################################################
 #
 # Logs de Sistema:
-# - /var/log/morpheus/morpheus-ui/current (truncado)
 # - /var/log/morpheus/morpheus-ui/*.log.* (removidos)
-# - /var/log/morpheus/elasticsearch/current (truncado)
-# - /var/log/morpheus/mysql/current (truncado)
-# - /var/log/morpheus/nginx/current (truncado)
-# - /var/log/morpheus/rabbitmq/current (truncado)
-# - /var/log/morpheus/check-server/current (truncado)
-# - /var/log/morpheus/guacd/current (truncado)
+# - /var/log/morpheus/morpheus-ui/@* (removidos)
+# - /var/log/morpheus/elasticsearch/*.log.* (removidos)
+# - /var/log/morpheus/mysql/*.log.* (removidos)
+# - /var/log/morpheus/nginx/*.log.* (removidos)
+# - /var/log/morpheus/rabbitmq/*.log.* (removidos)
+# - /var/log/morpheus/check-server/*.log.* (removidos)
+# - /var/log/morpheus/guacd/*.log.* (removidos)
+#
+# MANTIDOS INTACTOS:
+# - Todos os arquivos 'current' (para evitar corrupção do supervise)
+# - Processos e serviços continuam rodando normalmente
 #
 # Logs de Instâncias (Elasticsearch):
-# - Índices morpheus-* (removidos)
-# - Todos os logs de instâncias armazenados
+# - Índices morpheus-* (removidos apenas se solicitado)
+#
+################################################################################
+# VANTAGENS DO MODO SEGURO:
+################################################################################
+#
+# - Serviços continuam rodando durante a limpeza
+# - Não há risco de corrupção do sistema supervise
+# - Não há interrupção do serviço Morpheus
+# - Remove arquivos desnecessários mantendo funcionalidade
+# - Sem necessidade de reinicialização após limpeza
 #
 ################################################################################
 # AVISOS IMPORTANTES:
@@ -75,8 +88,8 @@
 #
 # - Este script requer permissões de root
 # - Logs de instâncias são perdidos permanentemente ao limpar Elasticsearch
-# - Os serviços Morpheus são temporariamente parados durante a limpeza
-# - Um backup dos logs pode ser criado antes da limpeza se solicitado
+# - Arquivos 'current' são mantidos para estabilidade do sistema
+# - Esta versão é mais segura que o truncamento de arquivos ativos
 #
 ################################################################################
 
@@ -90,6 +103,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Variáveis de controle
@@ -105,11 +119,16 @@ Uso: $SCRIPT_NAME [OPÇÕES]
 
 Opções:
   --all                 Limpa todos os logs (sistema + elasticsearch)
-  --system-only         Limpa apenas logs de sistema
+  --system-only         Limpa apenas logs de sistema (modo seguro)
   --elasticsearch-only  Limpa apenas logs/índices do Elasticsearch
   --dry-run            Mostra o que seria limpo sem executar
   --force              Executa sem confirmação interativa
   --help               Exibe esta ajuda
+
+Modo Seguro:
+  Esta versão do script NÃO para os serviços Morpheus durante a limpeza,
+  evitando problemas de corrupção do supervise. Remove apenas arquivos
+  arquivados, mantendo os arquivos 'current' intactos.
 
 Exemplos:
   $SCRIPT_NAME --all
@@ -135,12 +154,6 @@ check_morpheus_installation() {
         echo -e "${YELLOW}Verifique se o Morpheus Data Enterprise está instalado${NC}"
         exit 1
     fi
-
-    if ! command -v morpheus-ctl &> /dev/null; then
-        echo -e "${RED}Erro: Comando 'morpheus-ctl' não encontrado${NC}"
-        echo -e "${YELLOW}Verifique se o Morpheus Data Enterprise está instalado corretamente${NC}"
-        exit 1
-    fi
 }
 
 # Função para calcular tamanho dos logs
@@ -153,30 +166,106 @@ calculate_log_size() {
     fi
 }
 
+# Função para calcular tamanho de arquivos específicos
+calculate_files_size() {
+    local files="$1"
+    if [[ -n "$files" ]]; then
+        echo "$files" | xargs du -ch 2>/dev/null | tail -1 | cut -f1
+    else
+        echo "0"
+    fi
+}
+
+# Função para verificar status dos serviços
+check_services_status() {
+    echo -e "${CYAN}Status atual dos serviços Morpheus:${NC}"
+    
+    local services_up=0
+    local services_total=0
+    
+    if morpheus-ctl status &>/dev/null; then
+        local status_output=$(morpheus-ctl status 2>/dev/null)
+        while read -r line; do
+            if [[ "$line" =~ ^(ok|down|fail): ]]; then
+                services_total=$((services_total + 1))
+                if [[ "$line" =~ ^ok:.*run: ]]; then
+                    services_up=$((services_up + 1))
+                    echo "  ✅ $line"
+                else
+                    echo "  ❌ $line"
+                fi
+            fi
+        done <<< "$status_output"
+        
+        if [[ $services_up -eq $services_total && $services_total -gt 0 ]]; then
+            echo -e "${GREEN}  ✅ Todos os serviços estão rodando normalmente${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}  ⚠️  $services_up de $services_total serviços rodando${NC}"
+            return 1
+        fi
+    else
+        echo -e "${RED}  ❌ Não foi possível verificar o status dos serviços${NC}"
+        return 2
+    fi
+}
+
 # Função para listar arquivos que seriam limpos
 list_files_to_clean() {
-    echo -e "${BLUE}=== ANÁLISE DE LOGS ===${NC}"
+    echo -e "${BLUE}=== ANÁLISE DE LOGS (MODO SEGURO) ===${NC}"
+    
+    # Verificar status dos serviços primeiro
+    check_services_status
+    echo ""
     
     if [[ "$CLEAN_SYSTEM" == true ]]; then
-        echo -e "\n${CYAN}Logs de Sistema do Morpheus:${NC}"
-        local total_size=0
+        echo -e "${CYAN}Logs de Sistema do Morpheus (apenas arquivos arquivados):${NC}"
+        local total_archived_size=0
+        local total_current_size=0
         
         for service in morpheus-ui elasticsearch mysql nginx rabbitmq check-server guacd; do
             local service_dir="$MORPHEUS_LOG_DIR/$service"
             if [[ -d "$service_dir" ]]; then
-                local size=$(calculate_log_size "$service_dir")
-                echo "  📁 $service/ - Tamanho: $size"
+                local service_size=$(calculate_log_size "$service_dir")
+                echo "  📁 $service/ - Tamanho total: $service_size"
                 
-                # Listar arquivo current
+                # Listar arquivo current (MANTIDO)
                 if [[ -f "$service_dir/current" ]]; then
                     local current_size=$(du -sh "$service_dir/current" 2>/dev/null | cut -f1)
-                    echo "    📄 current - $current_size (será truncado)"
+                    echo "    📄 current - $current_size ${GREEN}(MANTIDO)${NC}"
                 fi
                 
-                # Listar arquivos arquivados
-                local archived_count=$(find "$service_dir" -name "*.log.*" -o -name "@*" 2>/dev/null | wc -l)
-                if [[ $archived_count -gt 0 ]]; then
-                    echo "    🗂️  $archived_count arquivo(s) arquivado(s) (serão removidos)"
+                # Listar arquivos arquivados (REMOVIDOS)
+                local archived_files=$(find "$service_dir" -type f \( -name "*.log.*" -o -name "@*" \) -not -name "current" 2>/dev/null)
+                if [[ -n "$archived_files" ]]; then
+                    local archived_count=$(echo "$archived_files" | wc -l)
+                    local archived_size=$(calculate_files_size "$archived_files")
+                    echo "    🗂️  $archived_count arquivo(s) arquivado(s) - $archived_size ${RED}(SERÃO REMOVIDOS)${NC}"
+                    
+                    # Mostrar alguns exemplos se houver muitos arquivos
+                    if [[ $archived_count -gt 5 ]]; then
+                        echo "        Exemplos:"
+                        echo "$archived_files" | head -3 | while read -r file; do
+                            if [[ -n "$file" ]]; then
+                                local filename=$(basename "$file")
+                                local filesize=$(du -sh "$file" 2>/dev/null | cut -f1)
+                                echo "        - $filename ($filesize)"
+                            fi
+                        done
+                        if [[ $archived_count -gt 3 ]]; then
+                            echo "        ... e mais $((archived_count - 3)) arquivo(s)"
+                        fi
+                    else
+                        echo "$archived_files" | while read -r file; do
+                            if [[ -n "$file" ]]; then
+                                local filename=$(basename "$file")
+                                local filesize=$(du -sh "$file" 2>/dev/null | cut -f1)
+                                echo "        - $filename ($filesize)"
+                            fi
+                        done
+                    fi
+                else
+                    echo "    ✅ Nenhum arquivo arquivado para remover"
                 fi
             fi
         done
@@ -189,9 +278,11 @@ list_files_to_clean() {
         if curl -s "localhost:9200/_cluster/health" &>/dev/null; then
             local indices=$(curl -s "localhost:9200/_cat/indices/morpheus-*?h=index,store.size" 2>/dev/null)
             if [[ -n "$indices" ]]; then
+                local indices_count=$(echo "$indices" | wc -l)
+                echo "  📊 $indices_count índice(s) encontrado(s):"
                 echo "$indices" | while read -r line; do
                     if [[ -n "$line" ]]; then
-                        echo "  📊 $line (será removido)"
+                        echo "    - $line ${RED}(SERÁ REMOVIDO)${NC}"
                     fi
                 done
             else
@@ -201,6 +292,12 @@ list_files_to_clean() {
             echo "  ⚠️  Elasticsearch não está acessível - não é possível verificar índices"
         fi
     fi
+    
+    echo -e "\n${MAGENTA}💡 MODO SEGURO ATIVO:${NC}"
+    echo -e "${MAGENTA}   • Serviços continuarão rodando durante a limpeza${NC}"
+    echo -e "${MAGENTA}   • Arquivos 'current' serão mantidos intactos${NC}"
+    echo -e "${MAGENTA}   • Sem risco de corrupção do supervise${NC}"
+    echo -e "${MAGENTA}   • Sem necessidade de reinicialização${NC}"
 }
 
 # Função para confirmar ação
@@ -209,7 +306,8 @@ confirm_action() {
         return 0
     fi
     
-    echo -e "\n${YELLOW}⚠️  Esta ação irá limpar os logs permanentemente!${NC}"
+    echo -e "\n${YELLOW}ℹ️  Esta ação irá remover apenas arquivos arquivados (modo seguro)${NC}"
+    echo -e "${GREEN}✅ Serviços continuarão rodando normalmente${NC}"
     read -p "Deseja continuar? (s/N): " confirm
     
     if [[ ! "$confirm" =~ ^[sS]$ ]]; then
@@ -218,86 +316,67 @@ confirm_action() {
     fi
 }
 
-# Função para parar serviços Morpheus
-stop_morpheus_services() {
-    echo -e "${BLUE}Parando serviços do Morpheus...${NC}"
-    
-    if [[ "$DRY_RUN" == false ]]; then
-        morpheus-ctl stop
-        
-        # Aguardar serviços pararem
-        local timeout=60
-        local count=0
-        while [[ $count -lt $timeout ]]; do
-            if ! morpheus-ctl status | grep -q "run:"; then
-                break
-            fi
-            sleep 2
-            count=$((count + 2))
-        done
-        
-        if [[ $count -ge $timeout ]]; then
-            echo -e "${YELLOW}Aviso: Alguns serviços podem ainda estar rodando${NC}"
-        else
-            echo -e "${GREEN}Serviços parados com sucesso${NC}"
-        fi
-    else
-        echo -e "${YELLOW}[DRY-RUN] morpheus-ctl stop${NC}"
-    fi
-}
-
-# Função para iniciar serviços Morpheus
-start_morpheus_services() {
-    echo -e "${BLUE}Iniciando serviços do Morpheus...${NC}"
-    
-    if [[ "$DRY_RUN" == false ]]; then
-        morpheus-ctl start
-        echo -e "${GREEN}Serviços iniciados${NC}"
-        echo -e "${CYAN}Use 'morpheus-ctl tail morpheus-ui' para monitorar a inicialização${NC}"
-    else
-        echo -e "${YELLOW}[DRY-RUN] morpheus-ctl start${NC}"
-    fi
-}
-
-# Função para limpar logs de sistema
-clean_system_logs() {
-    echo -e "\n${BLUE}=== LIMPANDO LOGS DE SISTEMA ===${NC}"
+# Função para limpar logs de sistema (modo seguro)
+clean_system_logs_safe() {
+    echo -e "\n${BLUE}=== LIMPANDO LOGS DE SISTEMA (MODO SEGURO) ===${NC}"
+    echo -e "${GREEN}ℹ️  Limpeza será feita sem parar os serviços${NC}"
     
     local services=("morpheus-ui" "elasticsearch" "mysql" "nginx" "rabbitmq" "check-server" "guacd")
+    local total_files_removed=0
+    local total_size_freed="0"
     
     for service in "${services[@]}"; do
         local service_dir="$MORPHEUS_LOG_DIR/$service"
         
         if [[ -d "$service_dir" ]]; then
-            echo -e "${CYAN}Limpando logs de $service...${NC}"
+            echo -e "${CYAN}Limpando logs arquivados de $service...${NC}"
             
-            # Truncar arquivo current
-            if [[ -f "$service_dir/current" ]]; then
-                if [[ "$DRY_RUN" == false ]]; then
-                    truncate -s 0 "$service_dir/current"
-                    echo "  ✅ current truncado"
-                else
-                    echo -e "${YELLOW}  [DRY-RUN] truncate -s 0 $service_dir/current${NC}"
-                fi
-            fi
+            # Encontrar apenas arquivos arquivados (NÃO o current)
+            local archived_files=$(find "$service_dir" -type f \( -name "*.log.*" -o -name "@*" \) -not -name "current" 2>/dev/null)
             
-            # Remover arquivos arquivados
-            local archived_files=$(find "$service_dir" -type f \( -name "*.log.*" -o -name "@*" \) 2>/dev/null)
             if [[ -n "$archived_files" ]]; then
                 local count=$(echo "$archived_files" | wc -l)
+                local size_before=""
+                
                 if [[ "$DRY_RUN" == false ]]; then
-                    echo "$archived_files" | xargs rm -f
-                    echo "  ✅ $count arquivo(s) arquivado(s) removido(s)"
+                    # Calcular tamanho antes da remoção
+                    size_before=$(calculate_files_size "$archived_files")
+                    
+                    # Remover arquivos
+                    echo "$archived_files" | xargs rm -f 2>/dev/null
+                    
+                    if [[ $? -eq 0 ]]; then
+                        echo "    ✅ $count arquivo(s) arquivado(s) removido(s) - $size_before liberados"
+                        total_files_removed=$((total_files_removed + count))
+                    else
+                        echo "    ❌ Erro ao remover alguns arquivos"
+                    fi
                 else
-                    echo -e "${YELLOW}  [DRY-RUN] $count arquivo(s) arquivado(s) seriam removidos${NC}"
+                    size_before=$(calculate_files_size "$archived_files")
+                    echo -e "${YELLOW}    [DRY-RUN] $count arquivo(s) arquivado(s) seriam removidos - $size_before seriam liberados${NC}"
                 fi
+            else
+                echo "    ℹ️  Nenhum arquivo arquivado para remover"
+            fi
+            
+            # Verificar se o arquivo current existe e está sendo usado
+            if [[ -f "$service_dir/current" ]]; then
+                local current_size=$(du -sh "$service_dir/current" 2>/dev/null | cut -f1)
+                echo "    📄 current mantido intacto - $current_size"
             fi
         else
             echo -e "${YELLOW}  ⚠️  Diretório $service não encontrado${NC}"
         fi
     done
     
-    echo -e "${GREEN}Limpeza de logs de sistema concluída${NC}"
+    if [[ "$DRY_RUN" == false ]]; then
+        echo -e "\n${GREEN}✅ Limpeza segura concluída:${NC}"
+        echo -e "${GREEN}   • $total_files_removed arquivo(s) removido(s)${NC}"
+        echo -e "${GREEN}   • Serviços não foram interrompidos${NC}"
+        echo -e "${GREEN}   • Sistema supervise mantido estável${NC}"
+    else
+        echo -e "\n${YELLOW}🔍 Simulação concluída (dry-run)${NC}"
+    fi
 }
 
 # Função para limpar logs do Elasticsearch
@@ -319,17 +398,21 @@ clean_elasticsearch_logs() {
         
         if [[ "$DRY_RUN" == false ]]; then
             # Remover todos os índices morpheus-*
-            curl -s -X DELETE "localhost:9200/morpheus-*" &>/dev/null
+            local result=$(curl -s -X DELETE "localhost:9200/morpheus-*" 2>/dev/null)
             
             if [[ $? -eq 0 ]]; then
                 echo -e "${GREEN}  ✅ Índices removidos com sucesso${NC}"
+                echo -e "${GREEN}     Todos os logs de instâncias foram limpos${NC}"
             else
                 echo -e "${RED}  ❌ Erro ao remover índices${NC}"
+                echo -e "${RED}     Detalhes: $result${NC}"
             fi
         else
             echo -e "${YELLOW}  [DRY-RUN] curl -X DELETE localhost:9200/morpheus-*${NC}"
             echo "$indices" | while read -r index; do
-                echo -e "${YELLOW}    - $index${NC}"
+                if [[ -n "$index" ]]; then
+                    echo -e "${YELLOW}    - $index${NC}"
+                fi
             done
         fi
     else
@@ -339,22 +422,36 @@ clean_elasticsearch_logs() {
 
 # Função para mostrar resumo final
 show_summary() {
-    echo -e "\n${GREEN}=== RESUMO DA LIMPEZA ===${NC}"
+    echo -e "\n${GREEN}=== RESUMO DA LIMPEZA SEGURA ===${NC}"
     
     if [[ "$CLEAN_SYSTEM" == true ]]; then
         local system_size=$(calculate_log_size "$MORPHEUS_LOG_DIR")
-        echo -e "${GREEN}✅ Logs de sistema limpos - Tamanho atual: $system_size${NC}"
+        echo -e "${GREEN}✅ Logs de sistema limpos (modo seguro)${NC}"
+        echo -e "${GREEN}   • Tamanho atual do diretório: $system_size${NC}"
+        echo -e "${GREEN}   • Arquivos 'current' mantidos intactos${NC}"
+        echo -e "${GREEN}   • Serviços não foram interrompidos${NC}"
     fi
     
     if [[ "$CLEAN_ELASTICSEARCH" == true ]]; then
         echo -e "${GREEN}✅ Logs do Elasticsearch limpos${NC}"
+        echo -e "${GREEN}   • Todos os índices morpheus-* removidos${NC}"
+    fi
+    
+    # Verificar status final dos serviços
+    echo -e "\n${CYAN}Verificação final dos serviços:${NC}"
+    if check_services_status; then
+        echo -e "${GREEN}✅ Todos os serviços continuam funcionando normalmente${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Alguns serviços podem precisar de atenção${NC}"
     fi
     
     if [[ "$DRY_RUN" == true ]]; then
         echo -e "\n${YELLOW}ℹ️  Esta foi uma execução de teste (dry-run)${NC}"
         echo -e "${YELLOW}   Execute novamente sem --dry-run para aplicar as mudanças${NC}"
     else
-        echo -e "\n${CYAN}ℹ️  Aguarde a inicialização completa dos serviços antes de acessar a UI${NC}"
+        echo -e "\n${MAGENTA}🎉 Limpeza segura concluída com sucesso!${NC}"
+        echo -e "${CYAN}ℹ️  Não há necessidade de reinicializar serviços${NC}"
+        echo -e "${CYAN}ℹ️  O Morpheus continua funcionando normalmente${NC}"
     fi
 }
 
@@ -406,7 +503,8 @@ main() {
         exit 1
     fi
     
-    echo -e "${BLUE}=== LIMPEZA DE LOGS DO MORPHEUS DATA ENTERPRISE ===${NC}"
+    echo -e "${BLUE}=== LIMPEZA SEGURA DE LOGS DO MORPHEUS DATA ENTERPRISE ===${NC}"
+    echo -e "${MAGENTA}🛡️  MODO SEGURO: Serviços não serão interrompidos${NC}"
     
     # Mostrar análise dos arquivos
     list_files_to_clean
@@ -416,23 +514,13 @@ main() {
         confirm_action
     fi
     
-    # Parar serviços se necessário
-    if [[ "$CLEAN_SYSTEM" == true && "$DRY_RUN" == false ]]; then
-        stop_morpheus_services
-    fi
-    
-    # Executar limpeza
+    # Executar limpeza (sem parar serviços)
     if [[ "$CLEAN_SYSTEM" == true ]]; then
-        clean_system_logs
+        clean_system_logs_safe
     fi
     
     if [[ "$CLEAN_ELASTICSEARCH" == true ]]; then
         clean_elasticsearch_logs
-    fi
-    
-    # Reiniciar serviços se necessário
-    if [[ "$CLEAN_SYSTEM" == true && "$DRY_RUN" == false ]]; then
-        start_morpheus_services
     fi
     
     # Mostrar resumo
