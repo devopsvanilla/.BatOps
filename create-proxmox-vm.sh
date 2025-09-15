@@ -194,45 +194,8 @@ qm set "$VMID" --ipconfig0 "ip=$VM_IP/$NETMASK,gw=$GATEWAY"
 # Configurar DNS
 qm set "$VMID" --nameserver "$DNS1 $DNS2"
 
-# Configurar usuário e senha
 log_info "Configurando usuário: $VM_USER"
 qm set "$VMID" --ciuser "$VM_USER" --cipassword "$VM_PASSWORD"
-
-# Configurar para habilitar autenticação por senha (Ubuntu 24.04 issue fix)
-log_info "Criando configuração customizada para habilitar SSH com senha..."
-cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
-#cloud-config
-ssh_pwauth: true
-disable_root: false
-users:
-    - name: $VM_USER
-        plain_text_passwd: "$VM_PASSWORD"
-        shell: /bin/bash
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        groups: [sudo]
-chpasswd:
-    expire: false
-write_files:
-  - path: /etc/ssh/sshd_config.d/99-cloud-init.conf
-    content: |
-      PasswordAuthentication yes
-      PermitRootLogin yes
-package_upgrade: true
-packages:
-    - qemu-guest-agent
-runcmd:
-    - systemctl enable qemu-guest-agent
-    - systemctl start qemu-guest-agent
-    - sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    - sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    - grep -q '^PasswordAuthentication yes' /etc/ssh/sshd_config || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
-    - systemctl restart sshd
-	- systemctl enable qemu-guest-agent
-  	- systemctl start qemu-guest-agent
-EOF
-
-# Aplicar configuração customizada
-qm set "$VMID" --cicustom "user=local:snippets/$VM_NAME-user.yaml"
 
 # Habilitar QEMU Guest Agent
 log_info "Habilitando QEMU Guest Agent..."
