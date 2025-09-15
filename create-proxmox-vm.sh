@@ -59,7 +59,7 @@ DEFAULT_VM_CORES="2"
 DEFAULT_VM_DISK_SIZE="20G"
 DEFAULT_CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
 DEFAULT_VM_USER="devopsvanila"
-DEFAULT_VM_PASSWORD="AbCdEf1@3$5^"
+DEFAULT_VM_PASSWORD="AbCdEf1@3$"
 
 # Parâmetros do script
 VM_NAME="$1"
@@ -221,9 +221,11 @@ packages:
 runcmd:
     - systemctl enable qemu-guest-agent
     - systemctl start qemu-guest-agent
-    - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    - sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    - sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    - grep -q '^PasswordAuthentication yes' /etc/ssh/sshd_config || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
     - systemctl restart sshd
+    - echo "Usuário $VM_USER criado e senha definida. SSH por senha habilitado."
 EOF
 
 # Aplicar configuração customizada
