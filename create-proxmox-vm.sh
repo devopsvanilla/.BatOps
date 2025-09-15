@@ -6,6 +6,22 @@
 
 set -e  # Parar script em caso de erro
 
+# =====================
+# VALORES PADRÃO
+# =====================
+DEFAULT_GATEWAY="192.168.1.1"
+DEFAULT_DNS1="8.8.8.8"
+DEFAULT_DNS2="8.8.4.4"
+DEFAULT_NETMASK="24"
+DEFAULT_VM_STORAGE="local-lvm"
+DEFAULT_VM_BRIDGE="vmbr0"
+DEFAULT_VM_MEMORY="2048"
+DEFAULT_VM_CORES="2"
+DEFAULT_VM_DISK_SIZE="20G"
+DEFAULT_CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+DEFAULT_VM_USER="devopsvanilla"
+DEFAULT_VM_PASSWORD="AbCdEf1@3$"
+
 # Cores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -42,24 +58,6 @@ if [ $# -ne 2 ]; then
     echo "Exemplo: $0 minha-vm 192.168.1.100"
     exit 1
 fi
-
-
-
-# =====================
-# VALORES PADRÃO
-# =====================
-DEFAULT_GATEWAY="192.168.1.1"
-DEFAULT_DNS1="8.8.8.8"
-DEFAULT_DNS2="8.8.4.4"
-DEFAULT_NETMASK="24"
-DEFAULT_VM_STORAGE="local-lvm"
-DEFAULT_VM_BRIDGE="vmbr0"
-DEFAULT_VM_MEMORY="2048"
-DEFAULT_VM_CORES="2"
-DEFAULT_VM_DISK_SIZE="20G"
-DEFAULT_CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-DEFAULT_VM_USER="devopsvanilla"
-DEFAULT_VM_PASSWORD="AbCdEf1@3$"
 
 # Parâmetros do script
 VM_NAME="$1"
