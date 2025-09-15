@@ -212,6 +212,11 @@ users:
         groups: [sudo]
 chpasswd:
     expire: false
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-cloud-init.conf
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin yes
 package_upgrade: true
 packages:
     - qemu-guest-agent
@@ -222,6 +227,8 @@ runcmd:
     - sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
     - grep -q '^PasswordAuthentication yes' /etc/ssh/sshd_config || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
     - systemctl restart sshd
+	- systemctl enable qemu-guest-agent
+  	- systemctl start qemu-guest-agent
 EOF
 
 # Aplicar configuração customizada
