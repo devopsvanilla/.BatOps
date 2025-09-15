@@ -194,8 +194,32 @@ qm set "$VMID" --ipconfig0 "ip=$VM_IP/$NETMASK,gw=$GATEWAY"
 # Configurar DNS
 qm set "$VMID" --nameserver "$DNS1 $DNS2"
 
+
+# Selecionar chave pública SSH
+PUB_KEYS=(~/.ssh/*.pub)
+echo "Chaves públicas disponíveis em ~/.ssh:"
+select KEY_PATH in "${PUB_KEYS[@]}"; do
+    if [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
+        SSH_KEY_CONTENT=$(<"$KEY_PATH")
+        break
+    else
+        echo "Seleção inválida. Tente novamente."
+    fi
+done
+
 log_info "Configurando usuário: $VM_USER"
 qm set "$VMID" --ciuser "$VM_USER" --cipassword "$VM_PASSWORD"
+
+# Gerar cloud-init customizado com chave SSH
+log_info "Adicionando chave pública SSH ao cloud-init..."
+cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
+#cloud-config
+ssh_authorized_keys:
+  - $SSH_KEY_CONTENT
+EOF
+
+# Aplicar configuração customizada
+qm set "$VMID" --cicustom "user=local:snippets/$VM_NAME-user.yaml"
 
 # Habilitar QEMU Guest Agent
 log_info "Habilitando QEMU Guest Agent..."
