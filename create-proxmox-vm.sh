@@ -4,7 +4,7 @@
 # Uso: ./create-vm.sh <nome_vm> <ip_static>
 # Exemplo: ./create-vm.sh minha-vm 192.168.1.100
 
-set -e  # Parar script em caso de erro
+set -e # Parar script em caso de erro
 
 # =====================
 # VALORES PADRÃO
@@ -48,8 +48,8 @@ log_error() {
 
 # Verificar se foi executado como root
 if [[ $EUID -ne 0 ]]; then
-   log_error "Este script deve ser executado como root"
-   exit 1
+    log_error "Este script deve ser executado como root"
+    exit 1
 fi
 
 # Verificar argumentos
@@ -69,6 +69,7 @@ GATEWAY=${GATEWAY:-$DEFAULT_GATEWAY}
 
 read -rp "DNS primário [default: $DEFAULT_DNS1]: " DNS1
 DNS1=${DNS1:-$DEFAULT_DNS1}
+
 read -rp "DNS secundário [default: $DEFAULT_DNS2]: " DNS2
 DNS2=${DNS2:-$DEFAULT_DNS2}
 
@@ -194,28 +195,129 @@ qm set "$VMID" --ipconfig0 "ip=$VM_IP/$NETMASK,gw=$GATEWAY"
 # Configurar DNS
 qm set "$VMID" --nameserver "$DNS1 $DNS2"
 
-
-# Selecionar chave pública SSH
-PUB_KEYS=(~/.ssh/*.pub)
-echo "Chaves públicas disponíveis em ~/.ssh:"
-select KEY_PATH in "${PUB_KEYS[@]}"; do
-    if [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
-        SSH_KEY_CONTENT=$(<"$KEY_PATH")
-        break
-    else
-        echo "Seleção inválida. Tente novamente."
-    fi
-done
-
+# Configurar usuário e senha via Proxmox cloud-init
 log_info "Configurando usuário: $VM_USER"
 qm set "$VMID" --ciuser "$VM_USER" --cipassword "$VM_PASSWORD"
 
-# Gerar cloud-init customizado com chave SSH
-log_info "Adicionando chave pública SSH ao cloud-init..."
+# Selecionar chave pública SSH
+echo
+echo "=== CONFIGURAÇÃO SSH ==="
+echo "1) Usar chave SSH existente"
+echo "2) Pular configuração SSH (apenas senha)"
+read -rp "Escolha uma opção [1-2]: " SSH_OPTION
+
+SSH_KEY_CONTENT=""
+if [[ "$SSH_OPTION" == "1" ]]; then
+    PUB_KEYS=(~/.ssh/*.pub)
+    if [ ${#PUB_KEYS[@]} -eq 0 ] || [ ! -f "${PUB_KEYS[0]}" ]; then
+        log_warning "Nenhuma chave SSH encontrada em ~/.ssh/"
+        log_info "Continuando apenas com autenticação por senha"
+    else
+        echo "Chaves públicas disponíveis:"
+        select KEY_PATH in "${PUB_KEYS[@]}" "Pular SSH"; do
+            if [[ "$KEY_PATH" == "Pular SSH" ]]; then
+                log_info "SSH por chave pulado"
+                break
+            elif [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
+                SSH_KEY_CONTENT=$(<"$KEY_PATH")
+                log_success "Chave SSH selecionada: $KEY_PATH"
+                break
+            else
+                echo "Seleção inválida. Tente novamente."
+            fi
+        done
+    fi
+fi
+
+# Criar cloud-init customizado completo
+log_info "Criando configuração cloud-init customizada..."
 cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
 #cloud-config
-ssh_authorized_keys:
-  - $SSH_KEY_CONTENT
+# Configuração completa para Ubuntu 24.04 Noble
+ssh_pwauth: true
+disable_root: false
+chpasswd:
+  expire: false
+
+# Usuário principal
+users:
+  - name: $VM_USER
+    passwd: \$(openssl passwd -6 "$VM_PASSWORD")
+    lock_passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
+    ssh_authorized_keys:
+      - $SSH_KEY_CONTENT"; fi)
+
+# Garantir que o usuário ubuntu padrão também funcione
+  - name: ubuntu
+    passwd: \$(openssl passwd -6 "$VM_PASSWORD")
+    lock_passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
+    ssh_authorized_keys:
+      - $SSH_KEY_CONTENT"; fi)
+
+# Instalar pacotes necessários
+package_upgrade: true
+packages:
+  - qemu-guest-agent
+  - cloud-init
+  - openssh-server
+  - curl
+  - wget
+  - vim
+  - htop
+
+# Comandos de configuração
+runcmd:
+  # Configurar QEMU Guest Agent
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  
+  # Configurar SSH para permitir senha E chave
+  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  
+  # Garantir que cloud-init esteja habilitado
+  - systemctl enable cloud-init-local
+  - systemctl enable cloud-init
+  - systemctl enable cloud-config
+  - systemctl enable cloud-final
+  
+  # Reiniciar SSH
+  - systemctl restart sshd
+  
+  # Atualizar sistema
+  - apt update
+  - apt upgrade -y
+  
+  # Limpeza final
+  - apt autoremove -y
+  - apt autoclean
+
+# Configuração de timezone
+timezone: America/Sao_Paulo
+
+# Configuração de locale
+locale: pt_BR.UTF-8
+
+# Configurações finais
+final_message: |
+  Sistema Ubuntu 24.04 configurado com sucesso!
+  
+  Usuário: $VM_USER
+  IP: $VM_IP
+  
+  Acesso SSH:
+  - ssh $VM_USER@$VM_IP (com senha)$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
+  - ssh -i chave_privada $VM_USER@$VM_IP (com chave)"; fi)
+  
+  Sistema pronto para uso!
 EOF
 
 # Aplicar configuração customizada
@@ -227,6 +329,9 @@ qm set "$VMID" --agent enabled=1,fstrim_cloned_disks=1
 
 # Configurar VGA para evitar problemas de console
 qm set "$VMID" --vga qxl
+
+# Configurar console serial
+qm set "$VMID" --serial0 socket --vga serial0
 
 # Regenerar imagem cloud-init
 log_info "Regenerando configuração cloud-init..."
@@ -249,14 +354,21 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo
         echo "=== INFORMAÇÕES DA VM ==="
         echo "Nome: $VM_NAME"
-        echo "VMID: $VMID"
+        echo "VMID: $VMID" 
         echo "IP: $VM_IP"
         echo "Usuário: $VM_USER"
         echo "Senha: $VM_PASSWORD"
         echo "=========================="
         echo
-    log_info "Para conectar via SSH: ssh $VM_USER@$VM_IP"
-        log_warning "Aguarde alguns minutos para o cloud-init terminar a configuração"
+        log_info "Opções de conexão SSH:"
+        log_info "1) Com senha: ssh $VM_USER@$VM_IP"
+        if [[ -n "$SSH_KEY_CONTENT" ]]; then
+            log_info "2) Com chave: ssh -i ~/.ssh/chave_privada $VM_USER@$VM_IP"
+        fi
+        log_info "3) Usuário ubuntu: ssh ubuntu@$VM_IP (mesma senha)"
+        echo
+        log_warning "IMPORTANTE: Aguarde 3-5 minutos para o cloud-init terminar completamente"
+        log_warning "Se não conseguir conectar imediatamente, aguarde mais alguns minutos"
     else
         log_error "Erro ao iniciar a VM"
     fi
@@ -274,4 +386,15 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     log_info "Imagem cloud removida"
 fi
 
+echo
 log_success "Script concluído!"
+echo
+log_info "RESUMO DA CONFIGURAÇÃO:"
+echo "- VM criada com cloud-init completo"
+echo "- Autenticação por SENHA habilitada"
+if [[ -n "$SSH_KEY_CONTENT" ]]; then
+    echo "- Autenticação por CHAVE SSH habilitada"
+fi
+echo "- Usuários criados: $VM_USER e ubuntu"
+echo "- Cloud-init instalado e configurado"
+echo "- QEMU Guest Agent habilitado"
