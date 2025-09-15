@@ -508,8 +508,41 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     log_info "Imagem cloud removida"
 fi
 
+
 echo
 log_success "Script concluído!"
+echo
+log_info "RESUMO DA VM CRIADA:"
+echo "----------------------------------------"
+echo "Nome da VM: $VM_NAME"
+echo "VMID: $VMID"
+echo "IP: $VM_IP"
+echo "Usuário principal: $VM_USER"
+echo "Senha: $VM_PASSWORD"
+echo "Usuário adicional: ubuntu (mesma senha)"
+echo "Memória RAM: $VM_MEMORY MB"
+echo "Cores de CPU: $VM_CORES"
+echo "Tamanho do disco: $VM_DISK_SIZE"
+echo "Bridge de rede: $VM_BRIDGE"
+echo "Storage: $VM_STORAGE"
+echo "Imagem cloud: $CLOUD_IMAGE_URL"
+echo "----------------------------------------"
+echo
+log_info "Formas de acesso SSH à VM:"
+echo "1) Acesso por senha (recomendado para primeiros testes):"
+echo "   ssh $VM_USER@$VM_IP"
+echo "   senha: $VM_PASSWORD"
+if [[ "$SSH_OPTION" == "1" ]]; then
+    echo "2) Acesso por chave SSH (se configurado):"
+    echo "   ssh -i <caminho_da_chave_privada> $VM_USER@$VM_IP"
+    echo "   (use a chave privada correspondente à pública selecionada)"
+fi
+echo "3) Usuário adicional 'ubuntu':"
+echo "   ssh ubuntu@$VM_IP"
+echo "   senha: $VM_PASSWORD"
+echo
+log_info "IMPORTANTE: Aguarde 3-5 minutos para o cloud-init finalizar completamente antes de acessar por SSH."
+log_info "Se não conseguir conectar imediatamente, aguarde mais alguns minutos."
 echo
 log_info "RESUMO DA CONFIGURAÇÃO:"
 echo "- VM criada com cloud-init completo"
