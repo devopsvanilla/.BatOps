@@ -207,16 +207,20 @@ echo "2) Pular configuração SSH (apenas senha)"
 read -rp "Escolha uma opção [1-2]: " SSH_OPTION
 
 SSH_KEY_CONTENT=""
+
+# CONFIGURAÇÃO COM CHAVE SSH
 if [[ "$SSH_OPTION" == "1" ]]; then
     PUB_KEYS=(~/.ssh/*.pub)
     if [ ${#PUB_KEYS[@]} -eq 0 ] || [ ! -f "${PUB_KEYS[0]}" ]; then
         log_warning "Nenhuma chave SSH encontrada em ~/.ssh/"
         log_info "Continuando apenas com autenticação por senha"
+        SSH_OPTION="2"
     else
         echo "Chaves públicas disponíveis:"
         select KEY_PATH in "${PUB_KEYS[@]}" "Pular SSH"; do
             if [[ "$KEY_PATH" == "Pular SSH" ]]; then
                 log_info "SSH por chave pulado"
+                SSH_OPTION="2"
                 break
             elif [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
                 SSH_KEY_CONTENT=$(<"$KEY_PATH")
@@ -229,11 +233,17 @@ if [[ "$SSH_OPTION" == "1" ]]; then
     fi
 fi
 
-# Criar cloud-init customizado completo
-log_info "Criando configuração cloud-init customizada..."
-cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
+# Gerar hash da senha ANTES de criar o arquivo cloud-init
+PASSWORD_HASH=$(openssl passwd -6 "$VM_PASSWORD")
+
+# CONFIGURAÇÃO APENAS COM SENHA (OPÇÃO 2 - CORREÇÃO IMPLEMENTADA)
+if [[ "$SSH_OPTION" == "2" ]]; then
+    log_info "Configuração apenas com usuário e senha selecionada"
+    log_info "Criando configuração cloud-init otimizada para senha..."
+
+    cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
 #cloud-config
-# Configuração completa para Ubuntu 24.04 Noble
+# Configuração otimizada para Ubuntu 24.04 Noble - Apenas senha
 ssh_pwauth: true
 disable_root: false
 chpasswd:
@@ -242,23 +252,19 @@ chpasswd:
 # Usuário principal
 users:
   - name: $VM_USER
-    passwd: \$(openssl passwd -6 "$VM_PASSWORD")
+    passwd: $PASSWORD_HASH
     lock_passwd: false
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
-    ssh_authorized_keys:
-      - $SSH_KEY_CONTENT"; fi)
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]
 
 # Garantir que o usuário ubuntu padrão também funcione
   - name: ubuntu
-    passwd: \$(openssl passwd -6 "$VM_PASSWORD")
+    passwd: $PASSWORD_HASH
     lock_passwd: false
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
-    ssh_authorized_keys:
-      - $SSH_KEY_CONTENT"; fi)
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]
 
 # Instalar pacotes necessários
 package_upgrade: true
@@ -277,11 +283,23 @@ runcmd:
   - systemctl enable qemu-guest-agent
   - systemctl start qemu-guest-agent
   
-  # Configurar SSH para permitir senha E chave
+  # FORÇAR configuração SSH para Ubuntu 24.04 - apenas senha
+  - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - chmod 600 /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - chmod 600 /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  
+  # Garantir configuração no arquivo principal
   - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  
+  # Garantir senhas dos usuários (backup)
+  - echo "$VM_USER:$VM_PASSWORD" | chpasswd
+  - echo "ubuntu:$VM_PASSWORD" | chpasswd
   
   # Garantir que cloud-init esteja habilitado
   - systemctl enable cloud-init-local
@@ -290,7 +308,112 @@ runcmd:
   - systemctl enable cloud-final
   
   # Reiniciar SSH
-  - systemctl restart sshd
+  - systemctl restart ssh
+  - sleep 5
+  
+  # Atualizar sistema
+  - apt update
+  - apt upgrade -y
+  
+  # Limpeza final
+  - apt autoremove -y
+  - apt autoclean
+
+# Configuração de timezone
+timezone: America/Sao_Paulo
+
+# Configuração de locale
+locale: pt_BR.UTF-8
+
+# Configurações finais
+final_message: |
+  Sistema Ubuntu 24.04 configurado com sucesso!
+  
+  Usuário: $VM_USER
+  IP: $VM_IP
+  
+  Acesso SSH e Console habilitados com senha!
+  
+  Sistema pronto para uso!
+EOF
+
+# CONFIGURAÇÃO COM CHAVE SSH (OPÇÃO 1)
+else
+    log_info "Criando configuração cloud-init com chave SSH e senha..."
+
+    cat > "/var/lib/vz/snippets/$VM_NAME-user.yaml" << EOF
+#cloud-config
+# Configuração completa para Ubuntu 24.04 Noble - SSH + Senha
+ssh_pwauth: true
+disable_root: false
+chpasswd:
+  expire: false
+
+# Usuário principal
+users:
+  - name: $VM_USER
+    passwd: $PASSWORD_HASH
+    lock_passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]
+    ssh_authorized_keys:
+      - $SSH_KEY_CONTENT
+
+# Garantir que o usuário ubuntu padrão também funcione
+  - name: ubuntu
+    passwd: $PASSWORD_HASH
+    lock_passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, adm, dialout, cdrom, floppy, audio, dip, video, plugdev, netdev, lxd]
+    ssh_authorized_keys:
+      - $SSH_KEY_CONTENT
+
+# Instalar pacotes necessários
+package_upgrade: true
+packages:
+  - qemu-guest-agent
+  - cloud-init
+  - openssh-server
+  - curl
+  - wget
+  - vim
+  - htop
+
+# Comandos de configuração
+runcmd:
+  # Configurar QEMU Guest Agent
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  
+  # FORÇAR configuração SSH para Ubuntu 24.04 - senha e chave
+  - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - chmod 600 /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - chmod 600 /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  
+  # Garantir configuração no arquivo principal
+  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  
+  # Garantir senhas dos usuários (backup)
+  - echo "$VM_USER:$VM_PASSWORD" | chpasswd
+  - echo "ubuntu:$VM_PASSWORD" | chpasswd
+  
+  # Garantir que cloud-init esteja habilitado
+  - systemctl enable cloud-init-local
+  - systemctl enable cloud-init
+  - systemctl enable cloud-config
+  - systemctl enable cloud-final
+  
+  # Reiniciar SSH
+  - systemctl restart ssh
+  - sleep 5
   
   # Atualizar sistema
   - apt update
@@ -314,11 +437,12 @@ final_message: |
   IP: $VM_IP
   
   Acesso SSH:
-  - ssh $VM_USER@$VM_IP (com senha)$(if [[ -n "$SSH_KEY_CONTENT" ]]; then echo "
-  - ssh -i chave_privada $VM_USER@$VM_IP (com chave)"; fi)
+  - ssh $VM_USER@$VM_IP (com senha)
+  - ssh -i chave_privada $VM_USER@$VM_IP (com chave)
   
   Sistema pronto para uso!
 EOF
+fi
 
 # Aplicar configuração customizada
 qm set "$VMID" --cicustom "user=local:snippets/$VM_NAME-user.yaml"
@@ -327,7 +451,7 @@ qm set "$VMID" --cicustom "user=local:snippets/$VM_NAME-user.yaml"
 log_info "Habilitando QEMU Guest Agent..."
 qm set "$VMID" --agent enabled=1,fstrim_cloned_disks=1
 
-# Configurar VGA para Standard VGA (padrão) - CORREÇÃO IMPLEMENTADA
+# Configurar VGA para Standard VGA (padrão)
 log_info "Configurando display VGA..."
 qm set "$VMID" --vga std
 
@@ -360,7 +484,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo
         log_info "Opções de conexão SSH:"
         log_info "1) Com senha: ssh $VM_USER@$VM_IP"
-        if [[ -n "$SSH_KEY_CONTENT" ]]; then
+        if [[ "$SSH_OPTION" == "1" ]]; then
             log_info "2) Com chave: ssh -i ~/.ssh/chave_privada $VM_USER@$VM_IP"
         fi
         log_info "3) Usuário ubuntu: ssh ubuntu@$VM_IP (mesma senha)"
@@ -390,7 +514,7 @@ echo
 log_info "RESUMO DA CONFIGURAÇÃO:"
 echo "- VM criada com cloud-init completo"
 echo "- Autenticação por SENHA habilitada"
-if [[ -n "$SSH_KEY_CONTENT" ]]; then
+if [[ "$SSH_OPTION" == "1" ]]; then
     echo "- Autenticação por CHAVE SSH habilitada"
 fi
 echo "- Usuários criados: $VM_USER e ubuntu"
