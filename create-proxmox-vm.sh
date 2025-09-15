@@ -327,11 +327,9 @@ qm set "$VMID" --cicustom "user=local:snippets/$VM_NAME-user.yaml"
 log_info "Habilitando QEMU Guest Agent..."
 qm set "$VMID" --agent enabled=1,fstrim_cloned_disks=1
 
-# Configurar VGA para evitar problemas de console
-qm set "$VMID" --vga qxl
-
-# Configurar console serial
-qm set "$VMID" --serial0 socket --vga serial0
+# Configurar VGA para Standard VGA (padrão) - CORREÇÃO IMPLEMENTADA
+log_info "Configurando display VGA..."
+qm set "$VMID" --vga std
 
 # Regenerar imagem cloud-init
 log_info "Regenerando configuração cloud-init..."
@@ -354,7 +352,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo
         echo "=== INFORMAÇÕES DA VM ==="
         echo "Nome: $VM_NAME"
-        echo "VMID: $VMID" 
+        echo "VMID: $VMID"
         echo "IP: $VM_IP"
         echo "Usuário: $VM_USER"
         echo "Senha: $VM_PASSWORD"
@@ -398,3 +396,4 @@ fi
 echo "- Usuários criados: $VM_USER e ubuntu"
 echo "- Cloud-init instalado e configurado"
 echo "- QEMU Guest Agent habilitado"
+echo "- Display configurado como Standard VGA"
