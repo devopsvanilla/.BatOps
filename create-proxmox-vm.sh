@@ -9,7 +9,7 @@ set -e  # Parar script em caso de erro
 # =====================
 # VALORES PADRÃO
 # =====================
-DEFAULT_GATEWAY="192.168.1.1"
+DEFAULT_GATEWAY="192.168.0.1"
 DEFAULT_DNS1="8.8.8.8"
 DEFAULT_DNS2="8.8.4.4"
 DEFAULT_NETMASK="24"
