@@ -32,7 +32,7 @@ services:
     container_name: morpheus-phpmyadmin
     restart: unless-stopped
     ports:
-      - "${PMA_PORT}:80"
+      - "${PMA_PORT}:8306"
     environment:
       PMA_HOST: host.docker.internal
       PMA_PORT: 3306

@@ -28,13 +28,13 @@ echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 # Pergunta a porta para expor o phpMyAdmin
 step "Configurando porta de acesso..."
 echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
-read -p "Digite a porta (default: 83306): " INPUT_PORT
-PORT=${INPUT_PORT:-83306}
+read -p "Digite a porta (default: 8306): " INPUT_PORT
+PORT=${INPUT_PORT:-8306}
 
 # Verifica se a porta é um número válido
 if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
-  warn "Porta inválida. Usando porta padrão 83306."
-  PORT=83306
+  warn "Porta inválida. Usando porta padrão 8306."
+  PORT=8306
 fi
 
 info "Porta selecionada: $PORT"
