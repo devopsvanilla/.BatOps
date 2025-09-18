@@ -65,7 +65,7 @@ fi
 step "Obtendo credenciais do MySQL do Morpheus..."
 if [ -f "/etc/morpheus/morpheus-secrets.json" ]; then
   if [ -r "/etc/morpheus/morpheus-secrets.json" ]; then
-    PASS_MYSQL=$(cat /etc/morpheus/morpheus-secrets.json | grep -Po '(?<="mysqlRootPassword"[ ]*:[ ]*")[^"]*')
+    PASS_MYSQL=$(sed -n 's/.*"mysqlRootPassword" *: *"\([^"]*\)".*/\1/p' /etc/morpheus/morpheus-secrets.json)
     if [ -n "$PASS_MYSQL" ]; then
       success "Senha do MySQL obtida com sucesso!"
     else
@@ -78,7 +78,7 @@ if [ -f "/etc/morpheus/morpheus-secrets.json" ]; then
   fi
 else
   error "Arquivo /etc/morpheus/morpheus-secrets.json não encontrado!"
-  echo -e "${YELLOW}   Certifique-se de que o Morpheus está instalado e configurado.${NC}"
+  echo -e "   Certifique-se de que o Morpheus está instalado e configurado."
   exit 1
 fi
 
@@ -89,8 +89,7 @@ export PASS_MYSQL="$PASS_MYSQL"
 step "Verificando se phpMyAdmin já está implantado..."
 if docker ps -a --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
   warn "Container morpheus-phpmyadmin já existe!"
-  
-  # Verifica se está rodando
+
   if docker ps --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
     info "Container está rodando. Atualizando stack..."
     docker compose down
@@ -115,36 +114,30 @@ fi
 step "Aguardando container ficar pronto..."
 sleep 5
 
-# Verifica se o serviço está rodando corretamente
+# Verifica se o serviço está rodando
 if docker ps --format '{{.Names}}\t{{.Status}}' | grep morpheus-phpmyadmin | grep -q "Up"; then
   success "Container está rodando corretamente!"
 else
   error "Problema detectado com o container!"
-  echo -e "${YELLOW}   Verifique os logs com: docker compose logs${NC}"
 fi
 
 # Resumo final
 echo -e "\n${CYAN}📋 === RESUMO DA EXECUÇÃO ===${NC}"
 echo -e "${GREEN}✨ Processo concluído com sucesso!${NC}\n"
-
 echo -e "📊 ${BLUE}Status da Implantação:${NC}"
 echo -e "   • Docker: $(if command -v docker &> /dev/null; then echo -e "${GREEN}✅ Instalado${NC}"; else echo -e "${RED}❌ Não instalado${NC}"; fi)"
 echo -e "   • Grupo Docker: $(if getent group docker > /dev/null; then echo -e "${GREEN}✅ Configurado${NC}"; else echo -e "${RED}❌ Não configurado${NC}"; fi)"
 echo -e "   • Stack phpMyAdmin: ${GREEN}✅ Stack ${OPERATION}${NC}"
-
 echo -e "\n🌐 ${BLUE}Acesso ao phpMyAdmin:${NC}"
 echo -e "   • URL: ${CYAN}http://localhost:8080${NC}"
 echo -e "   • Usuário: ${YELLOW}morpheus${NC}"
 echo -e "   • Senha: ${YELLOW}[Extraída automaticamente do Morpheus]${NC}"
-
 echo -e "\n🔧 ${BLUE}Comandos Úteis:${NC}"
 echo -e "   • Ver status: ${CYAN}docker compose ps${NC}"
 echo -e "   • Ver logs: ${CYAN}docker compose logs -f${NC}"
 echo -e "   • Parar: ${CYAN}docker compose down${NC}"
 echo -e "   • Reiniciar: ${CYAN}docker compose restart${NC}"
-
 echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
 echo -e "   O usuário ${SUDO_USER:-root} foi adicionado ao grupo docker."
 echo -e "   Faça logout/login para aplicar as permissões.\n"
-
 echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído!${NC}"
