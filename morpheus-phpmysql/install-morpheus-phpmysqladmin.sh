@@ -25,6 +25,20 @@ fi
 
 echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 
+# Pergunta a porta para expor o phpMyAdmin
+step "Configurando porta de acesso..."
+echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
+read -p "Digite a porta (default: 8080): " INPUT_PORT
+PORT=${INPUT_PORT:-8080}
+
+# Verifica se a porta é um número válido
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
+  warn "Porta inválida. Usando porta padrão 8080."
+  PORT=8080
+fi
+
+info "Porta selecionada: $PORT"
+
 # Verifica se Docker está instalado
 step "Verificando se Docker está instalado..."
 if ! command -v docker &> /dev/null
@@ -82,8 +96,51 @@ else
   exit 1
 fi
 
-# Exporta variável para docker compose
+# Cria arquivo .env apenas com a porta (SEM senha por segurança)
+step "Criando arquivo de configuração .env..."
+cat > .env <<EOF
+# Configurações do phpMyAdmin para Morpheus Data
+# A senha é obtida dinamicamente do morpheus-secrets.json
+PMA_PORT=$PORT
+EOF
+
+success "Arquivo .env criado com a porta $PORT"
+
+# Cria arquivo docker-compose.yml que usa variáveis de ambiente
+step "Criando docker-compose.yml..."
+cat > docker-compose.yml <<EOF
+version: '3.8'
+
+services:
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: morpheus-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "\${PMA_PORT}:80"
+    environment:
+      PMA_HOST: host.docker.internal
+      PMA_PORT: 3306
+      PMA_USER: morpheus
+      PMA_PASSWORD: \${PASS_MYSQL}
+      UPLOAD_LIMIT: 256M
+      PMA_ABSOLUTE_URI: "http://localhost:\${PMA_PORT}/"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - phpmyadmin_sessions:/sessions
+
+volumes:
+  phpmyadmin_sessions:
+EOF
+
+success "Arquivo docker-compose.yml criado com variáveis de ambiente"
+
+# Exporta variáveis para docker compose
 export PASS_MYSQL="$PASS_MYSQL"
+export PMA_PORT="$PORT"
+
+info "Variáveis de ambiente configuradas para o docker-compose"
 
 # Verifica se a stack já existe
 step "Verificando se phpMyAdmin já está implantado..."
@@ -119,25 +176,40 @@ if docker ps --format '{{.Names}}\t{{.Status}}' | grep morpheus-phpmyadmin | gre
   success "Container está rodando corretamente!"
 else
   error "Problema detectado com o container!"
+  echo -e "${YELLOW}   💡 Verifique os logs com: docker compose logs${NC}"
 fi
 
 # Resumo final
 echo -e "\n${CYAN}📋 === RESUMO DA EXECUÇÃO ===${NC}"
 echo -e "${GREEN}✨ Processo concluído com sucesso!${NC}\n"
+
 echo -e "📊 ${BLUE}Status da Implantação:${NC}"
 echo -e "   • Docker: $(if command -v docker &> /dev/null; then echo -e "${GREEN}✅ Instalado${NC}"; else echo -e "${RED}❌ Não instalado${NC}"; fi)"
 echo -e "   • Grupo Docker: $(if getent group docker > /dev/null; then echo -e "${GREEN}✅ Configurado${NC}"; else echo -e "${RED}❌ Não configurado${NC}"; fi)"
 echo -e "   • Stack phpMyAdmin: ${GREEN}✅ Stack ${OPERATION}${NC}"
+echo -e "   • Porta configurada: ${CYAN}$PORT${NC}"
+
+echo -e "\n📁 ${BLUE}Arquivos Criados:${NC}"
+echo -e "   • ${CYAN}.env${NC} - Configurações do ambiente (apenas porta)"
+echo -e "   • ${CYAN}docker-compose.yml${NC} - Definição dos serviços"
+
 echo -e "\n🌐 ${BLUE}Acesso ao phpMyAdmin:${NC}"
-echo -e "   • URL: ${CYAN}http://localhost:8080${NC}"
+echo -e "   • URL: ${CYAN}http://localhost:$PORT${NC}"
 echo -e "   • Usuário: ${YELLOW}morpheus${NC}"
 echo -e "   • Senha: ${YELLOW}[Extraída automaticamente do Morpheus]${NC}"
+
 echo -e "\n🔧 ${BLUE}Comandos Úteis:${NC}"
 echo -e "   • Ver status: ${CYAN}docker compose ps${NC}"
 echo -e "   • Ver logs: ${CYAN}docker compose logs -f${NC}"
 echo -e "   • Parar: ${CYAN}docker compose down${NC}"
 echo -e "   • Reiniciar: ${CYAN}docker compose restart${NC}"
+
 echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
-echo -e "   O usuário ${SUDO_USER:-root} foi adicionado ao grupo docker."
-echo -e "   Faça logout/login para aplicar as permissões.\n"
-echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído!${NC}"
+echo -e "   • O usuário ${SUDO_USER:-root} foi adicionado ao grupo docker"
+echo -e "   • Faça logout/login para aplicar as permissões"
+echo -e "   • A senha é obtida dinamicamente do morpheus-secrets.json (não salva em arquivo)"
+echo -e "   • Para executar docker compose manualmente, exporte as variáveis primeiro:\n"
+echo -e "   ${CYAN}export PASS_MYSQL=\$(sudo sed -n 's/.*\"root_password\" *: *\"\([^\"]*\)\".*/\1/p' /etc/morpheus/morpheus-secrets.json)${NC}"
+echo -e "   ${CYAN}export PMA_PORT=$PORT${NC}\n"
+
+echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído na porta $PORT!${NC}"
