@@ -28,13 +28,13 @@ echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 # Pergunta a porta para o MySQL
 step "Configurando porta do MySQL..."
 echo -e "${BLUE}🗄️  Em que porta o MySQL do Morpheus está exposto?${NC}"
-read -p "Digite a porta (default: 8306): " INPUT_MYSQL_PORT
-MYSQL_PORT=${INPUT_MYSQL_PORT:-8306}
+read -p "Digite a porta (default: 3306): " INPUT_MYSQL_PORT
+MYSQL_PORT=${INPUT_MYSQL_PORT:-3306}
 
 # Verifica se a porta é um número válido
 if ! [[ "$MYSQL_PORT" =~ ^[0-9]+$ ]] || [ "$MYSQL_PORT" -lt 1024 ] || [ "$MYSQL_PORT" -gt 65535 ]; then
-  warn "Porta inválida. Usando porta padrão 8306."
-  MYSQL_PORT=8306
+  warn "Porta inválida. Usando porta padrão 3306."
+  MYSQL_PORT=3306
 fi
 
 info "Porta do MySQL selecionada: $MYSQL_PORT"
