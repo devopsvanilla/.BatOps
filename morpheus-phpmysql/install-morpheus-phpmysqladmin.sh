@@ -42,13 +42,13 @@ info "Porta do MySQL selecionada: $MYSQL_PORT"
 # Pergunta a porta para expor o phpMyAdmin
 step "Configurando porta de acesso do phpMyAdmin..."
 echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
-read -p "Digite a porta (default: 8080): " INPUT_PMA_PORT
-PMA_PORT=${INPUT_PMA_PORT:-8080}
+read -p "Digite a porta (default: 8306): " INPUT_PMA_PORT
+PMA_PORT=${INPUT_PMA_PORT:-8306}
 
 # Verifica se a porta é um número válido
 if ! [[ "$PMA_PORT" =~ ^[0-9]+$ ]] || [ "$PMA_PORT" -lt 1024 ] || [ "$PMA_PORT" -gt 65535 ]; then
-  warn "Porta inválida. Usando porta padrão 8080."
-  PMA_PORT=8080
+  warn "Porta inválida. Usando porta padrão 8306."
+  PMA_PORT=8306
 fi
 
 info "Porta do phpMyAdmin selecionada: $PMA_PORT"
@@ -117,6 +117,69 @@ else
   exit 1
 fi
 
+# Configurar MySQL para aceitar conexões externas
+step "Configurando MySQL para aceitar conexões externas..."
+MYSQL_CONFIG_FILE="/etc/mysql/mysql.conf.d/mysqld.cnf"
+
+if [ -f "$MYSQL_CONFIG_FILE" ]; then
+  # Verificar configuração atual do bind-address
+  CURRENT_BIND=$(grep -E "^\s*bind-address" $MYSQL_CONFIG_FILE 2>/dev/null || echo "")
+  
+  if [[ "$CURRENT_BIND" =~ "127.0.0.1" ]] || [[ "$CURRENT_BIND" =~ "localhost" ]]; then
+    info "MySQL configurado apenas para localhost. Alterando para aceitar conexões externas..."
+    
+    # Fazer backup da configuração
+    cp $MYSQL_CONFIG_FILE ${MYSQL_CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)
+    
+    # Alterar bind-address para 0.0.0.0
+    sed -i 's/^[[:space:]]*bind-address[[:space:]]*=.*/bind-address = 0.0.0.0/' $MYSQL_CONFIG_FILE
+    
+    # Reiniciar MySQL
+    info "Reiniciando serviço MySQL..."
+    systemctl restart mysql
+    
+    # Verificar se MySQL reiniciou corretamente
+    sleep 3
+    if systemctl is-active mysql >/dev/null 2>&1; then
+      success "MySQL reconfigurado para aceitar conexões externas!"
+    else
+      error "Erro ao reiniciar MySQL. Restaurando backup..."
+      mv ${MYSQL_CONFIG_FILE}.backup.* $MYSQL_CONFIG_FILE
+      systemctl restart mysql
+      exit 1
+    fi
+  else
+    success "MySQL já está configurado para aceitar conexões externas!"
+  fi
+else
+  warn "Arquivo de configuração do MySQL não encontrado em $MYSQL_CONFIG_FILE"
+  info "Tentando localizar arquivo de configuração..."
+  
+  # Tentar encontrar outros locais comuns
+  for config_path in "/etc/mysql/my.cnf" "/etc/my.cnf" "/opt/morpheus/embedded/mysql/my.cnf"; do
+    if [ -f "$config_path" ]; then
+      info "Arquivo de configuração encontrado em: $config_path"
+      # Aplicar mesma lógica para outros arquivos
+      break
+    fi
+  done
+fi
+
+# Descobrir IP do host para usar no docker-compose
+step "Detectando IP do host..."
+HOST_IP=$(ip addr show | grep "inet 192.168" | head -1 | awk '{print $2}' | cut -d/ -f1)
+if [ -z "$HOST_IP" ]; then
+  HOST_IP=$(ip addr show | grep "inet 10\." | head -1 | awk '{print $2}' | cut -d/ -f1)
+fi
+if [ -z "$HOST_IP" ]; then
+  HOST_IP=$(ip addr show | grep "inet 172\." | head -1 | awk '{print $2}' | cut -d/ -f1)
+fi
+if [ -z "$HOST_IP" ]; then
+  HOST_IP="127.0.0.1"
+fi
+
+info "IP do host detectado: $HOST_IP"
+
 # Verifica se docker-compose.yml existe
 step "Verificando arquivo docker-compose.yml..."
 if [ ! -f "docker-compose.yml" ]; then
@@ -135,12 +198,14 @@ cat > .env <<EOF
 PMA_PORT=$PMA_PORT
 PMA_USER=$PMA_USER  
 MYSQL_PORT=$MYSQL_PORT
+HOST_IP=$HOST_IP
 EOF
 
 success "Arquivo .env atualizado com as configurações do prompt:"
 echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
 echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
+echo -e "   • IP do Host: ${CYAN}$HOST_IP${NC}"
 
 # FORÇA exportação das variáveis
 step "Exportando variáveis de ambiente..."
@@ -148,6 +213,7 @@ export PASS_MYSQL="$PASS_MYSQL"
 export PMA_PORT="$PMA_PORT" 
 export PMA_USER="$PMA_USER"
 export MYSQL_PORT="$MYSQL_PORT"
+export HOST_IP="$HOST_IP"
 
 # Confirma variáveis exportadas
 info "Variáveis confirmadas:"
@@ -155,6 +221,7 @@ echo -e "   • PASS_MYSQL: ${PASS_MYSQL:0:4}... ✅"
 echo -e "   • PMA_PORT: $PMA_PORT ✅" 
 echo -e "   • PMA_USER: $PMA_USER ✅"
 echo -e "   • MYSQL_PORT: $MYSQL_PORT ✅"
+echo -e "   • HOST_IP: $HOST_IP ✅"
 
 # Para containers existentes e recria forçadamente
 step "Parando containers existentes..."
@@ -189,9 +256,10 @@ echo -e "⚙️  ${BLUE}Configurações Aplicadas (do prompt):${NC}"
 echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
 echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
+echo -e "   • IP do Host: ${CYAN}$HOST_IP${NC}"
 
 echo -e "\n🌐 ${BLUE}Acesso ao phpMyAdmin:${NC}"
-echo -e "   • URL: ${CYAN}http://localhost:$PMA_PORT${NC}"
+echo -e "   • URL: ${CYAN}http://$HOST_IP:$PMA_PORT${NC}"
 echo -e "   • Usuário: ${YELLOW}$PMA_USER${NC}"
 echo -e "   • Senha: ${YELLOW}[Extraída automaticamente do Morpheus]${NC}"
 
@@ -199,5 +267,10 @@ echo -e "\n🔧 ${BLUE}Comandos Úteis:${NC}"
 echo -e "   • Ver logs: ${CYAN}docker compose logs -f${NC}"
 echo -e "   • Verificar porta: ${CYAN}docker port morpheus-phpmyadmin${NC}"
 echo -e "   • Parar: ${CYAN}docker compose down${NC}"
+
+echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
+echo -e "   • MySQL foi reconfigurado para aceitar conexões externas"
+echo -e "   • Backup da configuração original foi criado"
+echo -e "   • Faça logout/login para aplicar as permissões do Docker"
 
 echo -e "\n${GREEN}🎉 phpMyAdmin configurado na porta $PMA_PORT conforme solicitado!${NC}"
