@@ -1,0 +1,15 @@
+services:
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: morpheus-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: host.docker.internal
+      PMA_PORT: 3306
+      PMA_USER: morpheus
+      PMA_PASSWORD: "$PASS_MYSQL"
+      UPLOAD_LIMIT: 256M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
