@@ -16,6 +16,13 @@ warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 error() { echo -e "${RED}❌ $1${NC}"; }
 step() { echo -e "${PURPLE}🔧 $1${NC}"; }
 
+# Verifica se o script está sendo executado com sudo
+if [ "$EUID" -ne 0 ]; then
+  error "Este script precisa ser executado com sudo para acessar arquivos protegidos."
+  echo -e "${CYAN}💡 Por favor, execute: ${YELLOW}sudo $0 $*${NC}"
+  exit 1
+fi
+
 echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 
 # Verifica se Docker está instalado
@@ -23,12 +30,12 @@ step "Verificando se Docker está instalado..."
 if ! command -v docker &> /dev/null
 then
   warn "Docker não encontrado. Instalando..."
-  sudo apt update
-  sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt update
-  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  apt update
+  apt install -y apt-transport-https ca-certificates curl software-properties-common
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  apt update
+  apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   success "Docker instalado com sucesso!"
 else
   success "Docker já está instalado!"
@@ -38,29 +45,40 @@ fi
 step "Verificando grupo docker..."
 if ! getent group docker > /dev/null; then
   info "Criando grupo docker..."
-  sudo groupadd docker
+  groupadd docker
   success "Grupo docker criado!"
 else
   success "Grupo docker já existe!"
 fi
 
-# Adiciona usuário ao grupo docker
+# Adiciona usuário ao grupo docker (usa $SUDO_USER para pegar o usuário real)
 step "Configurando permissões do usuário..."
-sudo usermod -aG docker $USER
-success "Usuário $USER adicionado ao grupo docker!"
+if [ -n "$SUDO_USER" ]; then
+  usermod -aG docker $SUDO_USER
+  success "Usuário $SUDO_USER adicionado ao grupo docker!"
+else
+  warn "SUDO_USER não detectado, usando root como fallback"
+  usermod -aG docker root
+fi
 
 # Obtém senha do MySQL do Morpheus
 step "Obtendo credenciais do MySQL do Morpheus..."
 if [ -f "/etc/morpheus/morpheus-secrets.json" ]; then
-  PASS_MYSQL=$(sudo cat /etc/morpheus/morpheus-secrets.json | grep -Po '(?<="mysqlRootPassword"[ ]*:[ ]*")[^"]*')
-  if [ -n "$PASS_MYSQL" ]; then
-    success "Senha do MySQL obtida com sucesso!"
+  if [ -r "/etc/morpheus/morpheus-secrets.json" ]; then
+    PASS_MYSQL=$(cat /etc/morpheus/morpheus-secrets.json | grep -Po '(?<="mysqlRootPassword"[ ]*:[ ]*")[^"]*')
+    if [ -n "$PASS_MYSQL" ]; then
+      success "Senha do MySQL obtida com sucesso!"
+    else
+      error "Erro ao extrair senha do MySQL do arquivo!"
+      exit 1
+    fi
   else
-    error "Erro ao extrair senha do MySQL!"
+    error "Sem permissão para ler /etc/morpheus/morpheus-secrets.json!"
     exit 1
   fi
 else
-  error "Arquivo morpheus-secrets.json não encontrado!"
+  error "Arquivo /etc/morpheus/morpheus-secrets.json não encontrado!"
+  echo -e "${YELLOW}   Certifique-se de que o Morpheus está instalado e configurado.${NC}"
   exit 1
 fi
 
@@ -69,26 +87,26 @@ export PASS_MYSQL="$PASS_MYSQL"
 
 # Verifica se a stack já existe
 step "Verificando se phpMyAdmin já está implantado..."
-if sudo docker ps -a --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
+if docker ps -a --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
   warn "Container morpheus-phpmyadmin já existe!"
   
   # Verifica se está rodando
-  if sudo docker ps --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
+  if docker ps --format '{{.Names}}' | grep -q '^morpheus-phpmyadmin$'; then
     info "Container está rodando. Atualizando stack..."
-    sudo docker compose down
-    sudo docker compose pull
-    sudo docker compose up -d
+    docker compose down
+    docker compose pull
+    docker compose up -d
     success "Stack atualizada e reiniciada com sucesso!"
     OPERATION="atualizada"
   else
     info "Container existe mas não está rodando. Iniciando..."
-    sudo docker compose up -d
+    docker compose up -d
     success "Stack iniciada com sucesso!"
     OPERATION="reiniciada"
   fi
 else
   info "phpMyAdmin não encontrado. Implantando nova stack..."
-  sudo docker compose up -d
+  docker compose up -d
   success "Stack implantada com sucesso!"
   OPERATION="implantada"
 fi
@@ -98,10 +116,11 @@ step "Aguardando container ficar pronto..."
 sleep 5
 
 # Verifica se o serviço está rodando corretamente
-if sudo docker ps --format '{{.Names}}\t{{.Status}}' | grep morpheus-phpmyadmin | grep -q "Up"; then
+if docker ps --format '{{.Names}}\t{{.Status}}' | grep morpheus-phpmyadmin | grep -q "Up"; then
   success "Container está rodando corretamente!"
 else
   error "Problema detectado com o container!"
+  echo -e "${YELLOW}   Verifique os logs com: docker compose logs${NC}"
 fi
 
 # Resumo final
@@ -125,7 +144,7 @@ echo -e "   • Parar: ${CYAN}docker compose down${NC}"
 echo -e "   • Reiniciar: ${CYAN}docker compose restart${NC}"
 
 echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
-echo -e "   Se esta é a primeira execução, faça logout/login"
-echo -e "   para aplicar as permissões do grupo docker.\n"
+echo -e "   O usuário ${SUDO_USER:-root} foi adicionado ao grupo docker."
+echo -e "   Faça logout/login para aplicar as permissões.\n"
 
 echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído!${NC}"
