@@ -25,26 +25,40 @@ fi
 
 echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 
-# Pergunta a porta para expor o phpMyAdmin
-step "Configurando porta de acesso..."
-echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
-read -p "Digite a porta (default: 8080): " INPUT_PORT
-PORT=${INPUT_PORT:-8080}
+# Pergunta a porta para o MySQL
+step "Configurando porta do MySQL..."
+echo -e "${BLUE}🗄️  Em que porta o MySQL do Morpheus está exposto?${NC}"
+read -p "Digite a porta (default: 8306): " INPUT_MYSQL_PORT
+MYSQL_PORT=${INPUT_MYSQL_PORT:-8306}
 
 # Verifica se a porta é um número válido
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
-  warn "Porta inválida. Usando porta padrão 8080."
-  PORT=8080
+if ! [[ "$MYSQL_PORT" =~ ^[0-9]+$ ]] || [ "$MYSQL_PORT" -lt 1024 ] || [ "$MYSQL_PORT" -gt 65535 ]; then
+  warn "Porta inválida. Usando porta padrão 8306."
+  MYSQL_PORT=8306
 fi
 
-info "Porta selecionada: $PORT"
+info "Porta do MySQL selecionada: $MYSQL_PORT"
+
+# Pergunta a porta para expor o phpMyAdmin
+step "Configurando porta de acesso do phpMyAdmin..."
+echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
+read -p "Digite a porta (default: 8306): " INPUT_PMA_PORT
+PMA_PORT=${INPUT_PMA_PORT:-8306}
+
+# Verifica se a porta é um número válido
+if ! [[ "$PMA_PORT" =~ ^[0-9]+$ ]] || [ "$PMA_PORT" -lt 1024 ] || [ "$PMA_PORT" -gt 65535 ]; then
+  warn "Porta inválida. Usando porta padrão 8306."
+  PMA_PORT=8306
+fi
+
+info "Porta do phpMyAdmin selecionada: $PMA_PORT"
 
 # Pergunta o usuário MySQL para conexão
 step "Configurando usuário MySQL..."
 echo -e "${BLUE}👤 Qual usuário MySQL deseja usar para o phpMyAdmin?${NC}"
 read -p "Digite o usuário (default: root): " INPUT_USER
 PMA_USER=${INPUT_USER:-root}
-info "Usuário selecionado: $PMA_USER"
+info "Usuário MySQL selecionado: $PMA_USER"
 
 # Verifica se Docker está instalado
 step "Verificando se Docker está instalado..."
@@ -103,85 +117,38 @@ else
   exit 1
 fi
 
-# Cria arquivo .env com porta e usuário
+# Verifica se docker-compose.yml existe
+step "Verificando arquivo docker-compose.yml..."
+if [ ! -f "docker-compose.yml" ]; then
+  error "Arquivo docker-compose.yml não encontrado no diretório atual!"
+  echo -e "${YELLOW}   💡 Certifique-se de que o arquivo docker-compose.yml está presente.${NC}"
+  exit 1
+else
+  success "Arquivo docker-compose.yml encontrado!"
+fi
+
+# Cria arquivo .env com todas as configurações
 step "Criando arquivo de configuração .env..."
 cat > .env <<EOF
 # Configuração do phpMyAdmin para Morpheus Data
 # A senha é obtida dinamicamente do morpheus-secrets.json
-PMA_PORT=$PORT
+PMA_PORT=$PMA_PORT
 PMA_USER=$PMA_USER
+MYSQL_PORT=$MYSQL_PORT
 EOF
 
-success "Arquivo .env criado com a porta $PORT e usuário $PMA_USER"
-
-# Cria arquivo docker-compose.yml usando variáveis de ambiente
-step "Criando docker-compose.yml..."
-cat > docker-compose.yml <<'EOF'
-# Para implantar a stack após a execução do script:
-# 1. Exporte as variáveis de ambiente necessárias:
-#
-#    export PASS_MYSQL=$(sudo sed -n 's/.*"root_password" *: *"\([^"]*\)".*/\1/p' /etc/morpheus/morpheus-secrets.json)
-#    export PMA_PORT=<porta_configurada>
-#    export PMA_USER=<usuario_configurado>
-#
-#    Substitua os valores pelas configurações do arquivo .env
-#
-# 2. Execute o Docker Compose para iniciar a stack:
-#
-#    docker compose up -d
-#
-# Para parar a stack:
-#
-#    docker compose down
-#
-# Para ver logs:
-#
-#    docker compose logs -f
-#
-# Para reiniciar a stack:
-#
-#    docker compose restart
-#
-# Para verificar status:
-#
-#    docker compose ps
-#
-# IMPORTANTE: As variáveis de ambiente PASS_MYSQL, PMA_PORT e PMA_USER 
-# devem estar definidas antes de executar qualquer comando docker compose.
-
-version: '3.8'
-
-services:
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: morpheus-phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "${PMA_PORT}:80"
-    environment:
-      PMA_HOST: host.docker.internal
-      PMA_PORT: 3306
-      PMA_USER: "${PMA_USER}"
-      PMA_PASSWORD: "${PASS_MYSQL}"
-      UPLOAD_LIMIT: 256M
-      PMA_ABSOLUTE_URI: "http://localhost:${PMA_PORT}/"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - phpmyadmin_sessions:/sessions
-
-volumes:
-  phpmyadmin_sessions:
-EOF
-
-success "Arquivo docker-compose.yml criado com a porta $PORT e usuário $PMA_USER"
+success "Arquivo .env criado com as configurações:"
+echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
+echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
+echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
 
 # Exporta variáveis para docker compose
 export PASS_MYSQL="$PASS_MYSQL"
-export PMA_PORT="$PORT"
+export PMA_PORT="$PMA_PORT"
 export PMA_USER="$PMA_USER"
+export MYSQL_PORT="$MYSQL_PORT"
 
-info "Variáveis de ambiente configuradas para o docker-compose"
+info "Variáveis de ambiente exportadas para Docker Compose"
 
 # Verifica se a stack já existe
 step "Verificando se phpMyAdmin já está implantado..."
@@ -228,15 +195,18 @@ echo -e "📊 ${BLUE}Status da Implantação:${NC}"
 echo -e "   • Docker: $(if command -v docker &> /dev/null; then echo -e "${GREEN}✅ Instalado${NC}"; else echo -e "${RED}❌ Não instalado${NC}"; fi)"
 echo -e "   • Grupo Docker: $(if getent group docker > /dev/null; then echo -e "${GREEN}✅ Configurado${NC}"; else echo -e "${RED}❌ Não configurado${NC}"; fi)"
 echo -e "   • Stack phpMyAdmin: ${GREEN}✅ Stack ${OPERATION}${NC}"
-echo -e "   • Porta configurada: ${CYAN}$PORT${NC}"
-echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 
-echo -e "\n📁 ${BLUE}Arquivos Criados:${NC}"
-echo -e "   • ${CYAN}.env${NC} - Configuração de porta e usuário"
-echo -e "   • ${CYAN}docker-compose.yml${NC} - Definição dos serviços"
+echo -e "\n⚙️  ${BLUE}Configurações Aplicadas:${NC}"
+echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
+echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"  
+echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
+
+echo -e "\n📁 ${BLUE}Arquivos Utilizados:${NC}"
+echo -e "   • ${CYAN}.env${NC} - Configurações geradas pelo script"
+echo -e "   • ${CYAN}docker-compose.yml${NC} - Definição dos serviços (arquivo externo)"
 
 echo -e "\n🌐 ${BLUE}Acesso ao phpMyAdmin:${NC}"
-echo -e "   • URL: ${CYAN}http://localhost:$PORT${NC}"
+echo -e "   • URL: ${CYAN}http://localhost:$PMA_PORT${NC}"
 echo -e "   • Usuário: ${YELLOW}$PMA_USER${NC}"
 echo -e "   • Senha: ${YELLOW}[Extraída automaticamente do Morpheus]${NC}"
 
@@ -250,9 +220,10 @@ echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
 echo -e "   • O usuário ${SUDO_USER:-root} foi adicionado ao grupo docker"
 echo -e "   • Faça logout/login para aplicar as permissões"
 echo -e "   • A senha é obtida dinamicamente do morpheus-secrets.json"
-echo -e "   • Para uso manual posterior, exporte as variáveis:\n"
+echo -e "   • Para uso manual, exporte as variáveis:\n"
 echo -e "   ${CYAN}export PASS_MYSQL=\$(sudo sed -n 's/.*\"root_password\" *: *\"\([^\"]*\)\".*/\1/p' /etc/morpheus/morpheus-secrets.json)${NC}"
-echo -e "   ${CYAN}export PMA_PORT=$PORT${NC}"
-echo -e "   ${CYAN}export PMA_USER=$PMA_USER${NC}\n"
+echo -e "   ${CYAN}export PMA_PORT=$PMA_PORT${NC}"
+echo -e "   ${CYAN}export PMA_USER=$PMA_USER${NC}"
+echo -e "   ${CYAN}export MYSQL_PORT=$MYSQL_PORT${NC}\n"
 
-echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído na porta $PORT com usuário $PMA_USER!${NC}"
+echo -e "${GREEN}🎉 Setup do phpMyAdmin concluído!${NC}"
