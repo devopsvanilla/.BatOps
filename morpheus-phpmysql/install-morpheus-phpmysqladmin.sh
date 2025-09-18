@@ -61,15 +61,15 @@ else
   usermod -aG docker root
 fi
 
-# Obtém senha do MySQL do Morpheus
-step "Obtendo credenciais do MySQL do Morpheus..."
+# Obtém senha do MySQL "root_password" do Morpheus
+step "Obtendo credenciais do MySQL root_password do Morpheus..."
 if [ -f "/etc/morpheus/morpheus-secrets.json" ]; then
   if [ -r "/etc/morpheus/morpheus-secrets.json" ]; then
-    PASS_MYSQL=$(sed -n 's/.*"mysqlRootPassword" *: *"\([^"]*\)".*/\1/p' /etc/morpheus/morpheus-secrets.json)
+    PASS_MYSQL=$(sed -n 's/.*"root_password" *: *"\([^"]*\)".*/\1/p' /etc/morpheus/morpheus-secrets.json)
     if [ -n "$PASS_MYSQL" ]; then
       success "Senha do MySQL obtida com sucesso!"
     else
-      error "Erro ao extrair senha do MySQL do arquivo!"
+      error "Erro ao extrair senha do MySQL root_password do arquivo!"
       exit 1
     fi
   else
