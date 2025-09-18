@@ -5,17 +5,14 @@ services:
     image: phpmyadmin/phpmyadmin:latest
     container_name: morpheus-phpmyadmin
     restart: unless-stopped
-    ports:
-      - "${PMA_PORT}:80"
+    network_mode: host                    # ← Usar rede do host
     environment:
-      PMA_HOST: host.docker.internal
+      PMA_HOST: 127.0.0.1                # ← Localhost direto
       PMA_PORT: "${MYSQL_PORT}"
       PMA_USER: "${PMA_USER}"
       PMA_PASSWORD: "${PASS_MYSQL}"
       UPLOAD_LIMIT: 256M
-      PMA_ABSOLUTE_URI: "http://localhost:${PMA_PORT}/"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      PMA_ABSOLUTE_URI: "http://127.0.0.1:${PMA_PORT}/"
     volumes:
       - phpmyadmin_sessions:/sessions
 
