@@ -1,3 +1,38 @@
+# Para implantar a stack manualmente após a execução do script:
+# 1. Exporte as variáveis de ambiente necessárias:
+#
+#    export PASS_MYSQL=$(sudo sed -n 's/.*"root_password" *: *"\([^"]*\)".*/\1/p' /etc/morpheus/morpheus-secrets.json)
+#    export PMA_PORT=<porta_phpmyadmin>
+#    export PMA_USER=<usuario_mysql>
+#    export MYSQL_PORT=<porta_mysql>
+#    export HOST_IP=<ip_do_host>
+#
+#    Substitua pelos valores configurados no arquivo .env
+#
+# 2. Execute o Docker Compose para iniciar a stack:
+#
+#    docker compose up -d
+#
+# Para parar a stack:
+#
+#    docker compose down
+#
+# Para ver logs:
+#
+#    docker compose logs -f
+#
+# Para reiniciar a stack:
+#
+#    docker compose restart
+#
+# Para verificar status:
+#
+#    docker compose ps
+#
+# IMPORTANTE: As variáveis de ambiente PASS_MYSQL, PMA_PORT, PMA_USER,
+# MYSQL_PORT e HOST_IP devem estar definidas antes de executar qualquer 
+# comando docker compose.
+
 services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest

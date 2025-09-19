@@ -28,7 +28,7 @@ echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 # Pergunta a porta para o MySQL
 step "Configurando porta do MySQL..."
 echo -e "${BLUE}🗄️  Em que porta o MySQL do Morpheus está exposto?${NC}"
-read -p "Digite a porta (default: 3306): " INPUT_MYSQL_PORT
+read -rp "Digite a porta (default: 3306): " INPUT_MYSQL_PORT
 MYSQL_PORT=${INPUT_MYSQL_PORT:-3306}
 
 # Verifica se a porta é um número válido
@@ -42,7 +42,7 @@ info "Porta do MySQL selecionada: $MYSQL_PORT"
 # Pergunta a porta para expor o phpMyAdmin
 step "Configurando porta de acesso do phpMyAdmin..."
 echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
-read -p "Digite a porta (default: 8306): " INPUT_PMA_PORT
+read -rp "Digite a porta (default: 8306): " INPUT_PMA_PORT
 PMA_PORT=${INPUT_PMA_PORT:-8306}
 
 # Verifica se a porta é um número válido
@@ -56,7 +56,7 @@ info "Porta do phpMyAdmin selecionada: $PMA_PORT"
 # Pergunta o usuário MySQL para conexão
 step "Configurando usuário MySQL..."
 echo -e "${BLUE}👤 Qual usuário MySQL deseja usar para o phpMyAdmin?${NC}"
-read -p "Digite o usuário (default: root): " INPUT_USER
+read -rp "Digite o usuário (default: root): " INPUT_USER
 PMA_USER=${INPUT_USER:-root}
 info "Usuário MySQL selecionado: $PMA_USER"
 
@@ -89,7 +89,7 @@ fi
 # Adiciona usuário ao grupo docker
 step "Configurando permissões do usuário..."
 if [ -n "$SUDO_USER" ]; then
-  usermod -aG docker $SUDO_USER
+  usermod -aG docker "$SUDO_USER"
   success "Usuário $SUDO_USER adicionado ao grupo docker!"
 else
   warn "SUDO_USER não detectado, usando root como fallback"
@@ -117,52 +117,45 @@ else
   exit 1
 fi
 
-# Configurar MySQL para aceitar conexões externas
-step "Configurando MySQL para aceitar conexões externas..."
-MYSQL_CONFIG_FILE="/etc/mysql/mysql.conf.d/mysqld.cnf"
+# Configurar MySQL embedded do Morpheus para aceitar conexões externas
+step "Configurando MySQL embedded do Morpheus para conexões externas..."
+MORPHEUS_MYSQL_CNF="/opt/morpheus/embedded/mysql/my.cnf"
 
-if [ -f "$MYSQL_CONFIG_FILE" ]; then
+if [ -f "$MORPHEUS_MYSQL_CNF" ]; then
   # Verificar configuração atual do bind-address
-  CURRENT_BIND=$(grep -E "^\s*bind-address" $MYSQL_CONFIG_FILE 2>/dev/null || echo "")
+  CURRENT_BIND=$(grep "bind-address" $MORPHEUS_MYSQL_CNF 2>/dev/null || echo "")
   
-  if [[ "$CURRENT_BIND" =~ "127.0.0.1" ]] || [[ "$CURRENT_BIND" =~ "localhost" ]]; then
-    info "MySQL configurado apenas para localhost. Alterando para aceitar conexões externas..."
+  if [[ "$CURRENT_BIND" =~ "127.0.0.1" ]]; then
+    info "MySQL embedded configurado apenas para localhost. Alterando para aceitar conexões externas..."
     
     # Fazer backup da configuração
-    cp $MYSQL_CONFIG_FILE ${MYSQL_CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)
+    cp $MORPHEUS_MYSQL_CNF ${MORPHEUS_MYSQL_CNF}.backup.$(date +%Y%m%d_%H%M%S)
     
     # Alterar bind-address para 0.0.0.0
-    sed -i 's/^[[:space:]]*bind-address[[:space:]]*=.*/bind-address = 0.0.0.0/' $MYSQL_CONFIG_FILE
+    sed -i 's/^bind-address.*/bind-address = 0.0.0.0/' $MORPHEUS_MYSQL_CNF
     
-    # Reiniciar MySQL
-    info "Reiniciando serviço MySQL..."
-    systemctl restart mysql
+    # Reiniciar serviços do Morpheus
+    info "Reiniciando serviços do Morpheus..."
+    systemctl restart morpheus-ui morpheus-app
+    
+    # Aguardar reinicialização
+    sleep 10
     
     # Verificar se MySQL reiniciou corretamente
-    sleep 3
-    if systemctl is-active mysql >/dev/null 2>&1; then
-      success "MySQL reconfigurado para aceitar conexões externas!"
+    if /opt/morpheus/embedded/mysql/bin/mysql -h 127.0.0.1 -P 3306 -u root -p"$PASS_MYSQL" -e "SELECT 1;" >/dev/null 2>&1; then
+      success "MySQL embedded reconfigurado para aceitar conexões externas!"
     else
-      error "Erro ao reiniciar MySQL. Restaurando backup..."
-      mv ${MYSQL_CONFIG_FILE}.backup.* $MYSQL_CONFIG_FILE
-      systemctl restart mysql
+      error "Erro ao reiniciar MySQL embedded. Restaurando backup..."
+      mv ${MORPHEUS_MYSQL_CNF}.backup.* $MORPHEUS_MYSQL_CNF
+      systemctl restart morpheus-ui morpheus-app
       exit 1
     fi
   else
-    success "MySQL já está configurado para aceitar conexões externas!"
+    success "MySQL embedded já está configurado para aceitar conexões externas!"
   fi
 else
-  warn "Arquivo de configuração do MySQL não encontrado em $MYSQL_CONFIG_FILE"
-  info "Tentando localizar arquivo de configuração..."
-  
-  # Tentar encontrar outros locais comuns
-  for config_path in "/etc/mysql/my.cnf" "/etc/my.cnf" "/opt/morpheus/embedded/mysql/my.cnf"; do
-    if [ -f "$config_path" ]; then
-      info "Arquivo de configuração encontrado em: $config_path"
-      # Aplicar mesma lógica para outros arquivos
-      break
-    fi
-  done
+  error "Arquivo de configuração do MySQL embedded não encontrado: $MORPHEUS_MYSQL_CNF"
+  exit 1
 fi
 
 # Descobrir IP do host para usar no docker-compose
@@ -190,7 +183,7 @@ else
   success "Arquivo docker-compose.yml encontrado!"
 fi
 
-# Cria arquivo .env com TODAS as configurações (FORÇA OVERRIDE)
+# Cria arquivo .env com todas as configurações
 step "Criando arquivo de configuração .env..."
 cat > .env <<EOF
 # Configuração do phpMyAdmin para Morpheus Data
@@ -207,8 +200,7 @@ echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
 echo -e "   • IP do Host: ${CYAN}$HOST_IP${NC}"
 
-# FORÇA exportação das variáveis
-step "Exportando variáveis de ambiente..."
+# Exporta variáveis para docker compose
 export PASS_MYSQL="$PASS_MYSQL"
 export PMA_PORT="$PMA_PORT" 
 export PMA_USER="$PMA_USER"
@@ -248,6 +240,14 @@ else
   warn "⚠️  Container na porta $CONTAINER_PORT, esperado $PMA_PORT"
 fi
 
+# Testar conectividade final
+step "Testando conectividade final..."
+if /opt/morpheus/embedded/mysql/bin/mysql -h "$HOST_IP" -P "$MYSQL_PORT" -u "$PMA_USER" -p"$PASS_MYSQL" -e "SELECT 'Teste OK!' AS Status;" >/dev/null 2>&1; then
+  success "✅ Conectividade MySQL externa confirmada!"
+else
+  warn "⚠️  Problema na conectividade MySQL externa"
+fi
+
 # Resumo final
 echo -e "\n${CYAN}📋 === RESUMO DA EXECUÇÃO ===${NC}"
 echo -e "${GREEN}✨ Processo concluído!${NC}\n"
@@ -269,7 +269,7 @@ echo -e "   • Verificar porta: ${CYAN}docker port morpheus-phpmyadmin${NC}"
 echo -e "   • Parar: ${CYAN}docker compose down${NC}"
 
 echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
-echo -e "   • MySQL foi reconfigurado para aceitar conexões externas"
+echo -e "   • MySQL embedded do Morpheus foi reconfigurado para aceitar conexões externas"
 echo -e "   • Backup da configuração original foi criado"
 echo -e "   • Faça logout/login para aplicar as permissões do Docker"
 
