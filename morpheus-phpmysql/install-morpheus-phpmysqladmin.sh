@@ -16,6 +16,15 @@ warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 error() { echo -e "${RED}❌ $1${NC}"; }
 step() { echo -e "${PURPLE}🔧 $1${NC}"; }
 
+# Função para gerar hash de senha usando openssl (disponível por padrão)
+generate_htpasswd() {
+    local username="$1"
+    local password="$2"
+    local salt=$(openssl rand -base64 3)
+    local hash=$(openssl passwd -apr1 -salt "$salt" "$password")
+    echo "$username:$hash"
+}
+
 # Verifica se o script está sendo executado com sudo
 if [ "$EUID" -ne 0 ]; then
   error "Este script precisa ser executado com sudo para acessar arquivos protegidos."
@@ -231,18 +240,12 @@ else
   exit 1
 fi
 
-# Configurar autenticação HTTP se habilitada
+# Configurar autenticação HTTP se habilitada (SEM INSTALAR NADA NO SERVIDOR)
 if [ "$ENABLE_HTTP_AUTH" = true ]; then
-  step "Configurando autenticação HTTP..."
+  step "Configurando autenticação HTTP usando openssl nativo..."
   
-  # Verificar se htpasswd está disponível
-  if ! command -v htpasswd &> /dev/null; then
-    info "Instalando apache2-utils para htpasswd..."
-    apt update && apt install -y apache2-utils
-  fi
-  
-  # Criar arquivo .htpasswd
-  htpasswd -cb .htpasswd "$HTTP_USER" "$HTTP_PASS"
+  # Gerar .htpasswd usando openssl (já disponível no sistema)
+  generate_htpasswd "$HTTP_USER" "$HTTP_PASS" > .htpasswd
   
   # Criar arquivo de configuração Apache
   cat > apache-security.conf <<EOF
@@ -254,7 +257,7 @@ if [ "$ENABLE_HTTP_AUTH" = true ]; then
 </Directory>
 EOF
   
-  success "Arquivos de autenticação HTTP criados!"
+  success "Arquivos de autenticação HTTP criados usando ferramentas nativas!"
 fi
 
 # Verifica se docker-compose.yml existe
@@ -375,8 +378,8 @@ echo -e "   • MySQL embedded do Morpheus reconfigurado para conexões externas
 echo -e "   • Usuários MySQL criados para acesso externo (MySQL 8.0+ syntax)"
 echo -e "   • Backup da configuração original foi criado"
 if [ "$ENABLE_HTTP_AUTH" = true ]; then
-echo -e "   • Autenticação HTTP configurada para máxima segurança"
+echo -e "   • Autenticação HTTP configurada usando openssl nativo (sem instalações)"
 fi
 echo -e "   • Faça logout/login para aplicar as permissões do Docker"
 
-echo -e "\n${GREEN}🎉 phpMyAdmin configurado com segurança aprimorada na porta $PMA_PORT!${NC}"
+echo -e "\n${GREEN}🎉 phpMyAdmin configurado com segurança sem instalações no servidor!${NC}"
