@@ -6,6 +6,7 @@
 #    export PMA_USER=<usuario_mysql>
 #    export MYSQL_PORT=<porta_mysql>
 #    export HOST_IP=<ip_do_host>
+#    export ENABLE_HTTP_AUTH=<true_ou_false>
 #
 #    Exemplo:
 #    export PASS_MYSQL=f728d412b85ec6c3321463eb
@@ -13,6 +14,7 @@
 #    export PMA_USER=root
 #    export MYSQL_PORT=3306
 #    export HOST_IP=192.168.0.30
+#    export ENABLE_HTTP_AUTH=true
 #
 # 2. Execute o Docker Compose para iniciar a stack:
 #
@@ -35,10 +37,11 @@
 #    docker compose ps
 #
 # IMPORTANTE: 
-# - As variáveis de ambiente PASS_MYSQL, PMA_PORT, PMA_USER, MYSQL_PORT 
-#   e HOST_IP devem estar definidas antes de executar qualquer comando docker compose.
+# - As variáveis de ambiente devem estar definidas antes de executar docker compose
+# - Para autenticação HTTP, os arquivos .htpasswd e apache-security.conf devem existir
 # - O MySQL embedded do Morpheus deve estar configurado para aceitar conexões externas
-# - Usuários MySQL devem ter permissões para conectar do IP externo
+
+version: '3.8'
 
 services:
   phpmyadmin:
@@ -56,6 +59,19 @@ services:
       PMA_ABSOLUTE_URI: "http://${HOST_IP}:${PMA_PORT}/"
     volumes:
       - phpmyadmin_sessions:/sessions
+      # Volumes condicionais para autenticação HTTP (montados se arquivos existirem)
+      - type: bind
+        source: ./.htpasswd
+        target: /etc/apache2/.htpasswd
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./apache-security.conf
+        target: /etc/apache2/conf-enabled/apache-security.conf
+        read_only: true
+        bind:
+          create_host_path: false
 
 volumes:
   phpmyadmin_sessions:
