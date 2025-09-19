@@ -7,7 +7,12 @@
 #    export MYSQL_PORT=<porta_mysql>
 #    export HOST_IP=<ip_do_host>
 #
-#    Substitua pelos valores configurados no arquivo .env
+#    Exemplo:
+#    export PASS_MYSQL=f728d412b85ec6c3321463eb
+#    export PMA_PORT=8306
+#    export PMA_USER=root
+#    export MYSQL_PORT=3306
+#    export HOST_IP=192.168.0.30
 #
 # 2. Execute o Docker Compose para iniciar a stack:
 #
@@ -29,9 +34,13 @@
 #
 #    docker compose ps
 #
-# IMPORTANTE: As variáveis de ambiente PASS_MYSQL, PMA_PORT, PMA_USER,
-# MYSQL_PORT e HOST_IP devem estar definidas antes de executar qualquer 
-# comando docker compose.
+# IMPORTANTE: 
+# - As variáveis de ambiente PASS_MYSQL, PMA_PORT, PMA_USER, MYSQL_PORT 
+#   e HOST_IP devem estar definidas antes de executar qualquer comando docker compose.
+# - O MySQL embedded do Morpheus deve estar configurado para aceitar conexões externas
+# - Usuários MySQL devem ter permissões para conectar do IP externo
+
+version: '3.8'
 
 services:
   phpmyadmin:

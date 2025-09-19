@@ -28,7 +28,7 @@ echo -e "${CYAN}🚀 === Morpheus phpMyAdmin Setup ===${NC}\n"
 # Pergunta a porta para o MySQL
 step "Configurando porta do MySQL..."
 echo -e "${BLUE}🗄️  Em que porta o MySQL do Morpheus está exposto?${NC}"
-read -rp "Digite a porta (default: 3306): " INPUT_MYSQL_PORT
+read -p "Digite a porta (default: 3306): " INPUT_MYSQL_PORT
 MYSQL_PORT=${INPUT_MYSQL_PORT:-3306}
 
 # Verifica se a porta é um número válido
@@ -42,7 +42,7 @@ info "Porta do MySQL selecionada: $MYSQL_PORT"
 # Pergunta a porta para expor o phpMyAdmin
 step "Configurando porta de acesso do phpMyAdmin..."
 echo -e "${BLUE}🌐 Em que porta deseja expor o phpMyAdmin?${NC}"
-read -rp "Digite a porta (default: 8306): " INPUT_PMA_PORT
+read -p "Digite a porta (default: 8306): " INPUT_PMA_PORT
 PMA_PORT=${INPUT_PMA_PORT:-8306}
 
 # Verifica se a porta é um número válido
@@ -56,7 +56,7 @@ info "Porta do phpMyAdmin selecionada: $PMA_PORT"
 # Pergunta o usuário MySQL para conexão
 step "Configurando usuário MySQL..."
 echo -e "${BLUE}👤 Qual usuário MySQL deseja usar para o phpMyAdmin?${NC}"
-read -rp "Digite o usuário (default: root): " INPUT_USER
+read -p "Digite o usuário (default: root): " INPUT_USER
 PMA_USER=${INPUT_USER:-root}
 info "Usuário MySQL selecionado: $PMA_USER"
 
@@ -89,7 +89,7 @@ fi
 # Adiciona usuário ao grupo docker
 step "Configurando permissões do usuário..."
 if [ -n "$SUDO_USER" ]; then
-  usermod -aG docker "$SUDO_USER"
+  usermod -aG docker $SUDO_USER
   success "Usuário $SUDO_USER adicionado ao grupo docker!"
 else
   warn "SUDO_USER não detectado, usando root como fallback"
@@ -136,18 +136,18 @@ if [ -f "$MORPHEUS_MYSQL_CNF" ]; then
     
     # Reiniciar serviços do Morpheus
     info "Reiniciando serviços do Morpheus..."
-    systemctl restart morpheus-ui morpheus-app
+    systemctl restart morpheus-runsvdir.service
     
     # Aguardar reinicialização
     sleep 10
     
     # Verificar se MySQL reiniciou corretamente
-    if /opt/morpheus/embedded/mysql/bin/mysql -h 127.0.0.1 -P 3306 -u root -p"$PASS_MYSQL" -e "SELECT 1;" >/dev/null 2>&1; then
+    if /opt/morpheus/embedded/mysql/bin/mysql -h 127.0.0.1 -P 3306 -u root -p$PASS_MYSQL -e "SELECT 1;" >/dev/null 2>&1; then
       success "MySQL embedded reconfigurado para aceitar conexões externas!"
     else
       error "Erro ao reiniciar MySQL embedded. Restaurando backup..."
       mv ${MORPHEUS_MYSQL_CNF}.backup.* $MORPHEUS_MYSQL_CNF
-      systemctl restart morpheus-ui morpheus-app
+      systemctl restart morpheus-runsvdir.service
       exit 1
     fi
   else
@@ -158,8 +158,8 @@ else
   exit 1
 fi
 
-# Descobrir IP do host para usar no docker-compose
-step "Detectando IP do host..."
+# Descobrir IP do host e hostname
+step "Detectando IP e hostname do host..."
 HOST_IP=$(ip addr show | grep "inet 192.168" | head -1 | awk '{print $2}' | cut -d/ -f1)
 if [ -z "$HOST_IP" ]; then
   HOST_IP=$(ip addr show | grep "inet 10\." | head -1 | awk '{print $2}' | cut -d/ -f1)
@@ -171,7 +171,37 @@ if [ -z "$HOST_IP" ]; then
   HOST_IP="127.0.0.1"
 fi
 
+HOSTNAME=$(hostname)
 info "IP do host detectado: $HOST_IP"
+info "Hostname detectado: $HOSTNAME"
+
+# Configurar permissões MySQL para conexões externas (MySQL 8+ syntax)
+step "Configurando permissões MySQL para conexões externas..."
+/opt/morpheus/embedded/mysql/bin/mysql -h 127.0.0.1 -P 3306 -u root -p$PASS_MYSQL << EOF
+CREATE USER IF NOT EXISTS 'root'@'$HOST_IP' IDENTIFIED WITH mysql_native_password BY '$PASS_MYSQL';
+CREATE USER IF NOT EXISTS 'root'@'$HOSTNAME' IDENTIFIED WITH mysql_native_password BY '$PASS_MYSQL';
+CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '$PASS_MYSQL';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'$HOST_IP' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'$HOSTNAME' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+
+if [ $? -eq 0 ]; then
+  success "Permissões MySQL configuradas para conexões externas!"
+else
+  error "Falha ao configurar permissões MySQL!"
+  exit 1
+fi
+
+# Testar conectividade externa
+step "Testando conectividade externa..."
+if /opt/morpheus/embedded/mysql/bin/mysql -h $HOST_IP -P $MYSQL_PORT -u $PMA_USER -p$PASS_MYSQL -e "SELECT 'OK' AS Status;" >/dev/null 2>&1; then
+  success "✅ Conectividade MySQL externa confirmada!"
+else
+  error "❌ Problema na conectividade MySQL externa"
+  exit 1
+fi
 
 # Verifica se docker-compose.yml existe
 step "Verificando arquivo docker-compose.yml..."
@@ -187,14 +217,13 @@ fi
 step "Criando arquivo de configuração .env..."
 cat > .env <<EOF
 # Configuração do phpMyAdmin para Morpheus Data
-# CONFIGURAÇÕES DO PROMPT - ESTAS TÊM PRIORIDADE
 PMA_PORT=$PMA_PORT
 PMA_USER=$PMA_USER  
 MYSQL_PORT=$MYSQL_PORT
 HOST_IP=$HOST_IP
 EOF
 
-success "Arquivo .env atualizado com as configurações do prompt:"
+success "Arquivo .env atualizado com as configurações:"
 echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
 echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
@@ -240,19 +269,20 @@ else
   warn "⚠️  Container na porta $CONTAINER_PORT, esperado $PMA_PORT"
 fi
 
-# Testar conectividade final
-step "Testando conectividade final..."
-if /opt/morpheus/embedded/mysql/bin/mysql -h "$HOST_IP" -P "$MYSQL_PORT" -u "$PMA_USER" -p"$PASS_MYSQL" -e "SELECT 'Teste OK!' AS Status;" >/dev/null 2>&1; then
-  success "✅ Conectividade MySQL externa confirmada!"
+# Teste final de conectividade do phpMyAdmin
+step "Testando acesso HTTP do phpMyAdmin..."
+sleep 5
+if curl -s -I http://$HOST_IP:$PMA_PORT | grep -q "200 OK"; then
+  success "✅ phpMyAdmin respondendo corretamente!"
 else
-  warn "⚠️  Problema na conectividade MySQL externa"
+  warn "⚠️  phpMyAdmin pode estar carregando ainda. Verifique os logs."
 fi
 
 # Resumo final
 echo -e "\n${CYAN}📋 === RESUMO DA EXECUÇÃO ===${NC}"
-echo -e "${GREEN}✨ Processo concluído!${NC}\n"
+echo -e "${GREEN}✨ Processo concluído com sucesso!${NC}\n"
 
-echo -e "⚙️  ${BLUE}Configurações Aplicadas (do prompt):${NC}"
+echo -e "⚙️  ${BLUE}Configurações Aplicadas:${NC}"
 echo -e "   • Porta phpMyAdmin: ${CYAN}$PMA_PORT${NC}"
 echo -e "   • Usuário MySQL: ${CYAN}$PMA_USER${NC}"
 echo -e "   • Porta MySQL: ${CYAN}$MYSQL_PORT${NC}"
@@ -267,10 +297,12 @@ echo -e "\n🔧 ${BLUE}Comandos Úteis:${NC}"
 echo -e "   • Ver logs: ${CYAN}docker compose logs -f${NC}"
 echo -e "   • Verificar porta: ${CYAN}docker port morpheus-phpmyadmin${NC}"
 echo -e "   • Parar: ${CYAN}docker compose down${NC}"
+echo -e "   • Reiniciar: ${CYAN}docker compose restart${NC}"
 
 echo -e "\n${YELLOW}⚠️  IMPORTANTE:${NC}"
-echo -e "   • MySQL embedded do Morpheus foi reconfigurado para aceitar conexões externas"
+echo -e "   • MySQL embedded do Morpheus reconfigurado para conexões externas"
+echo -e "   • Usuários MySQL criados para acesso externo (MySQL 8.0+ syntax)"
 echo -e "   • Backup da configuração original foi criado"
 echo -e "   • Faça logout/login para aplicar as permissões do Docker"
 
-echo -e "\n${GREEN}🎉 phpMyAdmin configurado na porta $PMA_PORT conforme solicitado!${NC}"
+echo -e "\n${GREEN}🎉 phpMyAdmin configurado e funcionando na porta $PMA_PORT!${NC}"
