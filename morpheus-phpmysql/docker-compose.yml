@@ -40,8 +40,6 @@
 # - O MySQL embedded do Morpheus deve estar configurado para aceitar conexões externas
 # - Usuários MySQL devem ter permissões para conectar do IP externo
 
-version: '3.8'
-
 services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
