@@ -13,7 +13,14 @@ Uma stack Docker Compose completa com MySQL e phpMyAdmin conectados e prontos pa
 
 ### 1. Configuração inicial
 
-Edite o arquivo `.env` para personalizar as configurações:
+Copie o arquivo de exemplo e edite as configurações:
+
+```bash
+cp .env.example .env
+# Edite o arquivo .env para personalizar as configurações
+```
+
+Arquivo `.env`:
 
 ```bash
 # MySQL Configuration
@@ -88,8 +95,9 @@ docker compose exec mysql mysql -u root -p
 ```
 68b98582eb0becee9152ad6e9021d940/
 ├── docker-compose.yml    # Configuração da stack
-├── .env                  # Variáveis de ambiente
-├── mysql-config/         # Configurações customizadas do MySQL
+├── .env.example         # Exemplo de variáveis de ambiente
+├── .env                 # Variáveis de ambiente (criar baseado no .example)
+├── mysql-config/        # Configurações customizadas do MySQL
 │   └── custom.cnf       # Arquivo de configuração do MySQL
 └── README.md            # Este arquivo
 ```
