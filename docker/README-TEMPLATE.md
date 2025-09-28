@@ -15,6 +15,7 @@ IMPORTANTE: Este prompt segue as especificações agents.md (https://agents.md/)
 
 ### 1. Cabeçalho
 - Título: `# [NOME_DA_STACK] com [TECNOLOGIAS_PRINCIPAIS]`
+- **Tempo de Leitura**: Incluir estimativa de tempo de leitura baseada no conteúdo (ex: "⏱️ Tempo de leitura: ~8 minutos")
 
 ### 2. Seções Obrigatórias (nesta ordem):
 1. **Propósito** - Descrição clara do objetivo da solução
@@ -79,6 +80,14 @@ SEMPRE incluir esta nota no início da implantação:
 - SEMPRE incluir links para sites oficiais de todas as tecnologias mencionadas
 - Usar formato: **[Nome da Tecnologia](https://link-oficial.com/)**
 
+### Tempo de Leitura
+
+- **Calcular automaticamente**: Estimar baseado no conteúdo do documento
+- **Fórmula padrão**: ~200 palavras por minuto (velocidade média de leitura)
+- **Posicionamento**: Logo após o título principal
+- **Formato**: `⏱️ Tempo de leitura: ~X minutos`
+- **Arredondamento**: Usar números inteiros (ex: ~8 minutos, não 7.5)
+
 ### Compliance
 
 - **Agents.md**: Seguir especificações do [agents.md](https://agents.md/) para compatibilidade com sistemas de IA
@@ -90,6 +99,13 @@ SEMPRE incluir esta nota no início da implantação:
 ### Autor Padrão
 
 ```markdown
+# [NOME_DA_STACK] com [TECNOLOGIAS_PRINCIPAIS]
+
+⏱️ Tempo de leitura: ~X minutos
+
+## Propósito
+[restante do conteúdo...]
+
 ## Autor
 
 DevOps Vanilla
@@ -216,7 +232,8 @@ O arquivo contém:
    - `[MÊS ANO]` - Data da atualização (ex: "Setembro 2025")
 3. **Execute o prompt** em qualquer agent/assistant compatível
 4. **Revise** se todas as 14 seções obrigatórias estão presentes
-5. **Teste** os comandos fornecidos
+5. **Calcule e adicione** o tempo de leitura estimado (~200 palavras/minuto)
+6. **Teste** os comandos fornecidos
 
 ### 5. Garantias do Template
 
@@ -224,5 +241,6 @@ O arquivo contém:
 ✅ Ser compatível com sistemas de IA  
 ✅ Manter qualidade e completude  
 ✅ Respeitar as especificações agents.md  
+✅ Incluir tempo de leitura estimado automaticamente  
 
 **O template está pronto para ser usado por qualquer agent/assistant!** 🎉
