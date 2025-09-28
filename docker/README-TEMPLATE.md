@@ -1,5 +1,7 @@
 # Template para README.md de Stacks Docker
 
+⏱️ Tempo de leitura: ~8 minutos
+
 Use este prompt para criar READMEs padronizados para todas as stacks Docker do projeto .BatOps.
 
 > 🤖 **Compatibilidade com Agents**: Este template segue as especificações do [agents.md](https://agents.md/) para garantir máxima compatibilidade com sistemas de agentes e assistentes de IA.
@@ -177,23 +179,36 @@ dos2unix .env docker-compose.yaml
 
 ## Especificações Agents.md
 
-Este prompt segue as diretrizes do [agents.md](https://agents.md/) que define padrões para:
+Este template segue rigorosamente as diretrizes do [agents.md](https://agents.md/) que define padrões para compatibilidade com sistemas de IA e agentes:
 
-- **Clareza de instruções**: Comandos específicos e não ambíguos
-- **Estrutura consistente**: Hierarquia padronizada de informações
-- **Reprodutibilidade**: Passos que podem ser executados por agentes de IA
-- **Completude**: Todas as informações necessárias incluídas
-- **Compatibilidade**: Formato que funciona com diversos sistemas de IA
+### Padrões Obrigatórios
 
-### Princípios Agents.md Aplicados
+- **Clareza de instruções**: Comandos específicos e não ambíguos para execução por agentes
+- **Estrutura consistente**: Hierarquia padronizada e previsível em todos os READMEs
+- **Reprodutibilidade**: Passos que podem ser executados deterministicamente por agentes de IA
+- **Completude**: Todas as informações necessárias incluídas sem dependências externas
+- **Compatibilidade**: Formato que funciona com diversos sistemas de IA (GPT, Claude, etc.)
 
-- **Instruções específicas**: Cada seção tem diretrizes claras
-- **Formatação padronizada**: Uso consistente de markdown
-- **Comandos testáveis**: Todos os comandos podem ser executados
-- **Estrutura previsível**: Ordem lógica e repetível
-- **Metadados claros**: Informações sobre tecnologias e dependências
+### Princípios Agents.md Implementados
 
-Este template garante consistência e completude em todas as stacks Docker do projeto .BatOps.
+- **Instruções específicas**: Cada seção tem diretrizes claras e executáveis
+- **Formatação padronizada**: Uso consistente de markdown e hierarquia de cabeçalhos
+- **Comandos testáveis**: Todos os comandos bash podem ser executados sem modificações
+- **Estrutura previsível**: Ordem lógica e repetível em todas as 14 seções obrigatórias
+- **Metadados claros**: Informações sobre tecnologias, dependências e tempo de leitura
+- **Variáveis identificáveis**: Placeholders claramente marcados com `[NOME_VARIAVEL]`
+- **Compliance automático**: Respeita markdownlint e outras ferramentas de validação
+
+### Compatibilidade com Sistemas de IA
+
+Este template foi projetado para:
+
+- **GitHub Copilot**: Compatibilidade total com o sistema de assistência do GitHub
+- **Claude (Anthropic)**: Estrutura otimizada para processamento pelo Claude
+- **ChatGPT (OpenAI)**: Formato compatível com modelos GPT
+- **Agentes personalizados**: Seguindo padrões agents.md para máxima interoperabilidade
+
+Este template garante consistência, qualidade e compatibilidade em todas as stacks Docker do projeto .BatOps.
 
 ## Como Usar Este Template
 
@@ -222,18 +237,30 @@ O arquivo contém:
 - **Testável**: Todos os comandos são funcionais
 - **Completo**: Todas as informações necessárias incluídas
 
-### 4. **Para Implementar Nova Stack**
+### 4. Para Implementar Nova Stack
 
-1. **Copie o prompt** da seção "Prompt para Agent/Assistant"
-2. **Substitua as variáveis**:
+#### Passos de Implementação
+
+1. **Preparar variáveis da stack**:
    - `[NOME_DA_STACK]` - Nome da stack (ex: "Grafana", "Jenkins", "ELK")
    - `[TECNOLOGIAS_PRINCIPAIS]` - Tecnologias principais (ex: "Prometheus e AlertManager")
    - `[NOME_STACK]` - Nome do diretório (ex: "grafana", "jenkins", "elk")
    - `[MÊS ANO]` - Data da atualização (ex: "Setembro 2025")
-3. **Execute o prompt** em qualquer agent/assistant compatível
-4. **Revise** se todas as 14 seções obrigatórias estão presentes
-5. **Calcule e adicione** o tempo de leitura estimado (~200 palavras/minuto)
-6. **Teste** os comandos fornecidos
+
+2. **Copiar prompt completo** da seção "Prompt para Agent/Assistant"
+
+3. **Executar em agent/assistant** compatível (GitHub Copilot, Claude, ChatGPT)
+
+4. **Validar resultado** verificando:
+   - ✅ Todas as 14 seções obrigatórias presentes
+   - ✅ Tempo de leitura calculado e adicionado
+   - ✅ Comandos bash funcionais
+   - ✅ Links para tecnologias oficiais
+   - ✅ Estrutura agents.md compliant
+
+5. **Testar comandos** fornecidos no README gerado
+
+6. **Revisar e ajustar** conforme necessidades específicas da stack
 
 ### 5. Garantias do Template
 
@@ -244,3 +271,14 @@ O arquivo contém:
 ✅ Incluir tempo de leitura estimado automaticamente  
 
 **O template está pronto para ser usado por qualquer agent/assistant!** 🎉
+
+## Autor
+
+DevOps Vanilla
+
+- GitHub: [@devopsvanilla](https://github.com/devopsvanilla)
+- Projeto: [.BatOps](https://github.com/devopsvanilla/.BatOps)
+
+---
+
+Última atualização: Setembro 2025

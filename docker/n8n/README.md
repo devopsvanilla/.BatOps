@@ -1,5 +1,7 @@
 # n8n com PostgreSQL e pgAdmin
 
+⏱️ Tempo de leitura: ~9 minutos
+
 ## Propósito
 
 Este projeto fornece uma solução completa para automação de workflows usando [n8n](https://n8n.io/) com banco de dados [PostgreSQL](https://www.postgresql.org/) e interface de administração [pgAdmin](https://www.pgadmin.org/), todos containerizados com [Docker Compose](https://docs.docker.com/compose/).
