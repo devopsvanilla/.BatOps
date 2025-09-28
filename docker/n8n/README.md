@@ -14,8 +14,17 @@ Este projeto fornece uma solução completa para automação de workflows usando
 
 ## Dependências
 
+### Sistema Operacional
+
+- **Linux** (Ubuntu, Debian, CentOS, RHEL, etc.) - Recomendado e testado
+- **macOS** - Compatível
+- **Windows** - Requer [WSL (Windows Subsystem for Linux)](https://docs.microsoft.com/en-us/windows/wsl/)
+
+> ⚠️ **Importante para usuários Windows**: Este procedimento foi desenvolvido e testado para ambientes Linux. Para Windows, é **altamente recomendado** usar [WSL2](https://docs.microsoft.com/en-us/windows/wsl/install) para garantir compatibilidade total com os scripts bash e comandos Docker.
+
 ### Obrigatórias
 
+- **Sistema operacional**: Linux ou WSL2 no Windows
 - [Docker](https://www.docker.com/) >= 20.10
 - [Docker Compose](https://docs.docker.com/compose/) >= 2.0
 
@@ -44,34 +53,98 @@ graph TB
 
 ## Como Implantar e Configurar
 
+> 📂 **Estrutura do Projeto**: Este projeto faz parte do repositório [.BatOps](https://github.com/devopsvanilla/.BatOps) e está localizado no diretório `docker/n8n/`. Todos os comandos devem ser executados a partir deste diretório específico.
+
+### 0. Configuração para Windows (WSL)
+
+Se estiver no Windows, configure o WSL primeiro:
+
+```bash
+# Instalar WSL2 (PowerShell como Administrador)
+wsl --install
+
+# Ou instalar distribuição específica
+wsl --install -d Ubuntu
+
+# Após instalação, entrar no WSL
+wsl
+
+# Instalar Docker no WSL
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+
+# Reiniciar sessão WSL
+exit
+wsl
+```
+
 ### 1. Preparação do Ambiente
 
 ```bash
-# Clone ou navegue até o diretório
-cd /home/devopsvanilla/.BatOps/docker/n8n/
+# Ir para o diretório home
+cd
 
-# Copie o arquivo de configuração
+# Clonar o repositório
+git clone https://github.com/devopsvanilla/.BatOps.git
+
+# Entrar diretamente no diretório da stack n8n
+cd .BatOps/docker/n8n
+
+# Copiar o arquivo de configuração de exemplo
 cp .env.example .env
 ```
 
 ### 2. Personalizar Configurações
 
 ```bash
-# Edite as variáveis conforme necessário
+# Certificar-se de estar no diretório correto
+pwd
+# Deve mostrar: /home/seu_usuario/.BatOps/docker/n8n
+
+# Editar as variáveis conforme necessário
 nano .env
+
+# Ou usar outro editor de sua preferência
+# vim .env
+# code .env
 ```
 
 ### 3. Inicializar os Serviços
 
 ```bash
+# IMPORTANTE: Execute todos os comandos a partir do diretório:
+# /home/seu_usuario/.BatOps/docker/n8n
+
 # Criar e iniciar todos os containers
 docker-compose up -d
 
-# Verificar status
+# Verificar status dos containers
 docker-compose ps
+
+# Verificar logs em tempo real (opcional)
+docker-compose logs -f
 ```
 
-### 4. Configuração Inicial do pgAdmin
+### 4. Verificação de Pré-requisitos
+
+```bash
+# Verificar se está no diretório correto
+pwd
+# Esperado: /home/seu_usuario/.BatOps/docker/n8n
+
+# Verificar se os arquivos necessários existem
+ls -la docker-compose.yaml .env.example
+
+# Verificar se Docker está funcionando
+docker --version
+docker-compose --version
+
+# Testar Docker (deve retornar "Hello from Docker!")
+docker run hello-world
+```
+
+### 5. Configuração Inicial do pgAdmin
 
 1. Acesse <http://localhost:8080>
 2. Login: `admin@n8n.local` / `pgadmin_password`
@@ -110,6 +183,9 @@ docker-compose ps
 ### Teste de Conectividade
 
 ```bash
+# Certificar-se de estar no diretório correto
+cd ~/.BatOps/docker/n8n
+
 # Verificar se todos os containers estão rodando
 docker-compose ps
 
@@ -207,6 +283,24 @@ sudo netstat -tlnp | grep -E ':(5678|8080|5432)'
 sudo chown -R 1000:1000 /var/lib/docker/volumes/n8n_*
 ```
 
+### Problemas no Windows
+
+**Sintomas**: Comandos bash não funcionam ou Docker não responde
+
+**Soluções**:
+
+```bash
+# Verificar se está no WSL
+wsl --status
+
+# Verificar se Docker está rodando no WSL
+docker --version
+sudo service docker start
+
+# Converter terminações de linha se necessário
+dos2unix .env docker-compose.yaml
+```
+
 ## Logs Gerados
 
 | Nome do Log | Origem | Local de Armazenamento |
@@ -257,11 +351,11 @@ Este projeto é fornecido "COMO ESTÁ" (AS-IS), sem garantias de qualquer tipo, 
 
 ## Autor
 
-**DevOps Vanilla**
+DevOps Vanilla
 
 - GitHub: [@devopsvanilla](https://github.com/devopsvanilla)
 - Projeto: [.BatOps](https://github.com/devopsvanilla/.BatOps)
 
 ---
 
-*Última atualização: Setembro 2025*
+Última atualização: Setembro 2025
