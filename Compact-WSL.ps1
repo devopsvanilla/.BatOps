@@ -55,7 +55,8 @@
 #>
 
 [CmdletBinding()]
-param(
+param
+(
     [Parameter(Position = 0)]
     [string]$Name,
     
@@ -67,82 +68,123 @@ param(
     [switch]$ExportOnly
 )
 
-# Configurações
-$ErrorActionPreference = "Stop"
-$VerbosePreference = "Continue"
-
 # Funções auxiliares
 function Write-ColorOutput {
     param(
         [string]$Message,
-        [string]$Color = "White"
+        [ConsoleColor]$Color = "White"
     )
     Write-Host $Message -ForegroundColor $Color
 }
 
 function Get-WSLDistributions {
-    Write-Verbose "Obtendo lista de distribuições WSL..."
-    $wslList = wsl --list --verbose 2>&1 | Out-String
+    <#
+    .SYNOPSIS
+        Obtém lista de distribuições WSL instaladas.
+    #>
     
-    if ($LASTEXITCODE -ne 0) {
-        throw "Erro ao listar distribuições WSL. Certifique-se de que o WSL está instalado."
-    }
-    
-    # Parse da saída do wsl --list --verbose
-    $lines = $wslList -split "`n" | Where-Object { $_ -match "\S" } | Select-Object -Skip 1
-    $distributions = @()
-    
-    foreach ($line in $lines) {
-        if ($line -match "^\s*([*\s])\s*(.+?)\s+(Stopped|Running)\s+(\d+)\s*$") {
-            $distributions += [PSCustomObject]@{
-                Default = ($matches[1] -eq "*")
-                Name = $matches[2].Trim()
-                State = $matches[3]
-                Version = $matches[4]
+    try {
+        # Enumerando distribuições WSL instaladas
+        $Distros = wsl --list --quiet | Where-Object { $_.Trim() -ne "" }
+        if ($Distros -is [string]) { $Distros = @($Distros) }
+        if (-not $Distros -or $Distros.Count -eq 0) {
+            Write-Host "[ERRO] Nenhuma distribuição WSL encontrada. Instale uma distribuição primeiro." -ForegroundColor Red
+            exit 1
+        }
+        
+        $wslList = wsl --list --verbose
+        $distributions = @()
+        
+        # Parse da saída do wsl --list --verbose
+        foreach ($line in $wslList) {
+            # Remove caracteres especiais e espaços extras
+            $cleanLine = $line -replace '[^\x20-\x7E]', '' -replace '\s+', ' ' -replace '^ ', ''
+            
+            # Ignora a linha de cabeçalho e linhas vazias
+            if ($cleanLine -match '^NAME' -or [string]::IsNullOrWhiteSpace($cleanLine)) {
+                continue
+            }
+            
+            # Parse: * Ubuntu-24.04 Running 2
+            if ($cleanLine -match '^([*]?)\s*([^\s]+)\s+(\w+)\s+(\d+)') {
+                $isDefault = $matches[1] -eq '*'
+                $distName = $matches[2]
+                $state = $matches[3]
+                $version = $matches[4]
+                
+                $distributions += [PSCustomObject]@{
+                    Default = $isDefault
+                    Name    = $distName
+                    State   = $state
+                    Version = $version
+                }
             }
         }
+        
+        return $distributions
     }
-    
-    return $distributions
+    catch {
+        Write-ColorOutput "[ERRO] Falha ao listar distribuições WSL: $($_.Exception.Message)" "Red"
+        exit 1
+    }
 }
 
 function Stop-WSLDistribution {
     param([string]$DistName)
     
     Write-ColorOutput "Parando distribuição $DistName..." "Yellow"
-    wsl --terminate $DistName
     
-    if ($LASTEXITCODE -ne 0) {
-        throw "Erro ao parar a distribuição $DistName"
+    try {
+        wsl --terminate $DistName
+        Start-Sleep -Seconds 2
+        Write-ColorOutput "Distribuição parada com sucesso." "Green"
     }
-    
-    Start-Sleep -Seconds 2
-    Write-ColorOutput "Distribuição $DistName parada com sucesso." "Green"
+    catch {
+        Write-ColorOutput "[AVISO] Não foi possível parar a distribuição: $($_.Exception.Message)" "Yellow"
+    }
 }
 
 function Compress-WSLDisk {
     param([string]$DistName)
     
-    Write-ColorOutput "`nCompactando disco virtual de $DistName..." "Cyan"
+    Write-ColorOutput "`nCompactando disco virtual da distribuição $DistName..." "Cyan"
     
-    # Obtém o caminho do disco virtual
-    $distroPath = (wsl --list --verbose | Select-String $DistName).Line
+    # Localiza o arquivo VHDX da distribuição
+    $vhdxPath = "$env:LOCALAPPDATA\Packages\CanonicalGroupLimited.*\LocalState\ext4.vhdx"
+    $vhdxFiles = Get-ChildItem -Path $env:LOCALAPPDATA\Packages -Filter "ext4.vhdx" -Recurse -ErrorAction SilentlyContinue |
+                 Where-Object { $_.DirectoryName -like "*$DistName*" -or $_.Directory.Parent.Name -like "*$DistName*" }
     
-    # Para distribuições instaladas via Microsoft Store
-    $vhdxPath = "$env:LOCALAPPDATA\Packages\" + 
-                "CanonicalGroupLimited.*\LocalState\ext4.vhdx"
-    
-    # Procura pelo arquivo VHDX
-    $vhdxFiles = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Recurse -Filter "ext4.vhdx" -ErrorAction SilentlyContinue |
-                 Where-Object { $_.DirectoryName -match $DistName.Replace("-", "") }
-    
-    if ($vhdxFiles) {
-        $vhdxPath = $vhdxFiles[0].FullName
-        Write-Verbose "Disco virtual encontrado: $vhdxPath"
+    if (-not $vhdxFiles) {
+        # Tenta localizar via registro
+        Write-ColorOutput "Tentando localizar VHDX via registro..." "Gray"
+        $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss"
+        $distroKeys = Get-ChildItem $regPath -ErrorAction SilentlyContinue
         
-        $sizeBefore = (Get-Item $vhdxPath).Length / 1GB
-        Write-ColorOutput "Tamanho antes: $([math]::Round($sizeBefore, 2)) GB" "Gray"
-        
+        foreach ($key in $distroKeys) {
+            $name = (Get-ItemProperty -Path $key.PSPath -Name DistributionName -ErrorAction SilentlyContinue).DistributionName
+            if ($name -eq $DistName) {
+                $basePath = (Get-ItemProperty -Path $key.PSPath -Name BasePath -ErrorAction SilentlyContinue).BasePath
+                $vhdxPath = Join-Path $basePath "ext4.vhdx"
+                if (Test-Path $vhdxPath) {
+                    $vhdxFiles = Get-Item $vhdxPath
+                    break
+                }
+            }
+        }
+    }
+    
+    if (-not $vhdxFiles -or $vhdxFiles.Count -eq 0) {
+        Write-ColorOutput "[AVISO] Arquivo VHDX não encontrado. Pulando compactação." "Yellow"
+        return
+    }
+    
+    $vhdxPath = $vhdxFiles[0].FullName
+    $sizeBefore = [math]::Round((Get-Item $vhdxPath).Length / 1GB, 2)
+    
+    Write-ColorOutput "Arquivo VHDX: $vhdxPath" "Gray"
+    Write-ColorOutput "Tamanho antes: $sizeBefore GB" "Gray"
+    
+    try {
         # Compacta usando diskpart
         $diskpartScript = @"
 select vdisk file="$vhdxPath"
@@ -153,19 +195,14 @@ detach vdisk
         
         $diskpartScript | diskpart | Out-Null
         
-        if ($LASTEXITCODE -eq 0) {
-            $sizeAfter = (Get-Item $vhdxPath).Length / 1GB
-            $saved = $sizeBefore - $sizeAfter
-            Write-ColorOutput "Tamanho depois: $([math]::Round($sizeAfter, 2)) GB" "Gray"
-            Write-ColorOutput "Espaço recuperado: $([math]::Round($saved, 2)) GB" "Green"
-        } else {
-            Write-ColorOutput "Aviso: Compactação via diskpart falhou. Tentando método alternativo..." "Yellow"
-            wsl --manage $DistName --set-sparse true 2>&1 | Out-Null
-        }
-    } else {
-        Write-ColorOutput "Aviso: Disco virtual não encontrado para compactação direta." "Yellow"
-        Write-ColorOutput "Usando método de otimização WSL..." "Yellow"
-        wsl --manage $DistName --set-sparse true 2>&1 | Out-Null
+        $sizeAfter = [math]::Round((Get-Item $vhdxPath).Length / 1GB, 2)
+        $saved = [math]::Round($sizeBefore - $sizeAfter, 2)
+        
+        Write-ColorOutput "Tamanho depois: $sizeAfter GB" "Green"
+        Write-ColorOutput "Espaço economizado: $saved GB" "Green"
+    }
+    catch {
+        Write-ColorOutput "[ERRO] Falha na compactação: $($_.Exception.Message)" "Red"
     }
 }
 
@@ -175,38 +212,47 @@ function Export-WSLDistribution {
         [string]$OutputPath
     )
     
-    Write-ColorOutput "`nExportando $DistName..." "Cyan"
+    Write-ColorOutput "`nExportando distribuição $DistName..." "Cyan"
     
     # Cria diretório de saída se não existir
     if (-not (Test-Path $OutputPath)) {
         New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-        Write-Verbose "Diretório criado: $OutputPath"
     }
     
-    # Nome do arquivo com timestamp
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $exportFile = Join-Path $OutputPath "$DistName-$timestamp.tar"
     
     Write-ColorOutput "Exportando para: $exportFile" "Gray"
-    Write-ColorOutput "Aguarde, isso pode levar alguns minutos..." "Yellow"
     
-    wsl --export $DistName $exportFile
-    
-    if ($LASTEXITCODE -ne 0) {
-        throw "Erro ao exportar a distribuição $DistName"
+    try {
+        wsl --export $DistName $exportFile
+        
+        if (Test-Path $exportFile) {
+            $fileSize = [math]::Round((Get-Item $exportFile).Length / 1GB, 2)
+            Write-ColorOutput "Exportação concluída: $fileSize GB" "Green"
+            return $exportFile
+        }
+        else {
+            throw "Arquivo de exportação não foi criado."
+        }
     }
-    
-    $fileSize = (Get-Item $exportFile).Length / 1GB
-    Write-ColorOutput "Exportação concluída!" "Green"
-    Write-ColorOutput "Arquivo: $exportFile" "Green"
-    Write-ColorOutput "Tamanho: $([math]::Round($fileSize, 2)) GB" "Green"
-    
-    return $exportFile
+    catch {
+        Write-ColorOutput "[ERRO] Falha na exportação: $($_.Exception.Message)" "Red"
+        throw
+    }
 }
 
 # Script principal
 try {
     Write-ColorOutput "`n=== Compact-WSL: Utilitário de Compactação e Backup WSL ===`n" "Cyan"
+    
+    # Enumerando distribuições WSL instaladas
+    $Distros = wsl --list --quiet | Where-Object { $_.Trim() -ne "" }
+    if ($Distros -is [string]) { $Distros = @($Distros) }
+    if (-not $Distros -or $Distros.Count -eq 0) {
+        Write-Host "[ERRO] Nenhuma distribuição WSL encontrada. Instale uma distribuição primeiro." -ForegroundColor Red
+        exit 1
+    }
     
     # Lista distribuições disponíveis
     $distributions = Get-WSLDistributions
@@ -257,7 +303,7 @@ try {
     
     if ($exportedFile) {
         Write-ColorOutput "`nPara restaurar este backup em outra máquina, use:" "Yellow"
-        Write-ColorOutput "wsl --import <nome> <diretório-instalação> $exportedFile" "Gray"
+        Write-ColorOutput "wsl --import <nome> <diretório> $exportedFile" "Gray"
     }
     
 } catch {
