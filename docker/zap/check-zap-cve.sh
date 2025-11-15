@@ -1,7 +1,8 @@
 #!/bin/bash
+set -euo pipefail
 
 # Verifica se o usuário passou uma URL
-if [ -z "$1" ]; then
+if [ -z "${1:-}" ]; then
   echo "Uso: $0 <URL>"
   exit 1
 fi
@@ -29,15 +30,74 @@ mkdir -p "$RESULTS_DIR"
 HTML_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.html"
 PDF_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.pdf"
 
-# Executa ZAP em modo baseline e gera relatório HTML
-echo "🔍 Executando scan de segurança em: $URL"
-docker run --rm -v "$RESULTS_DIR:/zap/wrk:rw" -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-  -t "$URL" \
-  -r "$(basename "$HTML_REPORT")"
+# Função para executar o baseline com uma imagem específica
+run_scan_with_image() {
+  local image="$1"
+  echo "📦 Usando imagem: $image"
+
+  # Se DRY_RUN estiver setado, simula geração do relatório
+  if [[ -n "${DRY_RUN:-}" ]]; then
+    echo "🧪 DRY_RUN ativo - simulando scan e criando HTML fictício"
+    cat >"$HTML_REPORT" <<'EOF'
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>ZAP Baseline Report (DRY RUN)</title></head><body><h1>ZAP Baseline Report (DRY RUN)</h1><p>Este é um relatório de teste.</p></body></html>
+EOF
+    return 0
+  fi
+
+  # Garante que o Docker está disponível
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker não encontrado. Instale e tente novamente."
+    return 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "❌ Docker não está rodando ou o usuário não tem permissão (verifique 'docker ps')."
+    return 1
+  fi
+
+  echo "🔍 Executando scan de segurança em: $URL"
+  set +e
+  docker run --rm \
+    -v "$RESULTS_DIR:/zap/wrk:rw" \
+    -t "$image" zap-baseline.py \
+    -t "$URL" \
+    -r "$(basename "$HTML_REPORT")"
+  local rc=$?
+  set -e
+  return $rc
+}
+
+# Estratégia de imagens: variável ZAP_IMAGE tem prioridade; depois fallback
+IMAGES_TO_TRY=()
+if [[ -n "${ZAP_IMAGE:-}" ]]; then
+  IMAGES_TO_TRY+=("$ZAP_IMAGE")
+else
+  IMAGES_TO_TRY+=(
+    "ghcr.io/zaproxy/zaproxy:stable"
+    "owasp/zap2docker-stable"
+    "owasp/zap2docker-weekly"
+  )
+fi
+
+# Tenta executar com as imagens em ordem até gerar o HTML
+for img in "${IMAGES_TO_TRY[@]}"; do
+  if run_scan_with_image "$img"; then
+    if [[ -f "$HTML_REPORT" && -s "$HTML_REPORT" ]]; then
+      break
+    fi
+  else
+    echo "⚠️  Falha ao executar com a imagem '$img'. Tentando próxima..."
+  fi
+done
 
 # Verifica se o relatório HTML foi gerado
 if [ ! -f "$HTML_REPORT" ]; then
   echo "❌ Erro: Relatório HTML não foi gerado"
+  echo "Dicas de troubleshooting:"
+  echo "  - Verifique conectividade com os registries (ghcr.io, registry-1.docker.io)"
+  echo "  - Se estiver atrás de proxy, exporte HTTP_PROXY/HTTPS_PROXY para o Docker"
+  echo "  - Em ambientes corporativos, o acesso ao GHCR pode ser bloqueado (use 'owasp/zap2docker-stable')"
+  echo "  - Você pode escolher a imagem definindo ZAP_IMAGE=..."
   exit 4
 fi
 
