@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - https://loonar.cloud
+    - https://morpheus-dev.loonar.dev/
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: https://loonar.cloud
+    url: https://morpheus-dev.loonar.dev/
   type: spider
 - parameters:
     maxDuration: 0
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: loonar.cloud-202511142256.html
+    reportFile: morpheus-dev.loonar.dev-202511150112.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report

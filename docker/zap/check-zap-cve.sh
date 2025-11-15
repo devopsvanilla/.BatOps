@@ -70,8 +70,8 @@ EOF
 # Pergunta ao usuário qual imagem deseja usar
 echo "Escolha a imagem Docker para executar o scan ZAP:"
 echo "1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)"
-echo "2) owasp/zap2docker-stable (Docker Hub, estável)"
-echo "3) owasp/zap2docker-weekly (Docker Hub, semanal)"
+echo "2) zaproxy/zap-stable (Docker Hub, estável)"
+echo "3) zaproxy/zap-weekly (Docker Hub, semanal)"
 echo "4) DRY_RUN (simulação, sem Docker)"
 read -p "Digite o número da opção desejada [1-4]: " ZAP_OPT
 
@@ -80,10 +80,10 @@ case "$ZAP_OPT" in
     ZAP_IMAGE="ghcr.io/zaproxy/zaproxy:stable"
     ;;
   2)
-    ZAP_IMAGE="owasp/zap2docker-stable"
+    ZAP_IMAGE="zaproxy/zap-stable"
     ;;
   3)
-    ZAP_IMAGE="owasp/zap2docker-weekly"
+    ZAP_IMAGE="zaproxy/zap-weekly"
     ;;
   4)
     DRY_RUN=1
@@ -107,7 +107,7 @@ if [ ! -f "$HTML_REPORT" ]; then
   echo "Dicas de troubleshooting:"
   echo "  - Verifique conectividade com os registries (ghcr.io, registry-1.docker.io)"
   echo "  - Se estiver atrás de proxy, exporte HTTP_PROXY/HTTPS_PROXY para o Docker"
-  echo "  - Em ambientes corporativos, o acesso ao GHCR pode ser bloqueado (use 'owasp/zap2docker-stable')"
+  echo "  - Em ambientes corporativos, o acesso ao GHCR pode ser bloqueado (use 'zaproxy/zap-stable')"
   echo "  - Você pode escolher a imagem definindo ZAP_IMAGE=..."
   exit 4
 fi

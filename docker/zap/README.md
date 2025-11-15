@@ -47,8 +47,8 @@ Por padrão, o baseline realiza um spider leve para descobrir páginas e, então
 Ao iniciar, você verá um menu interativo:
 
 1) `ghcr.io/zaproxy/zaproxy:stable` (GHCR, mais recente)
-2) `owasp/zap2docker-stable` (Docker Hub, estável)
-3) `owasp/zap2docker-weekly` (Docker Hub, semanal)
+2) `zaproxy/zap-stable` (Docker Hub, estável)
+3) `zaproxy/zap-weekly` (Docker Hub, semanal)
 4) `DRY_RUN` (simulação, sem Docker)
 
 - Escolha 2 ou 3 para evitar GHCR, caso sua rede bloqueie `ghcr.io`.
@@ -89,7 +89,7 @@ xdg-open ./zap-results/example.com-YYYYMMDDHHMM.html
 1) Erro ao acessar GHCR: `OpenSSL SSL_connect: SSL_ERROR_SYSCALL` ou `EOF`
 - Causa provável: firewall/proxy corporativo interceptando/bloqueando TLS para `ghcr.io`
 - Soluções rápidas:
-  - Use Docker Hub: escolha a opção 2 (`owasp/zap2docker-stable`) ou 3 (`owasp/zap2docker-weekly`)
+  - Use Docker Hub: escolha a opção 2 (`zaproxy/zap-stable`) ou 3 (`zaproxy/zap-weekly`)
   - Verifique rede com:
     ```bash
     curl -v https://ghcr.io/v2/
