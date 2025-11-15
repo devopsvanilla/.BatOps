@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: loonar.cloud-202511142217.html
+    reportFile: loonar.cloud-202511142256.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report

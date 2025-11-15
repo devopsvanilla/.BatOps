@@ -67,28 +67,39 @@ EOF
   return $rc
 }
 
-# Estratégia de imagens: variável ZAP_IMAGE tem prioridade; depois fallback
-IMAGES_TO_TRY=()
-if [[ -n "${ZAP_IMAGE:-}" ]]; then
-  IMAGES_TO_TRY+=("$ZAP_IMAGE")
-else
-  IMAGES_TO_TRY+=(
-    "ghcr.io/zaproxy/zaproxy:stable"
-    "owasp/zap2docker-stable"
-    "owasp/zap2docker-weekly"
-  )
-fi
+# Pergunta ao usuário qual imagem deseja usar
+echo "Escolha a imagem Docker para executar o scan ZAP:"
+echo "1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)"
+echo "2) owasp/zap2docker-stable (Docker Hub, estável)"
+echo "3) owasp/zap2docker-weekly (Docker Hub, semanal)"
+echo "4) DRY_RUN (simulação, sem Docker)"
+read -p "Digite o número da opção desejada [1-4]: " ZAP_OPT
 
-# Tenta executar com as imagens em ordem até gerar o HTML
-for img in "${IMAGES_TO_TRY[@]}"; do
-  if run_scan_with_image "$img"; then
-    if [[ -f "$HTML_REPORT" && -s "$HTML_REPORT" ]]; then
-      break
-    fi
-  else
-    echo "⚠️  Falha ao executar com a imagem '$img'. Tentando próxima..."
-  fi
-done
+case "$ZAP_OPT" in
+  1)
+    ZAP_IMAGE="ghcr.io/zaproxy/zaproxy:stable"
+    ;;
+  2)
+    ZAP_IMAGE="owasp/zap2docker-stable"
+    ;;
+  3)
+    ZAP_IMAGE="owasp/zap2docker-weekly"
+    ;;
+  4)
+    DRY_RUN=1
+    ;;
+  *)
+    echo "Opção inválida. Abortando."
+    exit 10
+    ;;
+esac
+
+# Executa o scan com a imagem escolhida
+if [[ -n "${DRY_RUN:-}" ]]; then
+  run_scan_with_image "dummy"
+else
+  run_scan_with_image "$ZAP_IMAGE"
+fi
 
 # Verifica se o relatório HTML foi gerado
 if [ ! -f "$HTML_REPORT" ]; then
