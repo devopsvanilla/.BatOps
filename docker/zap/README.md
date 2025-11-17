@@ -68,7 +68,24 @@ Por padrão, o baseline realiza um spider leve para descobrir páginas e, então
 
 ## 🚀 Como usar
 
-### Opção 1: Docker Compose (Recomendado)
+### Opção 1: Script Interativo (Recomendado para iniciantes)
+
+Execute o script wrapper que guia você por todas as opções:
+
+```bash
+./run-zap-scanner.sh
+```
+
+O script interativo irá:
+- ✅ Verificar se Docker está instalado e rodando
+- 🔨 Construir a imagem (ou perguntar se deseja reconstruir)
+- 🎯 Solicitar a URL alvo
+- 📦 Permitir escolher a imagem ZAP
+- ⚠️ Alertar sobre scans em produção e pedir confirmação
+- 📝 Solicitar número de ticket/chamado (se produção)
+- 🚀 Executar o scan e exibir resultados
+
+### Opção 2: Docker Compose
 
 ```bash
 # Build da imagem
@@ -84,7 +101,7 @@ docker compose run --rm zap-scanner https://seu-site.com
 ls -la zap-results/
 ```
 
-### Opção 2: Docker CLI
+### Opção 3: Docker CLI (Uso avançado)
 
 ```bash
 # Build da imagem
