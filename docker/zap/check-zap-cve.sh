@@ -104,8 +104,12 @@ check_and_install_dependencies() {
   fi
 }
 
-# Executa verificação de dependências
-check_and_install_dependencies
+# Executa verificação de dependências (pula se estiver em container ou variável setada)
+if [[ -z "${SKIP_DEPENDENCY_CHECK:-}" ]] && [[ ! -f "/.dockerenv" ]]; then
+  check_and_install_dependencies
+else
+  echo -e "${CYAN}ℹ️  Pulando verificação/instalação de dependências (ambiente containerizado ou SKIP_DEPENDENCY_CHECK=1)${NC}"
+fi
 
 # Verifica se o usuário passou uma URL
 if [ -z "${1:-}" ]; then
@@ -175,33 +179,45 @@ EOF
   return $rc
 }
 
-# Pergunta ao usuário qual imagem deseja usar
-echo -e "${YELLOW}Escolha a imagem Docker para executar o scan ZAP:${NC}"
-echo -e "${YELLOW}1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)${NC}"
-echo -e "${YELLOW}2) zaproxy/zap-stable (Docker Hub, estável)${NC}"
-echo -e "${YELLOW}3) zaproxy/zap-weekly (Docker Hub, semanal)${NC}"
-echo -e "${YELLOW}4) DRY_RUN (simulação, sem Docker)${NC}"
-echo -e -n "${YELLOW}Digite o número da opção desejada [1-4]: ${NC}"
-read ZAP_OPT
-
-case "$ZAP_OPT" in
-  1)
-    ZAP_IMAGE="ghcr.io/zaproxy/zaproxy:stable"
-    ;;
-  2)
-    ZAP_IMAGE="zaproxy/zap-stable"
-    ;;
-  3)
-    ZAP_IMAGE="zaproxy/zap-weekly"
-    ;;
-  4)
+# Seleção da imagem ZAP (não interativa se variáveis de ambiente definidas)
+if [[ -n "${ZAP_IMAGE:-}" ]]; then
+  if [[ "$ZAP_IMAGE" == "DRY_RUN" ]]; then
     DRY_RUN=1
-    ;;
-  *)
-    echo -e "${RED}Opção inválida. Abortando.${NC}"
-    exit 10
-    ;;
-esac
+    echo -e "${CYAN}🧪 DRY_RUN habilitado via ZAP_IMAGE=DRY_RUN${NC}"
+  fi
+elif [[ -n "${NO_PROMPT:-}" || -n "${CI:-}" || -f "/.dockerenv" ]]; then
+  # Modo não interativo: escolhe padrão estável
+  ZAP_IMAGE="ghcr.io/zaproxy/zaproxy:stable"
+  echo -e "${CYAN}ℹ️  Modo não interativo detectado. Usando imagem padrão: ${ZAP_IMAGE}${NC}"
+else
+  # Pergunta ao usuário qual imagem deseja usar
+  echo -e "${YELLOW}Escolha a imagem Docker para executar o scan ZAP:${NC}"
+  echo -e "${YELLOW}1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)${NC}"
+  echo -e "${YELLOW}2) zaproxy/zap-stable (Docker Hub, estável)${NC}"
+  echo -e "${YELLOW}3) zaproxy/zap-weekly (Docker Hub, semanal)${NC}"
+  echo -e "${YELLOW}4) DRY_RUN (simulação, sem Docker)${NC}"
+  echo -e -n "${YELLOW}Digite o número da opção desejada [1-4]: ${NC}"
+  read ZAP_OPT
+
+  case "$ZAP_OPT" in
+    1)
+      ZAP_IMAGE="ghcr.io/zaproxy/zaproxy:stable"
+      ;;
+    2)
+      ZAP_IMAGE="zaproxy/zap-stable"
+      ;;
+    3)
+      ZAP_IMAGE="zaproxy/zap-weekly"
+      ;;
+    4)
+      DRY_RUN=1
+      ;;
+    *)
+      echo -e "${RED}Opção inválida. Abortando.${NC}"
+      exit 10
+      ;;
+  esac
+fi
 
 # Executa o scan com a imagem escolhida
 # Captura o exit code mas não para o script (ZAP retorna 0=sucesso, 1=warnings, 2=erros, 3=falha fatal)

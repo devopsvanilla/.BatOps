@@ -25,7 +25,9 @@ RUN mkdir -p /app/zap-results
 RUN chmod +x /app/check-zap-cve.sh
 
 # Define variáveis de ambiente para evitar instalação interativa
-ENV SKIP_DEPENDENCY_CHECK=1
+ENV SKIP_DEPENDENCY_CHECK=1 \
+    NO_PROMPT=1 \
+    CI=1
 
 # Volume para armazenar resultados
 VOLUME ["/app/zap-results"]
