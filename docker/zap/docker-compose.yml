@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  zap-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zap-security-scanner
+    privileged: true
+    volumes:
+      # Monta o socket do Docker do host (Docker-in-Docker)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Monta o diretório de resultados
+      - ./zap-results:/app/zap-results
+    environment:
+      - SKIP_DEPENDENCY_CHECK=1
+    # Sobrescreva com a URL que deseja testar
+    command: ["https://devopsvanilla.guru"]
+    network_mode: bridge

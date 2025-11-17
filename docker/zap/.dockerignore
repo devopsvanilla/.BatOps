@@ -1,0 +1,10 @@
+zap-results/
+*.md
+*.log
+*.html
+*.pdf
+.git/
+.gitignore
+docker-compose.yml
+Dockerfile
+CHANGELOG.md
