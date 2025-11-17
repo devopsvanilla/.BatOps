@@ -1,9 +1,115 @@
 #!/bin/bash
 set -euo pipefail
 
+# Desabilita pipefail para permitir que o script continue após o ZAP retornar exit code não-zero
+set +o pipefail
+
+# Definição de cores
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Função para verificar e instalar dependências
+check_and_install_dependencies() {
+  local missing_deps=()
+  
+  # Verifica Docker
+  if ! command -v docker >/dev/null 2>&1; then
+    missing_deps+=("docker.io")
+  fi
+  
+  # Verifica wkhtmltopdf
+  if ! command -v wkhtmltopdf >/dev/null 2>&1; then
+    missing_deps+=("wkhtmltopdf")
+  fi
+  
+  # Se houver dependências faltando, tenta instalar
+  if [ ${#missing_deps[@]} -gt 0 ]; then
+    echo -e "${ORANGE}⚠️  Dependências faltando: ${missing_deps[*]}${NC}"
+    echo -e "${YELLOW}Deseja instalar as dependências necessárias? [S/n]: ${NC}"
+    read -r response
+    
+    if [[ "$response" =~ ^[Ss]$ ]] || [[ -z "$response" ]]; then
+      echo -e "${CYAN}🔧 Instalando dependências...${NC}"
+      
+      # Atualiza lista de pacotes
+      if ! sudo apt-get update >/dev/null 2>&1; then
+        echo -e "${RED}❌ Erro ao atualizar lista de pacotes. Execute manualmente: sudo apt-get update${NC}"
+        exit 1
+      fi
+      
+      # Instala dependências
+      for dep in "${missing_deps[@]}"; do
+        echo -e "${CYAN}   Instalando $dep...${NC}"
+        if sudo apt-get install -y "$dep" >/dev/null 2>&1; then
+          echo -e "${GREEN}   ✅ $dep instalado com sucesso${NC}"
+        else
+          echo -e "${RED}   ❌ Erro ao instalar $dep${NC}"
+          if [ "$dep" = "docker.io" ]; then
+            echo -e "${ORANGE}   Para instalar Docker manualmente, execute:${NC}"
+            echo -e "${ORANGE}   sudo apt-get update && sudo apt-get install -y docker.io${NC}"
+            echo -e "${ORANGE}   sudo systemctl start docker${NC}"
+            echo -e "${ORANGE}   sudo usermod -aG docker \$USER${NC}"
+            exit 1
+          fi
+        fi
+      done
+      
+      # Verifica se Docker foi instalado e está rodando
+      if [[ " ${missing_deps[*]} " =~ docker.io ]]; then
+        echo -e "${CYAN}🔧 Iniciando serviço Docker...${NC}"
+        sudo systemctl start docker 2>/dev/null || true
+        sudo systemctl enable docker 2>/dev/null || true
+        
+        # Adiciona usuário ao grupo docker
+        if ! groups | grep -q docker; then
+          echo -e "${CYAN}🔧 Adicionando usuário ao grupo docker...${NC}"
+          sudo usermod -aG docker "$USER"
+          echo -e "${ORANGE}⚠️  Para usar Docker sem sudo, você precisa fazer logout e login novamente.${NC}"
+          echo -e "${ORANGE}   Ou execute: newgrp docker${NC}"
+        fi
+      fi
+      
+      echo -e "${GREEN}✅ Todas as dependências foram instaladas!${NC}\n"
+    else
+      echo -e "${ORANGE}⚠️  Instalação cancelada. O script pode não funcionar corretamente.${NC}"
+      
+      # Lista dependências que precisam ser instaladas manualmente
+      if [[ " ${missing_deps[*]} " =~ docker.io ]]; then
+        echo -e "${ORANGE}   Docker é obrigatório. Instale com: sudo apt-get install docker.io${NC}"
+        exit 1
+      fi
+    fi
+  fi
+  
+  # Verifica se Docker está rodando (se instalado)
+  if command -v docker >/dev/null 2>&1; then
+    if ! docker info >/dev/null 2>&1; then
+      echo -e "${ORANGE}⚠️  Docker está instalado mas não está rodando.${NC}"
+      echo -e "${YELLOW}Deseja iniciar o serviço Docker? [S/n]: ${NC}"
+      read -r response
+      
+      if [[ "$response" =~ ^[Ss]$ ]] || [[ -z "$response" ]]; then
+        sudo systemctl start docker
+        echo -e "${GREEN}✅ Docker iniciado com sucesso${NC}\n"
+      else
+        echo -e "${RED}❌ Docker não está rodando. O script não pode continuar.${NC}"
+        exit 1
+      fi
+    fi
+  fi
+}
+
+# Executa verificação de dependências
+check_and_install_dependencies
+
 # Verifica se o usuário passou uma URL
 if [ -z "${1:-}" ]; then
-  echo "Uso: $0 <URL>"
+  echo -e "${RED}Uso: $0 <URL>${NC}"
   exit 1
 fi
 
@@ -11,7 +117,7 @@ URL="$1"
 
 # Validação da URL no formato http(s)://<fqdn>
 if [[ ! "$URL" =~ ^https?://([a-zA-Z0-9.-]+\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(/.*)?$ ]]; then
-  echo "Erro: URL inválida. Use o formato http(s)://<domínio> (ex: https://devopsvanilla.guru)"
+  echo -e "${RED}Erro: URL inválida. Use o formato http(s)://<domínio> (ex: https://devopsvanilla.guru)${NC}"
   exit 2
 fi
 
@@ -29,51 +135,54 @@ mkdir -p "$RESULTS_DIR"
 # Caminho do relatório
 HTML_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.html"
 PDF_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.pdf"
+ZAP_OUTPUT_LOG="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.log"
 
 # Função para executar o baseline com uma imagem específica
 run_scan_with_image() {
   local image="$1"
-  echo "📦 Usando imagem: $image"
+  echo -e "${CYAN}📦 Usando imagem: $image${NC}"
 
   # Se DRY_RUN estiver setado, simula geração do relatório
   if [[ -n "${DRY_RUN:-}" ]]; then
-    echo "🧪 DRY_RUN ativo - simulando scan e criando HTML fictício"
+    echo -e "${CYAN}🧪 DRY_RUN ativo - simulando scan e criando HTML fictício${NC}"
     cat >"$HTML_REPORT" <<'EOF'
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>ZAP Baseline Report (DRY RUN)</title></head><body><h1>ZAP Baseline Report (DRY RUN)</h1><p>Este é um relatório de teste.</p></body></html>
 EOF
+    echo "FAIL-NEW: 0     FAIL-INPROG: 0  WARN-NEW: 5    WARN-INPROG: 0  INFO: 0 IGNORE: 0       PASS: 10" > "$ZAP_OUTPUT_LOG"
     return 0
   fi
 
   # Garante que o Docker está disponível
   if ! command -v docker >/dev/null 2>&1; then
-    echo "❌ Docker não encontrado. Instale e tente novamente."
+    echo -e "${RED}❌ Docker não encontrado. Instale e tente novamente.${NC}"
     return 1
   fi
 
   if ! docker info >/dev/null 2>&1; then
-    echo "❌ Docker não está rodando ou o usuário não tem permissão (verifique 'docker ps')."
+    echo -e "${RED}❌ Docker não está rodando ou o usuário não tem permissão (verifique 'docker ps').${NC}"
     return 1
   fi
 
-  echo "🔍 Executando scan de segurança em: $URL"
+  echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
   set +e
   docker run --rm \
     -v "$RESULTS_DIR:/zap/wrk:rw" \
     -t "$image" zap-baseline.py \
     -t "$URL" \
-    -r "$(basename "$HTML_REPORT")"
+    -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
   local rc=$?
   set -e
   return $rc
 }
 
 # Pergunta ao usuário qual imagem deseja usar
-echo "Escolha a imagem Docker para executar o scan ZAP:"
-echo "1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)"
-echo "2) zaproxy/zap-stable (Docker Hub, estável)"
-echo "3) zaproxy/zap-weekly (Docker Hub, semanal)"
-echo "4) DRY_RUN (simulação, sem Docker)"
-read -p "Digite o número da opção desejada [1-4]: " ZAP_OPT
+echo -e "${YELLOW}Escolha a imagem Docker para executar o scan ZAP:${NC}"
+echo -e "${YELLOW}1) ghcr.io/zaproxy/zaproxy:stable (GHCR, mais recente)${NC}"
+echo -e "${YELLOW}2) zaproxy/zap-stable (Docker Hub, estável)${NC}"
+echo -e "${YELLOW}3) zaproxy/zap-weekly (Docker Hub, semanal)${NC}"
+echo -e "${YELLOW}4) DRY_RUN (simulação, sem Docker)${NC}"
+echo -e -n "${YELLOW}Digite o número da opção desejada [1-4]: ${NC}"
+read ZAP_OPT
 
 case "$ZAP_OPT" in
   1)
@@ -89,36 +198,120 @@ case "$ZAP_OPT" in
     DRY_RUN=1
     ;;
   *)
-    echo "Opção inválida. Abortando."
+    echo -e "${RED}Opção inválida. Abortando.${NC}"
     exit 10
     ;;
 esac
 
 # Executa o scan com a imagem escolhida
+# Captura o exit code mas não para o script (ZAP retorna 0=sucesso, 1=warnings, 2=erros, 3=falha fatal)
+set +e
 if [[ -n "${DRY_RUN:-}" ]]; then
   run_scan_with_image "dummy"
+  ZAP_EXIT_CODE=$?
 else
   run_scan_with_image "$ZAP_IMAGE"
+  ZAP_EXIT_CODE=$?
 fi
+set -e
 
 # Verifica se o relatório HTML foi gerado
 if [ ! -f "$HTML_REPORT" ]; then
-  echo "❌ Erro: Relatório HTML não foi gerado"
-  echo "Dicas de troubleshooting:"
-  echo "  - Verifique conectividade com os registries (ghcr.io, registry-1.docker.io)"
-  echo "  - Se estiver atrás de proxy, exporte HTTP_PROXY/HTTPS_PROXY para o Docker"
-  echo "  - Em ambientes corporativos, o acesso ao GHCR pode ser bloqueado (use 'zaproxy/zap-stable')"
-  echo "  - Você pode escolher a imagem definindo ZAP_IMAGE=..."
+  echo -e "${RED}❌ Erro: Relatório HTML não foi gerado${NC}"
+  echo -e "${ORANGE}Dicas de troubleshooting:${NC}"
+  echo -e "${ORANGE}  - Verifique conectividade com os registries (ghcr.io, registry-1.docker.io)${NC}"
+  echo -e "${ORANGE}  - Se estiver atrás de proxy, exporte HTTP_PROXY/HTTPS_PROXY para o Docker${NC}"
+  echo -e "${ORANGE}  - Em ambientes corporativos, o acesso ao GHCR pode ser bloqueado (use 'zaproxy/zap-stable')${NC}"
+  echo -e "${ORANGE}  - Você pode escolher a imagem definindo ZAP_IMAGE=...${NC}"
   exit 4
 fi
 
-echo "✅ Relatório HTML gerado em: $HTML_REPORT"
+echo -e "${GREEN}✅ Relatório HTML gerado em: $HTML_REPORT${NC}"
 
 # Converte HTML para PDF usando wkhtmltopdf
+PDF_GENERATED=0
 if command -v wkhtmltopdf >/dev/null 2>&1; then
-  wkhtmltopdf "$HTML_REPORT" "$PDF_REPORT"
-  echo "✅ Relatório PDF gerado em: $PDF_REPORT"
+  set +e
+  wkhtmltopdf "$HTML_REPORT" "$PDF_REPORT" >/dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Relatório PDF gerado em: $PDF_REPORT${NC}"
+    PDF_GENERATED=1
+  else
+    echo -e "${ORANGE}⚠️  Erro ao gerar PDF com wkhtmltopdf.${NC}"
+  fi
+  set -e
 else
-  echo "⚠️  wkhtmltopdf não está instalado. Apenas o relatório HTML foi gerado."
-  echo "   Para gerar PDF, instale com: sudo apt install wkhtmltopdf"
+  echo -e "${ORANGE}⚠️  wkhtmltopdf não está instalado. Apenas o relatório HTML foi gerado.${NC}"
+  echo -e "${ORANGE}   Para gerar PDF, instale com: sudo apt install wkhtmltopdf${NC}"
 fi
+
+# Extrai estatísticas do relatório HTML
+echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}               RESUMO DO SCAN DE SEGURANÇA${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+# Extrai informações da linha de resumo do ZAP (formato: FAIL-NEW: 0 FAIL-INPROG: 0 WARN-NEW: 11...)
+if [ -f "$ZAP_OUTPUT_LOG" ]; then
+  # Extrai a última linha que contém o resumo
+  SUMMARY_LINE=$(grep -E "FAIL-NEW:.*WARN-NEW:.*PASS:" "$ZAP_OUTPUT_LOG" 2>/dev/null | tail -1)
+  
+  if [ -n "$SUMMARY_LINE" ]; then
+    # Extrai cada valor usando regex
+    FAIL_COUNT=$(echo "$SUMMARY_LINE" | grep -oP 'FAIL-NEW:\s*\K\d+' || echo "0")
+    WARN_COUNT=$(echo "$SUMMARY_LINE" | grep -oP 'WARN-NEW:\s*\K\d+' || echo "0")
+    PASS_COUNT=$(echo "$SUMMARY_LINE" | grep -oP 'PASS:\s*\K\d+' || echo "0")
+  else
+    # Fallback: tenta extrair do HTML
+    PASS_COUNT=$(grep -oP 'PASS: \K\d+' "$HTML_REPORT" 2>/dev/null | tail -1 || echo "0")
+    WARN_COUNT=$(grep -oP 'WARN-NEW: \K\d+' "$HTML_REPORT" 2>/dev/null | tail -1 || echo "0")
+    FAIL_COUNT=$(grep -oP 'FAIL-NEW: \K\d+' "$HTML_REPORT" 2>/dev/null | tail -1 || echo "0")
+  fi
+  
+  # Calcula total de testes
+  TOTAL_TESTS=$((PASS_COUNT + WARN_COUNT + FAIL_COUNT))
+  
+  echo -e "${CYAN}🎯 Total de testes executados:${NC} ${BLUE}$TOTAL_TESTS${NC}"
+  echo -e "${GREEN}✅ Testes aprovados (PASS):${NC}    ${GREEN}$PASS_COUNT${NC}"
+  echo -e "${ORANGE}⚠️  Alertas encontrados (WARN):${NC}  ${ORANGE}$WARN_COUNT${NC}"
+  echo -e "${RED}❌ Falhas detectadas (FAIL):${NC}   ${RED}$FAIL_COUNT${NC}"
+  echo ""
+  
+  # Barra de progresso visual
+  if [ "$TOTAL_TESTS" -gt 0 ]; then
+    PASS_PERCENT=$((PASS_COUNT * 100 / TOTAL_TESTS))
+    WARN_PERCENT=$((WARN_COUNT * 100 / TOTAL_TESTS))
+    FAIL_PERCENT=$((FAIL_COUNT * 100 / TOTAL_TESTS))
+    
+    echo -e "${CYAN}📊 Distribuição:${NC}"
+    
+    # Cria barra de 50 caracteres
+    BAR_LENGTH=50
+    PASS_BAR=$((PASS_COUNT * BAR_LENGTH / TOTAL_TESTS))
+    WARN_BAR=$((WARN_COUNT * BAR_LENGTH / TOTAL_TESTS))
+    FAIL_BAR=$((FAIL_COUNT * BAR_LENGTH / TOTAL_TESTS))
+    
+    printf "   "
+    printf "${GREEN}"
+    printf '█%.0s' $(seq 1 $PASS_BAR) 2>/dev/null
+    printf "${ORANGE}"
+    printf '█%.0s' $(seq 1 $WARN_BAR) 2>/dev/null
+    printf "${RED}"
+    printf '█%.0s' $(seq 1 $FAIL_BAR) 2>/dev/null
+    printf "${NC}"
+    printf '░%.0s' $(seq 1 $((BAR_LENGTH - PASS_BAR - WARN_BAR - FAIL_BAR))) 2>/dev/null
+    printf "${NC}\n"
+    
+    echo -e "   ${GREEN}■${NC} Pass: ${PASS_PERCENT}%  ${ORANGE}■${NC} Warn: ${WARN_PERCENT}%  ${RED}■${NC} Fail: ${FAIL_PERCENT}%"
+  fi
+fi
+
+echo ""
+echo -e "${CYAN}📄 Relatórios gerados:${NC}"
+echo -e "   ${BLUE}HTML:${NC} $HTML_REPORT"
+if [ "$PDF_GENERATED" -eq 1 ]; then
+  echo -e "   ${BLUE}PDF:${NC}  $PDF_REPORT"
+fi
+echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+# Retorna o exit code original do ZAP
+exit "${ZAP_EXIT_CODE:-0}"

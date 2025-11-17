@@ -2,10 +2,12 @@
 
 Esta página documenta o script `check-zap-cve.sh`, que executa um scan de baseline (passivo) com o OWASP ZAP em uma URL alvo, gerando um relatório HTML (e opcionalmente PDF) em `zap-results/`.
 
+![ZAP Scan Report](../../_images/check-zap-cve.jpeg)
 
 ## Visão geral
 
-O script:
+**O script:**
+
 - Valida a URL no formato `http(s)://<fqdn>` (pode conter caminho)
 - Pergunta qual imagem Docker do ZAP você deseja usar (GHCR ou Docker Hub) ou permite um modo de simulação (DRY_RUN)
 - Executa o ZAP Baseline (passivo, sem ataques ativos) dentro de um container Docker
@@ -71,9 +73,24 @@ Saídas e códigos de retorno relevantes:
 ./check-zap-cve.sh https://example.com
 ```
 
+- Executar informando a opção diretamente (sem interação):
+```bash
+# Opção 1 - GHCR (mais recente)
+echo "1" | ./check-zap-cve.sh https://example.com
+
+# Opção 2 - Docker Hub estável (recomendado se GHCR estiver bloqueado)
+echo "2" | ./check-zap-cve.sh https://example.com
+
+# Opção 3 - Docker Hub semanal
+echo "3" | ./check-zap-cve.sh https://example.com
+
+# Opção 4 - DRY_RUN (simulação)
+echo "4" | ./check-zap-cve.sh https://example.com
+```
+
 - Se a rede bloquear GHCR, escolha a opção 2 (Docker Hub estável) quando o menu for exibido.
 
-- Simular sem Docker/rede (DRY_RUN):
+- Simular sem Docker/rede (DRY_RUN usando variável de ambiente):
 ```bash
 DRY_RUN=1 ./check-zap-cve.sh https://example.com
 ```
@@ -162,3 +179,24 @@ xdg-open ./zap-results/example.com-YYYYMMDDHHMM.html
 - O modo Baseline do ZAP é uma excelente verificação inicial e de monitoramento contínuo
 - Para uma cobertura mais profunda, combine com scans ativos, SAST/DAST adicionais, e revisões manuais
 - Use o DRY_RUN para validar a integração (CI/CD) sem dependências de rede
+
+
+## Agradecimentos
+
+Este projeto utiliza as seguintes ferramentas e dependências:
+
+- **[OWASP ZAP (Zed Attack Proxy)](https://www.zaproxy.org/)** - Scanner de segurança de aplicações web, open source e mantido pela OWASP
+  - Imagens Docker: `ghcr.io/zaproxy/zaproxy:stable`, `zaproxy/zap-stable`, `zaproxy/zap-weekly`
+  - Licença: Apache License 2.0
+
+- **[Docker](https://www.docker.com/)** - Plataforma de containerização utilizada para executar o ZAP de forma isolada e portável
+  - Licença: Apache License 2.0
+
+- **[wkhtmltopdf](https://wkhtmltopdf.org/)** - Ferramenta de conversão de HTML para PDF usando o engine de renderização Qt WebKit
+  - Licença: LGPLv3
+
+Agradecemos também à comunidade OWASP e aos mantenedores de todas essas ferramentas pelo trabalho contínuo em tornar a segurança de aplicações mais acessível.
+
+---
+
+Este script faz parte do **[.BatOps](https://github.com/devopsvanilla/.BatOps)** - Uma coleção de scripts utilitários para DevOps e automação.
