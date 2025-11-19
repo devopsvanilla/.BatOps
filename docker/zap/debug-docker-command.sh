@@ -26,7 +26,8 @@ get_host_entries() {
         
         if [ -n "$ip" ] && [ -n "$hostname" ]; then
           entries="${entries} --add-host=${hostname}:${ip}"
-          echo "Detectado: ${hostname} -> ${ip}"
+          # Mensagens informativas vão para stderr
+          echo "Detectado: ${hostname} -> ${ip}" >&2
           found=true
         fi
       fi
@@ -34,9 +35,10 @@ get_host_entries() {
   fi
   
   if [ "$found" = false ]; then
-    echo "AVISO: Nenhuma entrada encontrada"
+    echo "AVISO: Nenhuma entrada encontrada" >&2
   fi
   
+  # Retorna apenas o valor para stdout
   echo "$entries"
 }
 
