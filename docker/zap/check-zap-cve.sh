@@ -162,20 +162,22 @@ get_host_entries() {
         
         if [ -n "$ip" ] && [ -n "$hostname" ]; then
           entries="${entries} --add-host=${hostname}:${ip}"
-          echo -e "${CYAN}🔗 Mapeamento DNS detectado: ${hostname} -> ${ip}${NC}"
+          # Envia mensagem informativa para stderr (não capturada pela atribuição)
+          echo -e "${CYAN}🔗 Mapeamento DNS detectado: ${hostname} -> ${ip}${NC}" >&2
           found=true
         fi
       fi
     done < /etc/hosts
   fi
   
-  # Se não encontrou entradas, informa ao usuário
+  # Se não encontrou entradas, informa ao usuário (stderr)
   if [ "$found" = false ]; then
-    echo -e "${YELLOW}⚠️  Nenhuma entrada encontrada em /etc/hosts para: ${domain}${NC}"
-    echo -e "${YELLOW}   Se o domínio não está no DNS público, adicione:${NC}"
-    echo -e "${YELLOW}   echo \"<IP> ${domain}\" | sudo tee -a /etc/hosts${NC}"
+    echo -e "${YELLOW}⚠️  Nenhuma entrada encontrada em /etc/hosts para: ${domain}${NC}" >&2
+    echo -e "${YELLOW}   Se o domínio não está no DNS público, adicione:${NC}" >&2
+    echo -e "${YELLOW}   echo \"<IP> ${domain}\" | sudo tee -a /etc/hosts${NC}" >&2
   fi
   
+  # Retorna apenas o valor (stdout)
   echo "$entries"
 }
 
