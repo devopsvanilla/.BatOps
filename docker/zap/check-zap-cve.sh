@@ -214,24 +214,48 @@ EOF
   chmod 777 "$RESULTS_DIR" 2>/dev/null || true
 
   echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
+  
+  # Determina modo de rede
+  local network_mode="${NETWORK_MODE:-internet}"
+  
+  if [ "$network_mode" = "local" ]; then
+    echo -e "${CYAN}🌐 Modo: Local/Dummy Access (usando rede do host)${NC}"
+    NETWORK_PARAM="--network host"
+  else
+    echo -e "${CYAN}🌐 Modo: Internet Access${NC}"
+    NETWORK_PARAM=""
+  fi
+  
   set +e
   
-  # Constrói comando Docker com ou sem --add-host
-  if [ -n "$host_entries" ]; then
+  # Constrói comando Docker baseado no modo de rede
+  if [ "$network_mode" = "local" ]; then
+    # Modo local: usa network host, não precisa --add-host
     docker run --rm \
+      --network host \
       -v "$RESULTS_DIR:/zap/wrk:rw" \
       -u zap \
-      $host_entries \
       -t "$image" zap-baseline.py \
       -t "$URL" \
       -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
   else
-    docker run --rm \
-      -v "$RESULTS_DIR:/zap/wrk:rw" \
-      -u zap \
-      -t "$image" zap-baseline.py \
-      -t "$URL" \
-      -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+    # Modo internet: usa --add-host se necessário
+    if [ -n "$host_entries" ]; then
+      docker run --rm \
+        -v "$RESULTS_DIR:/zap/wrk:rw" \
+        -u zap \
+        $host_entries \
+        -t "$image" zap-baseline.py \
+        -t "$URL" \
+        -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+    else
+      docker run --rm \
+        -v "$RESULTS_DIR:/zap/wrk:rw" \
+        -u zap \
+        -t "$image" zap-baseline.py \
+        -t "$URL" \
+        -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+    fi
   fi
   
   local rc=$?
@@ -277,6 +301,40 @@ else
       exit 10
       ;;
   esac
+fi
+
+# Seleção do modo de rede (se não definido via variável de ambiente)
+if [[ -z "${NETWORK_MODE:-}" ]]; then
+  if [[ -n "${NO_PROMPT:-}" || -n "${CI:-}" || -f "/.dockerenv" ]]; then
+    # Modo não interativo: verifica se há entrada no /etc/hosts
+    if grep -qw "$FQDN" /etc/hosts 2>/dev/null; then
+      NETWORK_MODE="local"
+      echo -e "${CYAN}ℹ️  Entrada encontrada em /etc/hosts. Usando modo: Local/Dummy Access${NC}"
+    else
+      NETWORK_MODE="internet"
+      echo -e "${CYAN}ℹ️  Usando modo: Internet Access${NC}"
+    fi
+  else
+    # Modo interativo: pergunta ao usuário
+    echo -e "${YELLOW}Escolha o modo de acesso à URL:${NC}"
+    echo -e "${YELLOW}1) Internet Access (URL acessível via DNS público/internet)${NC}"
+    echo -e "${YELLOW}2) Local/Dummy Access (URL local, usa /etc/hosts e rede do host)${NC}"
+    echo -e -n "${YELLOW}Digite o número da opção [1-2]: ${NC}"
+    read NET_OPT
+    
+    case "$NET_OPT" in
+      1)
+        NETWORK_MODE="internet"
+        ;;
+      2)
+        NETWORK_MODE="local"
+        ;;
+      *)
+        echo -e "${ORANGE}Opção inválida. Usando padrão: Internet Access${NC}"
+        NETWORK_MODE="internet"
+        ;;
+    esac
+  fi
 fi
 
 # Executa o scan com a imagem escolhida

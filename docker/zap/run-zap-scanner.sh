@@ -54,6 +54,30 @@ fi
 
 echo -e "${GREEN}✅ URL válida: $TARGET_URL${NC}\n"
 
+# Modo de acesso à rede
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}🌐 Modo de acesso à URL${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+echo -e "${YELLOW}1) Internet Access ${BLUE}(URL acessível via DNS público/internet)${NC}"
+echo -e "${YELLOW}2) Local/Dummy Access ${BLUE}(URL local, usa /etc/hosts e rede do host)${NC}"
+echo -e -n "${YELLOW}Digite o número da opção [1-2]: ${NC}"
+read -r NETWORK_MODE_OPTION
+
+case "$NETWORK_MODE_OPTION" in
+    1)
+        NETWORK_MODE="internet"
+        echo -e "${GREEN}✅ Selecionado: Internet Access${NC}\n"
+        ;;
+    2)
+        NETWORK_MODE="local"
+        echo -e "${GREEN}✅ Selecionado: Local/Dummy Access (network=host)${NC}\n"
+        ;;
+    *)
+        echo -e "${ORANGE}⚠️  Opção inválida. Usando padrão: Internet Access${NC}\n"
+        NETWORK_MODE="internet"
+        ;;
+esac
+
 # Escolher imagem ZAP
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}📦 Escolha a imagem do OWASP ZAP${NC}"
@@ -137,6 +161,7 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}        RESUMO DA CONFIGURAÇÃO${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 echo -e "${BLUE}URL alvo:${NC}        $TARGET_URL"
+echo -e "${BLUE}Modo de rede:${NC}    $NETWORK_MODE"
 echo -e "${BLUE}Imagem ZAP:${NC}      $ZAP_IMAGE"
 echo -e "${BLUE}Resultados:${NC}      $SCRIPT_DIR/zap-results/"
 if [ -n "${TICKET_NUMBER:-}" ]; then
@@ -152,6 +177,7 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 
 # Executar o script check-zap-cve.sh diretamente (sem container intermediário)
 export ZAP_IMAGE
+export NETWORK_MODE
 export SKIP_DEPENDENCY_CHECK=1
 export NO_PROMPT=1
 
