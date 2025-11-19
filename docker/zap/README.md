@@ -43,6 +43,7 @@ Esta solução oferece **execução isolada via containers Docker** com suporte 
 - Docker instalado e em execução
 - Permissões para executar Docker (usuário no grupo docker)
 
+---
 
 ## Sobre OWASP ZAP e reputação para essa atividade
 
@@ -56,8 +57,7 @@ Para esta atividade, usamos o modo Baseline do ZAP:
 
 Observação: um scan passivo não substitui um teste de intrusão completo. Para análises profundas, é recomendado utilizar scans ativos e outras técnicas, em um ambiente controlado.
 
-
-## O que é testado no Baseline
+### O que é testado no Baseline
 
 O ZAP Baseline é focado em detecção passiva. Exemplos de itens verificados:
 
@@ -69,6 +69,7 @@ O ZAP Baseline é focado em detecção passiva. Exemplos de itens verificados:
 
 Por padrão, o baseline realiza um spider leve para descobrir páginas e, então, aplica regras passivas sobre as respostas. Não há exploração ativa.
 
+---
 
 ## 🚀 Como usar
 
@@ -99,7 +100,9 @@ O script apresentará opções interativas para:
 ### 🌐 Modos de Acesso à URL
 
 #### Internet Access
+
 Para URLs acessíveis via DNS público ou internet:
+
 - Container usa rede bridge padrão do Docker
 - Ideal para sites públicos e APIs externas
 - Suporta resolução DNS customizada via `--add-host`
@@ -111,7 +114,9 @@ Para URLs acessíveis via DNS público ou internet:
 ```
 
 #### Local/Dummy Access 🆕
+
 Para URLs locais, localhost ou serviços internos:
+
 - Container usa `--network host` para acesso direto ao host
 - Acessa serviços em 127.0.0.1, localhost ou IPs privados
 - Utiliza automaticamente o `/etc/hosts` do host
@@ -143,6 +148,7 @@ ZAP_IMAGE=DRY_RUN ./check-zap-cve.sh https://seu-site.com
 # Forçar modo Local/Dummy Access
 NETWORK_MODE=local ZAP_IMAGE=zaproxy/zap-stable ./check-zap-cve.sh http://localhost:3000
 ```
+---
 
 ## ⚙️ Configuração
 
@@ -179,6 +185,7 @@ ZAP_IMAGE=DRY_RUN NO_PROMPT=1 ./check-zap-cve.sh https://exemplo.com
 
 Em ambientes não-interativos (CI/CD, containers), o script usa automaticamente `ghcr.io/zaproxy/zaproxy:stable`.
 
+---
 
 ## 📊 Resultados
 
@@ -201,6 +208,7 @@ xdg-open zap-results/example.com-YYYYMMDDHHMM.html
 xdg-open zap-results/example.com-YYYYMMDDHHMM.pdf
 ```
 
+---
 
 ## 🔧 Troubleshooting
 
@@ -330,6 +338,8 @@ cd /caminho/para/.BatOps/docker/zap
 docker build -t zap-scanner .
 ```
 
+---
+
 ## 📝 Notas técnicas
 
 - **Network modes**: Suporta bridge (padrão) e host (para acesso local)
@@ -340,6 +350,7 @@ docker build -t zap-scanner .
 - **CI/CD ready**: Suporte completo a pipelines com modo `DRY_RUN` para testes
 - **Multi-environment**: Funciona em desenvolvimento, staging e produção com aprovação
 
+---
 
 ## 🔒 Segurança
 
@@ -383,6 +394,8 @@ Para scans de rotina, sempre prefira executar em:
 - 🏠 Infraestrutura **on-premises** controlada
 - 🔒 Ambientes **isolados** sem CDN/WAF ativo
 - 📝 Com **aprovação documentada** quando absolutamente necessário em produção
+
+---
 
 ## Agradecimentos
 

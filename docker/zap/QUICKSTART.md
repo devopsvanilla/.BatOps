@@ -34,7 +34,7 @@ grep finops-hom.sondahybrid.com /etc/hosts
 
 ## ⚠️  Avisos Conhecidos (Podem ser Ignorados)
 
-```
+```text
 2025-11-19 03:04:11,748 Unable to copy yaml file to /zap/wrk/zap.yaml [Errno 13] Permission denied: '/zap/wrk/zap.yaml'
 ```
 
@@ -45,11 +45,13 @@ grep finops-hom.sondahybrid.com /etc/hosts
 ## 🌐 Modos de Acesso
 
 ### Internet Access
+
 - URL acessível via DNS público ou internet
 - Container ZAP usa rede bridge (padrão)
 - Usa `--add-host` para resolução DNS customizada
 
 ### Local/Dummy Access ⭐ **NOVO**
+
 - URL local (serviço rodando no host)
 - Container ZAP usa `--network host`
 - Acessa diretamente o `/etc/hosts` do host
@@ -57,7 +59,7 @@ grep finops-hom.sondahybrid.com /etc/hosts
 
 ## Exemplo de Saída Esperada
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         OWASP ZAP Scanner - Execução Simplificada
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
