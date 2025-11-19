@@ -29,6 +29,20 @@ grep finops-hom.sondahybrid.com /etc/hosts
 ✅ **Detecção automática de DNS** - Lê `/etc/hosts` e propaga para container ZAP  
 ✅ **Sem erro de sintaxe** - Correção do `docker: invalid reference format`  
 ✅ **Performance melhorada** - Execução direta sem camadas extras  
+✅ **Modo Local/Dummy** - Suporte a URLs locais com `--network host`  
+
+## 🌐 Modos de Acesso
+
+### Internet Access
+- URL acessível via DNS público ou internet
+- Container ZAP usa rede bridge (padrão)
+- Usa `--add-host` para resolução DNS customizada
+
+### Local/Dummy Access ⭐ **NOVO**
+- URL local (serviço rodando no host)
+- Container ZAP usa `--network host`
+- Acessa diretamente o `/etc/hosts` do host
+- **Ideal para:** Serviços rodando em localhost, 127.0.0.1, ou IPs privados  
 
 ## Exemplo de Saída Esperada
 
@@ -39,14 +53,19 @@ grep finops-hom.sondahybrid.com /etc/hosts
 
 ✅ URL válida: https://finops-hom.sondahybrid.com
 
+🌐 Modo de acesso à URL
+1) Internet Access (URL acessível via DNS público/internet)
+2) Local/Dummy Access (URL local, usa /etc/hosts e rede do host)
+Digite o número da opção [1-2]: 2
+✅ Selecionado: Local/Dummy Access (network=host)
+
 📦 Escolha a imagem do OWASP ZAP
 ...
 2) zaproxy/zap-stable (Docker Hub, estável - recomendado)
 ...
 
 ℹ️  Pulando verificação/instalação de dependências
-🔗 Mapeamento DNS detectado: finops-hom.sondahybrid.com -> 127.0.0.1
-📦 Usando imagem: zaproxy/zap-stable
+🌐 Modo: Local/Dummy Access (usando rede do host)
 🔍 Executando scan de segurança em: https://finops-hom.sondahybrid.com
 ```
 
