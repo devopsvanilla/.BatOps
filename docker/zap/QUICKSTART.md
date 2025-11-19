@@ -30,6 +30,17 @@ grep finops-hom.sondahybrid.com /etc/hosts
 ✅ **Sem erro de sintaxe** - Correção do `docker: invalid reference format`  
 ✅ **Performance melhorada** - Execução direta sem camadas extras  
 ✅ **Modo Local/Dummy** - Suporte a URLs locais com `--network host`  
+✅ **Permissões corrigidas** - Ajuste automático de permissões em `zap-results/`  
+
+## ⚠️  Avisos Conhecidos (Podem ser Ignorados)
+
+```
+2025-11-19 03:04:11,748 Unable to copy yaml file to /zap/wrk/zap.yaml [Errno 13] Permission denied: '/zap/wrk/zap.yaml'
+```
+
+**Impacto:** Nenhum - O relatório HTML é gerado corretamente.  
+**Causa:** Arquivo interno temporário do ZAP que não afeta o resultado.  
+**Status:** Corrigido automaticamente para novos scans (v202511190304+).  
 
 ## 🌐 Modos de Acesso
 

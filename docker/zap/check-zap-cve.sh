@@ -211,7 +211,12 @@ EOF
   local host_entries=$(get_host_entries "$FQDN")
   
   # Garante permissões corretas no diretório de resultados
+  # O container roda como usuário 'zap' (UID 1000), precisa de permissão de escrita
   chmod 777 "$RESULTS_DIR" 2>/dev/null || true
+  
+  # Garante que arquivos já existentes também tenham permissões corretas
+  find "$RESULTS_DIR" -type f -exec chmod 666 {} \; 2>/dev/null || true
+  find "$RESULTS_DIR" -type d -exec chmod 777 {} \; 2>/dev/null || true
 
   echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
   
@@ -220,10 +225,8 @@ EOF
   
   if [ "$network_mode" = "local" ]; then
     echo -e "${CYAN}🌐 Modo: Local/Dummy Access (usando rede do host)${NC}"
-    NETWORK_PARAM="--network host"
   else
     echo -e "${CYAN}🌐 Modo: Internet Access${NC}"
-    NETWORK_PARAM=""
   fi
   
   set +e
