@@ -219,7 +219,7 @@ EOF
     docker run --rm \
       -v "$RESULTS_DIR:/zap/wrk:rw" \
       -u zap \
-      $host_entries \
+      "$host_entries" \
       -t "$image" zap-baseline.py \
       -t "$URL" \
       -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
