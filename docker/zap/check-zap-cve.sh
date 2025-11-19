@@ -145,6 +145,7 @@ ZAP_OUTPUT_LOG="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.log"
 get_host_entries() {
   local domain="$1"
   local entries=""
+  local found=false
   
   # Procura entradas no /etc/hosts que correspondem ao domínio
   if [ -f /etc/hosts ]; then
@@ -162,9 +163,17 @@ get_host_entries() {
         if [ -n "$ip" ] && [ -n "$hostname" ]; then
           entries="${entries} --add-host=${hostname}:${ip}"
           echo -e "${CYAN}🔗 Mapeamento DNS detectado: ${hostname} -> ${ip}${NC}"
+          found=true
         fi
       fi
     done < /etc/hosts
+  fi
+  
+  # Se não encontrou entradas, informa ao usuário
+  if [ "$found" = false ]; then
+    echo -e "${YELLOW}⚠️  Nenhuma entrada encontrada em /etc/hosts para: ${domain}${NC}"
+    echo -e "${YELLOW}   Se o domínio não está no DNS público, adicione:${NC}"
+    echo -e "${YELLOW}   echo \"<IP> ${domain}\" | sudo tee -a /etc/hosts${NC}"
   fi
   
   echo "$entries"
@@ -204,13 +213,25 @@ EOF
 
   echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
   set +e
-  docker run --rm \
-    -v "$RESULTS_DIR:/zap/wrk:rw" \
-    -u zap \
-    $host_entries \
-    -t "$image" zap-baseline.py \
-    -t "$URL" \
-    -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+  
+  # Constrói comando Docker com ou sem --add-host
+  if [ -n "$host_entries" ]; then
+    docker run --rm \
+      -v "$RESULTS_DIR:/zap/wrk:rw" \
+      -u zap \
+      $host_entries \
+      -t "$image" zap-baseline.py \
+      -t "$URL" \
+      -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+  else
+    docker run --rm \
+      -v "$RESULTS_DIR:/zap/wrk:rw" \
+      -u zap \
+      -t "$image" zap-baseline.py \
+      -t "$URL" \
+      -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
+  fi
+  
   local rc=$?
   set -e
   return $rc

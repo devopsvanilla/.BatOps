@@ -2,7 +2,29 @@
 
 ## Problemas Corrigidos
 
-### 1. Erro de DNS: "Name or service not known"
+### 1. Erro: "docker: invalid reference format"
+
+**Sintoma:**
+```
+docker: invalid reference format
+Run 'docker run --help' for more information
+```
+
+**Causa:**
+Problema na construção do comando Docker quando variáveis de ambiente estão vazias ou mal formatadas.
+
+**Solução Implementada:**
+O script agora verifica se há entradas no `/etc/hosts` antes de construir o comando Docker, evitando sintaxe inválida.
+
+**Se você vê este erro:**
+1. Verifique se o domínio precisa de entrada no `/etc/hosts`
+2. Adicione a entrada se necessário:
+   ```bash
+   echo "192.168.1.100 finops-hom.sondahybrid.com" | sudo tee -a /etc/hosts
+   ```
+3. Execute o script novamente
+
+### 2. Erro de DNS: "Name or service not known"
 
 **Sintoma:**
 ```
