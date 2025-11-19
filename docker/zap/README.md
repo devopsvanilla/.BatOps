@@ -4,19 +4,19 @@ Esta página documenta a execução containerizada do **zap-scanner**, automaç�
 
 ![ZAP Scan Report](../../_images/check-zap-cve.jpeg)
 
-## 🛡️ Por que usar esta abordagem containerizada?
+## 🛡️ Por que usar esta abordagem?
 
 ### Vantagens de Segurança e Isolamento
 
-Esta solução containerizada oferece **execução totalmente isolada** sem necessidade de instalar dependências no host:
+Esta solução oferece **execução isolada via containers Docker** com detecção automática de configurações DNS locais:
 
-- **🔒 Zero instalação no host**: Não é necessário instalar Docker CLI, wkhtmltopdf ou outras dependências diretamente no sistema operacional do executor
-- **🏝️ Isolamento completo**: Todas as ferramentas e dependências ficam contidas dentro do container, evitando conflitos com versões instaladas no sistema
-- **🛡️ Camadas de segurança**: O ambiente de execução é efêmero e destruído após cada scan, reduzindo a superfície de ataque
-- **🔐 Controle de privilégios**: Embora o container precise de acesso ao Docker socket, o isolamento garante que vulnerabilidades no ZAP não comprometam diretamente o host
-- **📦 Reprodutibilidade**: Mesma imagem, mesmo ambiente, mesmos resultados - eliminando o clássico "funciona na minha máquina"
-- **🚀 Deploy rápido**: Ambiente pronto para uso em segundos, sem configuração manual ou scripts de setup
-- **♻️ Cleanup automático**: Com `--rm`, o container é removido automaticamente após execução, sem deixar rastros
+- **🔒 Isolamento de segurança**: O ZAP roda em container separado, protegendo o sistema host
+- **🌐 Suporte a DNS local**: Detecta automaticamente entradas do `/etc/hosts` e propaga para o container
+- **🏝️ Ambiente efêmero**: Container é destruído após cada scan, sem deixar rastros
+- **📦 Reprodutibilidade**: Mesma imagem, mesmo ambiente, mesmos resultados
+- **🚀 Deploy rápido**: Pronto para uso em segundos, sem configuração manual
+- **♻️ Cleanup automático**: Container removido automaticamente com `--rm`
+- **🔧 Flexibilidade**: Suporta domínios públicos e privados (via /etc/hosts)
 
 ### Casos de uso ideais
 
@@ -68,54 +68,42 @@ Por padrão, o baseline realiza um spider leve para descobrir páginas e, então
 
 ## 🚀 Como usar
 
-### Opção 1: Script Interativo (Recomendado para iniciantes)
+### Modo Recomendado: Script Wrapper Interativo
 
-Execute o script wrapper que guia você por todas as opções:
+Execute o script que guia você por todas as opções:
 
 ```bash
 ./run-zap-scanner.sh
 ```
 
-O script interativo irá:
+**OU** passe a URL como argumento para modo semi-interativo:
+
+```bash
+./run-zap-scanner.sh https://finops-hom.sondahybrid.com
+```
+
+O script irá:
 - ✅ Verificar se Docker está instalado e rodando
-- 🔨 Construir a imagem (ou perguntar se deseja reconstruir)
-- 🎯 Solicitar a URL alvo
-- 📦 Permitir escolher a imagem ZAP
+- 🎯 Validar a URL alvo
+- 🔗 Detectar automaticamente entradas do `/etc/hosts` para domínios não públicos
+- 📦 Permitir escolher a imagem ZAP (GHCR ou Docker Hub)
 - ⚠️ Alertar sobre scans em produção e pedir confirmação
 - 📝 Solicitar número de ticket/chamado (se produção)
 - 🚀 Executar o scan e exibir resultados
 
-### Opção 2: Docker Compose
+### Modo Direto: Script check-zap-cve.sh
+
+Para uso avançado ou automação, chame diretamente:
 
 ```bash
-# Build da imagem
-docker compose build
+# Com seleção de imagem interativa
+./check-zap-cve.sh https://seu-site.com
 
-# Executar com URL padrão (configurada no docker-compose.yml)
-docker compose up
+# Com imagem pré-definida
+ZAP_IMAGE=zaproxy/zap-stable ./check-zap-cve.sh https://seu-site.com
 
-# Executar com URL customizada
-docker compose run --rm zap-scanner https://seu-site.com
-
-# Ver logs e resultados
-ls -la zap-results/
-```
-
-### Opção 3: Docker CLI (Uso avançado)
-
-```bash
-# Build da imagem
-docker build -t zap-scanner .
-
-# Executar o scanner
-docker run --rm \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $(pwd)/zap-results:/app/zap-results \
-  --privileged \
-  zap-scanner https://devopsvanilla.guru
-
-# Ver resultados
-ls -la zap-results/
+# Modo simulação (rápido, para testes)
+ZAP_IMAGE=DRY_RUN ./check-zap-cve.sh https://seu-site.com
 ```
 
 ## ⚙️ Configuração
