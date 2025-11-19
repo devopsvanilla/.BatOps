@@ -141,6 +141,35 @@ HTML_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.html"
 PDF_REPORT="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.pdf"
 ZAP_OUTPUT_LOG="${RESULTS_DIR}/${FQDN}-${TIMESTAMP}.log"
 
+# Função para extrair entradas do /etc/hosts para o domínio alvo
+get_host_entries() {
+  local domain="$1"
+  local entries=""
+  
+  # Procura entradas no /etc/hosts que correspondem ao domínio
+  if [ -f /etc/hosts ]; then
+    while IFS= read -r line; do
+      # Ignora comentários e linhas vazias
+      [[ "$line" =~ ^\s*# ]] && continue
+      [[ -z "$line" ]] && continue
+      
+      # Verifica se a linha contém o domínio
+      if echo "$line" | grep -qw "$domain"; then
+        # Extrai IP e hostname
+        local ip=$(echo "$line" | awk '{print $1}')
+        local hostname=$(echo "$line" | awk '{print $2}')
+        
+        if [ -n "$ip" ] && [ -n "$hostname" ]; then
+          entries="${entries} --add-host=${hostname}:${ip}"
+          echo -e "${CYAN}🔗 Mapeamento DNS detectado: ${hostname} -> ${ip}${NC}"
+        fi
+      fi
+    done < /etc/hosts
+  fi
+  
+  echo "$entries"
+}
+
 # Função para executar o baseline com uma imagem específica
 run_scan_with_image() {
   local image="$1"
@@ -167,10 +196,18 @@ EOF
     return 1
   fi
 
+  # Extrai entradas do /etc/hosts para o domínio
+  local host_entries=$(get_host_entries "$FQDN")
+  
+  # Garante permissões corretas no diretório de resultados
+  chmod 777 "$RESULTS_DIR" 2>/dev/null || true
+
   echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
   set +e
   docker run --rm \
     -v "$RESULTS_DIR:/zap/wrk:rw" \
+    -u zap \
+    $host_entries \
     -t "$image" zap-baseline.py \
     -t "$URL" \
     -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"

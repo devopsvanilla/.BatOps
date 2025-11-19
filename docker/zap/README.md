@@ -1,6 +1,6 @@
-# Scanner de Baseline com OWASP ZAP - Docker
+# Scanner de Baseline com OWASP ZAP em Docker - zap-scanner
 
-Esta página documenta a execução containerizada do script `check-zap-cve.sh`, que executa um scan de baseline (passivo) com o OWASP ZAP em uma URL alvo, gerando um relatório HTML e PDF em `zap-results/`.
+Esta página documenta a execução containerizada do **zap-scanner**, automação feita em Bash e Docker que executa um scan de baseline (passivo) com o OWASP ZAP em uma URL alvo, gerando um relatório HTML e PDF em `zap-results/`.
 
 ![ZAP Scan Report](../../_images/check-zap-cve.jpeg)
 
@@ -174,7 +174,51 @@ xdg-open zap-results/example.com-YYYYMMDDHHMM.pdf
 
 ## 🔧 Troubleshooting
 
-### Permissão negada ao Docker socket
+> **📖 Documentação Completa:** Consulte [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) para guia detalhado de resolução de problemas.
+
+### Problemas Comuns
+
+#### ❌ Erro: "Name or service not known"
+
+**Sintoma:**
+```
+finops-hom.sondahybrid.com: Name or service not known
+```
+
+**Causa:** O domínio não está no DNS público e o container não consegue resolvê-lo.
+
+**Solução:** Configure o `/etc/hosts` do servidor:
+
+```bash
+# Adicione o mapeamento DNS no host
+echo "192.168.1.100 finops-hom.sondahybrid.com" | sudo tee -a /etc/hosts
+
+# Verifique a resolução
+ping -c1 finops-hom.sondahybrid.com
+
+# Execute o scan - o script detectará automaticamente a entrada
+./run-zap-scanner.sh https://finops-hom.sondahybrid.com
+```
+
+O script agora **detecta automaticamente** entradas do `/etc/hosts` e as propaga para o container ZAP usando `--add-host`.
+
+#### ❌ Erro: "Permission denied: '/zap/wrk/zap.yaml'"
+
+**Sintoma:**
+```
+Unable to copy yaml file to /zap/wrk/zap.yaml [Errno 13] Permission denied
+```
+
+**Causa:** Conflito de permissões entre usuário do container e volume montado.
+
+**Solução:** O script agora corrige automaticamente as permissões do diretório `zap-results/` antes de executar. Se persistir:
+
+```bash
+# Manual fix
+chmod 777 ./zap-results/
+```
+
+#### Permissão negada ao Docker socket
 
 Se você receber erro de permissão:
 
@@ -185,7 +229,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Erro ao acessar GHCR
+#### Erro ao acessar GHCR
 
 **Sintoma:** `OpenSSL SSL_connect: SSL_ERROR_SYSCALL` ou `EOF`
 
@@ -194,12 +238,7 @@ newgrp docker
 **Solução rápida:** Use Docker Hub com `ZAP_IMAGE=zaproxy/zap-stable`
 
 ```bash
-docker run --rm \
-  -e ZAP_IMAGE=zaproxy/zap-stable \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $(pwd)/zap-results:/app/zap-results \
-  --privileged \
-  zap-scanner https://seu-site.com
+ZAP_IMAGE=zaproxy/zap-stable ./run-zap-scanner.sh https://seu-site.com
 ```
 
 **Solução estrutural:** Configure proxy no daemon Docker (`/etc/systemd/system/docker.service.d/proxy.conf`):
@@ -219,7 +258,7 @@ sudo systemctl restart docker
 docker info | grep -i proxy -A2
 ```
 
-### Container não consegue acessar internet
+#### Container não consegue acessar internet
 
 Verifique configurações de rede:
 
@@ -228,7 +267,7 @@ docker network ls
 docker network inspect bridge
 ```
 
-### Rate limit no Docker Hub (erro 429)
+#### Rate limit no Docker Hub (erro 429)
 
 **Sintoma:** Pulls falham por limite de requisições anônimas
 
@@ -238,11 +277,11 @@ docker network inspect bridge
 docker login
 ```
 
-### PDF não é gerado
+#### PDF não é gerado
 
 O wkhtmltopdf está incluído no container e usa `xvfb` para display virtual. Se o PDF não for gerado, verifique os logs do container.
 
-### Build falha ou imagem não encontrada
+#### Build falha ou imagem não encontrada
 
 Certifique-se de estar no diretório correto:
 

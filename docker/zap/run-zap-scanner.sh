@@ -64,13 +64,20 @@ else
     fi
 fi
 
-# Solicitar URL alvo
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}🎯 URL do alvo para scan de segurança${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-echo -e "${ORANGE}Formato: http(s)://<domínio> (ex: https://devopsvanilla.guru)${NC}"
-echo -e -n "${YELLOW}Digite a URL: ${NC}"
-read -r TARGET_URL
+# Solicitar URL alvo (pode vir como argumento ou prompt)
+if [ -n "${1:-}" ]; then
+    TARGET_URL="$1"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}🎯 URL do alvo para scan de segurança${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+else
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}🎯 URL do alvo para scan de segurança${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    echo -e "${ORANGE}Formato: http(s)://<domínio> (ex: https://devopsvanilla.guru)${NC}"
+    echo -e -n "${YELLOW}Digite a URL: ${NC}"
+    read -r TARGET_URL
+fi
 
 # Validação básica da URL
 if [[ ! "$TARGET_URL" =~ ^https?://([a-zA-Z0-9.-]+\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(/.*)?$ ]]; then
@@ -176,11 +183,13 @@ echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}        INICIANDO SCAN DE SEGURANÇA${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# Construir comando Docker
+# Construir comando Docker com propagação de variáveis de ambiente
 DOCKER_CMD="docker run --rm \
   -e ZAP_IMAGE=$ZAP_IMAGE \
+  -e TARGET_URL=$TARGET_URL \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $SCRIPT_DIR/zap-results:/app/zap-results \
+  -v /etc/hosts:/etc/hosts:ro \
   --privileged \
   zap-scanner $TARGET_URL"
 
