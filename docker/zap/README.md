@@ -8,22 +8,26 @@ Esta página documenta a execução containerizada do **zap-scanner**, automaç�
 
 ### Vantagens de Segurança e Isolamento
 
-Esta solução oferece **execução isolada via containers Docker** com detecção automática de configurações DNS locais:
+Esta solução oferece **execução isolada via containers Docker** com suporte completo a ambientes locais e remotos:
 
 - **🔒 Isolamento de segurança**: O ZAP roda em container separado, protegendo o sistema host
-- **🌐 Suporte a DNS local**: Detecta automaticamente entradas do `/etc/hosts` e propaga para o container
+- **🌐 Dual-mode networking**: Suporte a URLs públicas (Internet) e locais (Localhost/IPs privados)
+- **🏠 Network host mode**: Acesso direto a serviços rodando no host sem configuração complexa
+- **🔗 DNS local inteligente**: Detecta automaticamente entradas do `/etc/hosts` e propaga para o container
 - **🏝️ Ambiente efêmero**: Container é destruído após cada scan, sem deixar rastros
 - **📦 Reprodutibilidade**: Mesma imagem, mesmo ambiente, mesmos resultados
 - **🚀 Deploy rápido**: Pronto para uso em segundos, sem configuração manual
 - **♻️ Cleanup automático**: Container removido automaticamente com `--rm`
-- **🔧 Flexibilidade**: Suporta domínios públicos e privados (via /etc/hosts)
+- **🔧 Máxima flexibilidade**: Suporta domínios públicos, privados, localhost e IPs internos
 
 ### Casos de uso ideais
 
-- Pipelines de CI/CD (GitHub Actions, GitLab CI, Jenkins)
-- Ambientes de produção onde não se pode instalar ferramentas diretamente
-- Equipes de segurança que precisam executar scans em diferentes ambientes
-- Desenvolvimento local sem "poluir" o sistema com dependências de ferramentas de teste
+- **Scans em ambientes de desenvolvimento/staging**: Aplicações rodando localmente ou em redes privadas
+- **URLs em localhost**: Serviços rodando em 127.0.0.1, localhost, ou portas não expostas
+- **Pipelines de CI/CD**: GitHub Actions, GitLab CI, Jenkins com integração automática
+- **Infraestrutura privada**: Aplicações em VPNs, redes internas, ou IPs não roteáveis
+- **Ambientes de produção**: Com aprovação formal e whitelist de IPs
+- **Testes de regressão**: Validação contínua de segurança após deploys
 
 ## Visão geral
 
@@ -70,7 +74,7 @@ Por padrão, o baseline realiza um spider leve para descobrir páginas e, então
 
 ### Modo Recomendado: Script Wrapper Interativo
 
-Execute o script que guia você por todas as opções:
+Execute o script que guia você por todas as opções de configuração:
 
 ```bash
 ./run-zap-scanner.sh
@@ -82,60 +86,98 @@ Execute o script que guia você por todas as opções:
 ./run-zap-scanner.sh https://finops-hom.sondahybrid.com
 ```
 
-O script irá:
+O script apresentará opções interativas para:
+
 - ✅ Verificar se Docker está instalado e rodando
 - 🎯 Validar a URL alvo
-- 🔗 Detectar automaticamente entradas do `/etc/hosts` para domínios não públicos
-- 📦 Permitir escolher a imagem ZAP (GHCR ou Docker Hub)
-- ⚠️ Alertar sobre scans em produção e pedir confirmação
+- 🌐 **Escolher modo de acesso**: Internet ou Local/Dummy
+- 📦 Selecionar imagem ZAP (GHCR ou Docker Hub)
+- ⚠️ Alertar sobre scans em produção e solicitar confirmação
 - 📝 Solicitar número de ticket/chamado (se produção)
 - 🚀 Executar o scan e exibir resultados
 
-### Modo Direto: Script check-zap-cve.sh
+### 🌐 Modos de Acesso à URL
 
-Para uso avançado ou automação, chame diretamente:
+#### Internet Access
+Para URLs acessíveis via DNS público ou internet:
+- Container usa rede bridge padrão do Docker
+- Ideal para sites públicos e APIs externas
+- Suporta resolução DNS customizada via `--add-host`
 
 ```bash
-# Com seleção de imagem interativa
+# Exemplo de uso
+./run-zap-scanner.sh https://devopsvanilla.guru
+# Escolha opção: 1) Internet Access
+```
+
+#### Local/Dummy Access 🆕
+Para URLs locais, localhost ou serviços internos:
+- Container usa `--network host` para acesso direto ao host
+- Acessa serviços em 127.0.0.1, localhost ou IPs privados
+- Utiliza automaticamente o `/etc/hosts` do host
+- **Ideal para**: Aplicações de desenvolvimento, staging, ou serviços não expostos
+
+```bash
+# Exemplo de uso
+./run-zap-scanner.sh https://app-local.empresa.com
+# Escolha opção: 2) Local/Dummy Access
+
+# Ou force o modo via variável de ambiente
+NETWORK_MODE=local ./run-zap-scanner.sh http://localhost:8080
+```
+
+### Modo Direto: Script check-zap-cve.sh
+
+Para uso avançado, automação ou integração em pipelines:
+
+```bash
+# Com seleção interativa de imagem
 ./check-zap-cve.sh https://seu-site.com
 
 # Com imagem pré-definida
 ZAP_IMAGE=zaproxy/zap-stable ./check-zap-cve.sh https://seu-site.com
 
-# Modo simulação (rápido, para testes)
+# Modo simulação (rápido, para testes de integração)
 ZAP_IMAGE=DRY_RUN ./check-zap-cve.sh https://seu-site.com
+
+# Forçar modo Local/Dummy Access
+NETWORK_MODE=local ZAP_IMAGE=zaproxy/zap-stable ./check-zap-cve.sh http://localhost:3000
 ```
 
 ## ⚙️ Configuração
 
 ### Variáveis de Ambiente
 
-- `SKIP_DEPENDENCY_CHECK=1` - Pula verificação de dependências (já instaladas no container)
-- `NO_PROMPT=1` - Executa em modo não interativo (não pergunta a imagem)
-- `ZAP_IMAGE=ghcr.io/zaproxy/zaproxy:stable` - Define explicitamente a imagem do ZAP a ser utilizada
-- `ZAP_IMAGE=DRY_RUN` - Executa em modo simulado (gera relatório fictício rapidamente)
+| Variável | Descrição | Valores |
+|----------|-----------|---------|
+| `ZAP_IMAGE` | Define a imagem Docker do ZAP | `ghcr.io/zaproxy/zaproxy:stable`, `zaproxy/zap-stable`, `zaproxy/zap-weekly`, `DRY_RUN` |
+| `NETWORK_MODE` | Define o modo de acesso à URL | `internet` (padrão), `local` |
+| `SKIP_DEPENDENCY_CHECK` | Pula verificação de dependências | `1` |
+| `NO_PROMPT` | Modo não-interativo | `1` |
+
+**Exemplos de uso:**
+
+```bash
+# Scan com modo local forçado
+NETWORK_MODE=local ./run-zap-scanner.sh http://localhost:8080
+
+# Scan em modo internet com imagem específica
+ZAP_IMAGE=zaproxy/zap-stable NETWORK_MODE=internet ./check-zap-cve.sh https://api.exemplo.com
+
+# Modo simulação para testes de CI/CD
+ZAP_IMAGE=DRY_RUN NO_PROMPT=1 ./check-zap-cve.sh https://exemplo.com
+```
 
 ### Opções de execução e imagens ZAP
 
-Em ambientes não interativos (como containers ou CI), o script usará automaticamente `ghcr.io/zaproxy/zaproxy:stable`.
+**Imagens Docker disponíveis:**
 
-Para alterar a imagem, use a variável `ZAP_IMAGE`:
+1. `ghcr.io/zaproxy/zaproxy:stable` - GitHub Container Registry (mais recente)
+2. `zaproxy/zap-stable` - Docker Hub (estável, recomendado)
+3. `zaproxy/zap-weekly` - Docker Hub (atualizações semanais)
+4. `DRY_RUN` - Modo simulação (sem scan real, apenas para testes)
 
-```bash
-docker run --rm \
-  -e ZAP_IMAGE=zaproxy/zap-stable \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $(pwd)/zap-results:/app/zap-results \
-  --privileged \
-  zap-scanner https://seu-site.com
-```
-
-**Imagens disponíveis:**
-
-1. `ghcr.io/zaproxy/zaproxy:stable` (GHCR, mais recente)
-2. `zaproxy/zap-stable` (Docker Hub, estável)
-3. `zaproxy/zap-weekly` (Docker Hub, semanal)
-4. `DRY_RUN` (simulação sem Docker - para validação rápida)
+Em ambientes não-interativos (CI/CD, containers), o script usa automaticamente `ghcr.io/zaproxy/zaproxy:stable`.
 
 
 ## 📊 Resultados
@@ -169,13 +211,24 @@ xdg-open zap-results/example.com-YYYYMMDDHHMM.pdf
 #### ❌ Erro: "Name or service not known"
 
 **Sintoma:**
-```
+
+```text
 finops-hom.sondahybrid.com: Name or service not known
 ```
 
 **Causa:** O domínio não está no DNS público e o container não consegue resolvê-lo.
 
-**Solução:** Configure o `/etc/hosts` do servidor:
+**Solução 1 - Modo Local/Dummy Access (Recomendado):**
+
+```bash
+# Execute o scan e escolha opção 2 (Local/Dummy Access)
+./run-zap-scanner.sh https://finops-hom.sondahybrid.com
+
+# Ou force via variável de ambiente
+NETWORK_MODE=local ./run-zap-scanner.sh https://finops-hom.sondahybrid.com
+```
+
+**Solução 2 - Configurar /etc/hosts + Internet Access:**
 
 ```bash
 # Adicione o mapeamento DNS no host
@@ -188,21 +241,20 @@ ping -c1 finops-hom.sondahybrid.com
 ./run-zap-scanner.sh https://finops-hom.sondahybrid.com
 ```
 
-O script agora **detecta automaticamente** entradas do `/etc/hosts` e as propaga para o container ZAP usando `--add-host`.
-
 #### ❌ Erro: "Permission denied: '/zap/wrk/zap.yaml'"
 
 **Sintoma:**
-```
+
+```text
 Unable to copy yaml file to /zap/wrk/zap.yaml [Errno 13] Permission denied
 ```
 
 **Causa:** Conflito de permissões entre usuário do container e volume montado.
 
-**Solução:** O script agora corrige automaticamente as permissões do diretório `zap-results/` antes de executar. Se persistir:
+**Solução:** O script corrige automaticamente as permissões. Se persistir:
 
 ```bash
-# Manual fix
+# Correção manual
 chmod 777 ./zap-results/
 ```
 
@@ -280,13 +332,13 @@ docker build -t zap-scanner .
 
 ## 📝 Notas técnicas
 
-- O container usa Docker-in-Docker (DinD) para executar as imagens ZAP
-- Requer modo privilegiado para montar o socket do Docker
-- Resultados são persistidos no volume montado
-- O ambiente é efêmero e destruído após execução com `--rm`
-- O modo Baseline do ZAP é uma excelente verificação inicial e de monitoramento contínuo
-- Para cobertura mais profunda, combine com scans ativos, SAST/DAST adicionais e revisões manuais
-- Use `ZAP_IMAGE=DRY_RUN` para validar a integração (CI/CD) sem dependências de rede
+- **Network modes**: Suporta bridge (padrão) e host (para acesso local)
+- **DNS resolution**: Detecção automática de `/etc/hosts` com propagação via `--add-host`
+- **Container lifecycle**: Ambiente efêmero destruído após execução com `--rm`
+- **Security scanning**: Modo Baseline (passivo) seguro para ambientes de produção
+- **Reporting**: Geração automática de HTML e PDF com wkhtmltopdf
+- **CI/CD ready**: Suporte completo a pipelines com modo `DRY_RUN` para testes
+- **Multi-environment**: Funciona em desenvolvimento, staging e produção com aprovação
 
 
 ## 🔒 Segurança
