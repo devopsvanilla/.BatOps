@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Banner
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}        OWASP ZAP Scanner - Execução Containerizada${NC}"
+echo -e "${CYAN}        OWASP ZAP Scanner - Execução Simplificada${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # Diretório do script
@@ -29,39 +29,6 @@ if ! docker info >/dev/null 2>&1; then
     echo -e "${RED}❌ Docker não está rodando. Inicie o serviço Docker:${NC}"
     echo -e "${ORANGE}   sudo systemctl start docker${NC}"
     exit 1
-fi
-
-# Verificar se a imagem já existe
-IMAGE_EXISTS=false
-if docker images | grep -q "zap-scanner"; then
-    IMAGE_EXISTS=true
-fi
-
-# Perguntar sobre build/rebuild
-if [ "$IMAGE_EXISTS" = true ]; then
-    echo -e "${YELLOW}🔍 Imagem 'zap-scanner' já existe.${NC}"
-    echo -e "${YELLOW}Deseja reconstruir a imagem? [s/N]: ${NC}"
-    read -r rebuild_response
-    
-    if [[ "$rebuild_response" =~ ^[Ss]$ ]]; then
-        echo -e "${CYAN}🔨 Reconstruindo imagem Docker...${NC}"
-        if docker build -t zap-scanner . >/dev/null 2>&1; then
-            echo -e "${GREEN}✅ Imagem reconstruída com sucesso${NC}\n"
-        else
-            echo -e "${RED}❌ Erro ao reconstruir imagem${NC}"
-            exit 1
-        fi
-    else
-        echo -e "${GREEN}✅ Usando imagem existente${NC}\n"
-    fi
-else
-    echo -e "${CYAN}🔨 Construindo imagem Docker pela primeira vez...${NC}"
-    if docker build -t zap-scanner . 2>&1 | grep -E "(Step|Successfully|naming to)"; then
-        echo -e "${GREEN}✅ Imagem construída com sucesso${NC}\n"
-    else
-        echo -e "${RED}❌ Erro ao construir imagem${NC}"
-        exit 1
-    fi
 fi
 
 # Solicitar URL alvo (pode vir como argumento ou prompt)
@@ -183,19 +150,13 @@ echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}        INICIANDO SCAN DE SEGURANÇA${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# Construir comando Docker com propagação de variáveis de ambiente
-DOCKER_CMD="docker run --rm \
-  -e ZAP_IMAGE=$ZAP_IMAGE \
-  -e TARGET_URL=$TARGET_URL \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $SCRIPT_DIR/zap-results:/app/zap-results \
-  -v /etc/hosts:/etc/hosts:ro \
-  --privileged \
-  zap-scanner $TARGET_URL"
+# Executar o script check-zap-cve.sh diretamente (sem container intermediário)
+export ZAP_IMAGE
+export SKIP_DEPENDENCY_CHECK=1
+export NO_PROMPT=1
 
-# Executar
 set +e
-eval "$DOCKER_CMD"
+"$SCRIPT_DIR/check-zap-cve.sh" "$TARGET_URL"
 EXIT_CODE=$?
 set -e
 
