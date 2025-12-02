@@ -1,0 +1,23 @@
+# Arquivos gerados automaticamente
+certs/
+data/
+*.log
+
+# Dados sensíveis
+*.key
+*.crt
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Docker
+.dockerignore
+docker-compose.override.yml

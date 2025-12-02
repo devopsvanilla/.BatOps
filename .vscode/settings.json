@@ -19,5 +19,6 @@
         "titleBar.inactiveBackground": "#83256199",
         "titleBar.inactiveForeground": "#e7e7e799"
     },
-    "peacock.color": "#832561"
+    "peacock.color": "#832561",
+    "gitConfigUser.selectedProfileId": "e2cabc49-c8ed-44c5-adde-aa5cbf27eb72"
 }
