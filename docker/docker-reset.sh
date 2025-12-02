@@ -3,8 +3,6 @@
 # Remove todos os containers, imagens, volumes, redes e dados
 # Mantém apenas o Docker instalado
 
-set -e
-
 echo "🚨 AVISO: RESET TOTAL DO DOCKER 🚨"
 echo "======================================"
 echo ""
@@ -55,20 +53,29 @@ fi
 
 # Parar todos os containers em execução
 echo "🛑 Parando todos os containers..."
-if [ "$(docker ps -q)" ]; then
-    docker stop "$(docker ps -q)"
+RUNNING_CONTAINERS=$(docker ps -q)
+if [ -n "$RUNNING_CONTAINERS" ]; then
+    echo "$RUNNING_CONTAINERS" | xargs -r docker stop
+else
+    echo "   ℹ️  Nenhum container em execução para parar."
 fi
 
 # Remover todos os containers (incluindo os parados)
 echo "🗑️  Removendo todos os containers..."
-if [ "$(docker ps -aq)" ]; then
-    docker rm "$(docker ps -aq)"
+ALL_CONTAINERS=$(docker ps -aq)
+if [ -n "$ALL_CONTAINERS" ]; then
+    echo "$ALL_CONTAINERS" | xargs -r docker rm --force
+else
+    echo "   ℹ️  Nenhum container para remover."
 fi
 
 # Remover todas as imagens
 echo "🖼️  Removendo todas as imagens..."
-if [ "$(docker images -q)" ]; then
-    docker rmi "$(docker images -q)" --force
+ALL_IMAGES=$(docker images -q)
+if [ -n "$ALL_IMAGES" ]; then
+    echo "$ALL_IMAGES" | xargs -r docker rmi --force
+else
+    echo "   ℹ️  Nenhuma imagem para remover."
 fi
 
 # Remover todos os volumes
