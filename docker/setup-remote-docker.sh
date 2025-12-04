@@ -13,7 +13,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Diretórios
-DOCKER_CERTS_DIR="$HOME/.docker/certs"
+DOCKER_BASE_DIR="$HOME/docker"
 DOCKER_CONFIG_DIR="$HOME/.docker"
 BASHRC="$HOME/.bashrc"
 ZSHRC="$HOME/.zshrc"
@@ -228,6 +228,7 @@ use_local_docker() {
 # Função para usar Docker remoto
 use_remote_docker() {
     local remote_host=$1
+    local DOCKER_CERTS_DIR="$DOCKER_BASE_DIR/$remote_host/docker-client-certs"
     
     log "Configurando para usar Docker remoto: $remote_host..."
     
@@ -239,7 +240,7 @@ use_remote_docker() {
     fi
     
     # Configurar variáveis de ambiente
-    configure_environment "$remote_host"
+    configure_environment "$remote_host" "$DOCKER_CERTS_DIR"
     
     log "Docker remoto configurado: $remote_host"
     info "Faça logout/login ou execute: source ~/.bashrc"
@@ -265,10 +266,17 @@ setup_new_remote() {
         exit 1
     fi
     
-    # Solicitar usuário SSH (opcional)
+    # Solicitar usuário SSH
     echo -n "Digite o usuário SSH do servidor [$USER]: "
     read -r SSH_USER
     SSH_USER=${SSH_USER:-$USER}
+    
+    # Solicitar senha SSH (opcional)
+    echo ""
+    info "Se você possui uma chave SSH configurada, apenas pressione ENTER para pular a senha."
+    echo -n "Digite a senha SSH (ou ENTER para usar chave SSH): "
+    read -rs SSH_PASSWORD
+    echo ""
     
     # Testar conectividade
     log "Testando conectividade com $DOCKER_HOST_IP..."
@@ -278,25 +286,51 @@ setup_new_remote() {
         log "Servidor acessível."
     fi
     
-    # Criar diretório para certificados
+    # Criar diretório local para certificados
+    local DOCKER_CERTS_DIR="$DOCKER_BASE_DIR/$DOCKER_HOST_IP/docker-client-certs"
     mkdir -p "$DOCKER_CERTS_DIR"
     
     # Copiar certificados do servidor
-    log "Copiando certificados do servidor..."
-    info "Você precisará fornecer a senha SSH do servidor."
+    log "Copiando certificados do servidor remoto..."
     
-    if scp -r "${SSH_USER}@${DOCKER_HOST_IP}:~/docker-client-certs/*" "$DOCKER_CERTS_DIR/" 2>/dev/null; then
-        log "Certificados copiados com sucesso."
+    if [ -n "$SSH_PASSWORD" ]; then
+        # Usar sshpass se senha foi fornecida
+        if ! command -v sshpass &> /dev/null; then
+            warn "sshpass não está instalado. Tentando instalar..."
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get install -y sshpass
+            elif command -v yum &> /dev/null; then
+                sudo yum install -y sshpass
+            else
+                error "Não foi possível instalar sshpass. Use chave SSH ou instale manualmente."
+                exit 1
+            fi
+        fi
+        
+        if sshpass -p "$SSH_PASSWORD" scp -r "${SSH_USER}@${DOCKER_HOST_IP}:~/docker-client-certs/"* "$DOCKER_CERTS_DIR/" 2>/dev/null; then
+            log "Certificados copiados com sucesso."
+        else
+            error "Falha ao copiar certificados com senha."
+            error "Verifique a senha e tente novamente."
+            exit 1
+        fi
     else
-        error "Falha ao copiar certificados."
-        echo ""
-        warn "Certifique-se de que:"
-        info "  1. O servidor está acessível via SSH"
-        info "  2. Os certificados estão em ~/docker-client-certs/ no servidor"
-        info "  3. O script install-docker.sh foi executado no servidor"
-        echo ""
-        error "Execute 'ssh ${SSH_USER}@${DOCKER_HOST_IP} ls ~/docker-client-certs/' para verificar"
-        exit 1
+        # Usar chave SSH
+        info "Usando chave SSH para autenticação..."
+        if scp -r "${SSH_USER}@${DOCKER_HOST_IP}:~/docker-client-certs/"* "$DOCKER_CERTS_DIR/" 2>/dev/null; then
+            log "Certificados copiados com sucesso."
+        else
+            error "Falha ao copiar certificados."
+            echo ""
+            warn "Certifique-se de que:"
+            info "  1. O servidor está acessível via SSH"
+            info "  2. Os certificados estão em ~/docker-client-certs/ no servidor"
+            info "  3. O script install-docker.sh foi executado no servidor"
+            info "  4. Sua chave SSH está configurada corretamente"
+            echo ""
+            error "Execute 'ssh ${SSH_USER}@${DOCKER_HOST_IP} ls ~/docker-client-certs/' para verificar"
+            exit 1
+        fi
     fi
     
     # Ajustar permissões dos certificados
@@ -306,15 +340,17 @@ setup_new_remote() {
     log "Permissões dos certificados ajustadas."
     
     # Salvar configuração
+    mkdir -p "$DOCKER_CONFIG_DIR"
     cat > "$DOCKER_CONFIG_DIR/remote-docker-host.conf" <<EOF
 # Configuração do Docker Remoto
 REMOTE_DOCKER_HOST=$DOCKER_HOST_IP
 REMOTE_DOCKER_PORT=2376
 REMOTE_DOCKER_USER=$SSH_USER
+REMOTE_DOCKER_CERTS=$DOCKER_CERTS_DIR
 EOF
     
-    # Configurar variáveis de ambiente
-    configure_environment "$DOCKER_HOST_IP"
+    # Configurar variáveis de ambiente no .bashrc
+    configure_environment "$DOCKER_HOST_IP" "$DOCKER_CERTS_DIR"
     
     # Testar conexão
     log "Testando conexão com Docker remoto..."
@@ -340,45 +376,49 @@ EOF
     
     echo ""
     log "Configuração concluída com sucesso!"
+    
+    # Perguntar se quer fazer source do .bashrc
+    echo ""
+    prompt "Deseja aplicar as configurações agora? (source ~/.bashrc) (s/N): "
+    read -r apply_now
+    if [[ "$apply_now" =~ ^[Ss]$ ]]; then
+        source "$BASHRC"
+        log "Configurações aplicadas! Você já pode usar 'docker ps' para testar."
+    else
+        info "Para aplicar as alterações manualmente, execute: source ~/.bashrc"
+    fi
 }
 
 # Função para configurar variáveis de ambiente
 configure_environment() {
     local host_ip=$1
+    local certs_dir=$2
     
-    # Determinar qual shell config usar
-    local shell_config=""
-    if [ -n "$BASH_VERSION" ] && [ -f "$BASHRC" ]; then
-        shell_config="$BASHRC"
-    elif [ -n "$ZSH_VERSION" ] && [ -f "$ZSHRC" ]; then
-        shell_config="$ZSHRC"
-    else
-        shell_config="$BASHRC"
+    log "Configurando variáveis de ambiente no ~/.bashrc..."
+    
+    # Remover configurações antigas do .bashrc
+    if [ -f "$BASHRC" ]; then
+        sed -i '/# Docker Remote Configuration/d' "$BASHRC"
+        sed -i '/export DOCKER_HOST=/d' "$BASHRC"
+        sed -i '/export DOCKER_TLS_VERIFY=/d' "$BASHRC"
+        sed -i '/export DOCKER_CERT_PATH=/d' "$BASHRC"
     fi
     
-    # Remover configurações antigas
-    if [ -f "$shell_config" ]; then
-        sed -i '/# Docker Remote Configuration/d' "$shell_config"
-        sed -i '/export DOCKER_HOST=/d' "$shell_config"
-        sed -i '/export DOCKER_TLS_VERIFY=/d' "$shell_config"
-        sed -i '/export DOCKER_CERT_PATH=/d' "$shell_config"
-    fi
-    
-    # Adicionar novas configurações
-    cat >> "$shell_config" <<EOF
+    # Adicionar novas configurações ao .bashrc
+    cat >> "$BASHRC" <<EOF
 
 # Docker Remote Configuration
 export DOCKER_HOST=tcp://${host_ip}:2376
 export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=$DOCKER_CERTS_DIR
+export DOCKER_CERT_PATH=${certs_dir}
 EOF
     
-    log "Variáveis de ambiente configuradas em $shell_config"
+    log "Variáveis de ambiente configuradas em ~/.bashrc"
     
     # Configurar para a sessão atual
     export DOCKER_HOST="tcp://${host_ip}:2376"
     export DOCKER_TLS_VERIFY=1
-    export DOCKER_CERT_PATH="$DOCKER_CERTS_DIR"
+    export DOCKER_CERT_PATH="${certs_dir}"
 }
 
 # Banner
@@ -405,8 +445,11 @@ info "Para testar a conexão:"
 echo "  docker ps"
 echo "  docker info"
 echo ""
+info "Os certificados estão em:"
+echo "  ~/docker/<IP_SERVIDOR>/docker-client-certs/"
+echo ""
 info "Para criar um context Docker (recomendado):"
-echo "  docker context create remote --docker \"host=tcp://$DOCKER_HOST_IP:2376,ca=$DOCKER_CERTS_DIR/ca.pem,cert=$DOCKER_CERTS_DIR/cert.pem,key=$DOCKER_CERTS_DIR/key.pem\""
+echo "  docker context create remote --docker \"host=tcp://<IP>:2376,ca=~/docker/<IP>/docker-client-certs/ca.pem,cert=~/docker/<IP>/docker-client-certs/cert.pem,key=~/docker/<IP>/docker-client-certs/key.pem\""
 echo "  docker context use remote"
 echo ""
 info "Para voltar ao Docker local (se disponível):"
