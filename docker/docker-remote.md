@@ -14,34 +14,17 @@ Este guia descreve como instalar e configurar o Docker com acesso remoto seguro 
 
 ## 🏗️ Arquitetura
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   SERVIDOR REMOTO (Linux)                   │
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Docker Daemon (dockerd)                              │   │
-│  │ - Escuta em: tcp://0.0.0.0:2376 (TLS)               │   │
-│  │ - Certificados em: /etc/docker/certs/               │   │
-│  │ - Certificados cliente em: ~/docker-client-certs/    │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-                            ⬆️
-                     Conexão TLS/SSL
-                     Porta 2376
-                            ⬇️
-┌─────────────────────────────────────────────────────────────┐
-│              COMPUTADOR CLIENTE (qualquer SO)                │
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Docker CLI + Certificados Cliente                    │   │
-│  │ - ca.pem, cert.pem, key.pem em: ~/docker/certs/     │   │
-│  │ - Docker Contexts para gerenciar conexões            │   │
-│  │                                                        │   │
-│  │ Uso: docker --tlsverify -H tcp://<IP>:2376 ps       │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+   A["SERVIDOR REMOTO (Linux)"]
+   subgraph SR[" "]
+      D["Docker Daemon (dockerd)\nEscuta: tcp://0.0.0.0:2376 (TLS)\nCertificados: /etc/docker/certs/\nCertificados cliente: ~/docker-client-certs/"]
+   end
+   B["COMPUTADOR CLIENTE (qualquer SO)"]
+   subgraph CC[" "]
+      C["Docker CLI + Certificados Cliente\nca.pem, cert.pem, key.pem: ~/docker/certs/\nDocker Contexts\nUso: docker --tlsverify -H tcp://<IP>:2376 ps"]
+   end
+   D <--> |"Conexão TLS/SSL\nPorta 2376"| C
 ```
 
 ## 🔧 Pré-requisitos
@@ -91,6 +74,21 @@ sudo ./install-docker-remote.sh
 ```
 
 ## O que o Script Faz (No Servidor)
+## 🧰 O que é Instalado pelo Script
+
+O script `install-docker-remote.sh` instala e configura automaticamente:
+
+- **Docker Engine, CLI e plugins**: Para execução e gerenciamento de containers.
+- **Certificados TLS**: Para acesso remoto seguro.
+- **Dependências essenciais**: curl, ca-certificates, gnupg, lsb-release, openssl, firewall (UFW).
+- **Node.js e npm (via nvm)**: Necessários para instalar ferramentas baseadas em Node.
+- **Dockly**: Um dashboard interativo para gerenciar containers Docker diretamente pelo terminal.
+
+### Sobre o Dockly
+
+> **Dockly** é uma ferramenta de dashboard interativo para Docker, acessível via terminal. Permite visualizar, gerenciar e interagir com containers, imagens, volumes e redes de forma intuitiva, tudo em modo texto. Ideal para administradores que preferem uma interface rápida e sem depender de GUIs pesadas.
+
+Instalação do Dockly é opcional e pode ser feita durante a execução do script. Após instalado, basta executar `dockly` no terminal para abrir o dashboard.
 
 O script `install-docker-remote.sh` executa automaticamente:
 

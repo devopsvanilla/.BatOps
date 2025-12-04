@@ -31,7 +31,10 @@ is_user_in_docker_group() {
 }
 # Diretório para certificados
 CERT_DIR="/etc/docker/certs"
-CLIENT_CERT_DIR="$HOME/docker-client-certs"
+# Obter o usuário real (não root mesmo quando executado com sudo)
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(eval echo "~$REAL_USER")
+CLIENT_CERT_DIR="$REAL_HOME/docker-client-certs"
 
 # Função para exibir mensagens
 log() {
@@ -49,28 +52,6 @@ error() {
 info() {
     echo -e "${BLUE}[DETALHE]${NC} $1"
 }
-
-# --- INÍCIO DO FLUXO PRINCIPAL ---
-
-# Verificar se está sendo executado como root
-if [[ "$EUID" -ne 0 ]]; then
-    error "Este script deve ser executado com sudo"
-    error "Use: sudo ./install-docker-remote.sh"
-    exit 1
-fi
-
-if is_docker_installed; then
-    warn "Docker já está instalado no sistema."
-    echo -n "Deseja continuar apenas com a configuração para acesso remoto (TLS)? (s/N): "
-    read -r docker_config_response
-    if [[ ! "$docker_config_response" =~ ^[Ss]$ ]]; then
-        log "Instalação/Configuração cancelada pelo usuário."
-        exit 0
-    fi
-    log "Prosseguindo apenas com a configuração para acesso remoto..."
-else
-    log "Docker não está instalado. Prosseguindo com a instalação..."
-fi
 
 # Função para verificar requisitos
 check_requirements() {
@@ -194,19 +175,42 @@ copy_client_certificates() {
     sudo cp "$CERT_DIR/ca.pem" "$CLIENT_CERT_DIR/"
     sudo cp "$CERT_DIR/cert.pem" "$CLIENT_CERT_DIR/"
     sudo cp "$CERT_DIR/key.pem" "$CLIENT_CERT_DIR/"
-    sudo chown -R "$USER:$USER" "$CLIENT_CERT_DIR"
+    sudo chown -R "$REAL_USER:$REAL_USER" "$CLIENT_CERT_DIR"
     chmod 0400 "$CLIENT_CERT_DIR/key.pem"
     chmod 0444 "$CLIENT_CERT_DIR/ca.pem" "$CLIENT_CERT_DIR/cert.pem"
     
     log "Certificados do cliente salvos em: $CLIENT_CERT_DIR"
 }
 
+# --- INÍCIO DO FLUXO PRINCIPAL ---
+
+# Verificar se está sendo executado como root
+if [[ "$EUID" -ne 0 ]]; then
+    error "Este script deve ser executado com sudo"
+    error "Use: sudo ./install-docker-remote.sh"
+    exit 1
+fi
+
+if is_docker_installed; then
+    warn "Docker já está instalado no sistema."
+    echo -n "Deseja continuar apenas com a configuração para acesso remoto (TLS)? (s/N): "
+    read -r docker_config_response
+    if [[ ! "$docker_config_response" =~ ^[Ss]$ ]]; then
+        log "Instalação/Configuração cancelada pelo usuário."
+        exit 0
+    fi
+    log "Prosseguindo apenas com a configuração para acesso remoto..."
+    # Detectar informações do host mesmo quando Docker já está instalado
+    detect_host_info
+else
+    log "Docker não está instalado. Prosseguindo com a instalação..."
+    # Detectar informações do host para nova instalação
+    detect_host_info
+fi
+
 # Verificar requisitos
 if ! is_docker_installed; then
     check_requirements
-
-    # Detectar informações do host
-    detect_host_info
 
     log "Atualizando lista de pacotes..."
     sudo apt-get update
@@ -245,7 +249,7 @@ if ! is_docker_installed; then
         sudo groupadd docker
     fi
     log "Adicionando usuário atual ao grupo docker..."
-    sudo usermod -aG docker "$USER"
+    sudo usermod -aG docker "$REAL_USER"
 fi
 
 # Gerar certificados TLS
