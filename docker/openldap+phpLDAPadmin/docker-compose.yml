@@ -20,8 +20,12 @@ services:
       - "${LDAP_PORT_389}:389"
       - "${LDAP_PORT_636}:636"
     volumes:
-      - ./data/slapd/database:/var/lib/ldap
-      - ./data/slapd/config:/etc/ldap/slapd.d
+      - type: bind
+        source: ./data/slapd/database
+        target: /var/lib/ldap
+      - type: bind
+        source: ./data/slapd/config
+        target: /etc/ldap/slapd.d
     healthcheck:
       test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b ${LDAP_BASE_DN} -D ${LDAP_ADMIN_DN} -w ${LDAP_ADMIN_PASSWORD} -s base || exit 1"]
       interval: 15s
@@ -53,4 +57,5 @@ services:
 
 networks:
   default:
-    name: ${COMPOSE_PROJECT_NAME:-openldap}_net
+    name: ${LDAP_DOCKER_NETWORK_NAME:-${COMPOSE_PROJECT_NAME:-openldap}_net}
+    external: ${LDAP_DOCKER_NETWORK_EXTERNAL:-false}
