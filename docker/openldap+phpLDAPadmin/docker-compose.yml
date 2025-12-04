@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: ${COMPOSE_PROJECT_NAME:-openldap}_server
+    restart: unless-stopped
+    environment:
+      LDAP_ORGANISATION: "${LDAP_ORGANISATION}"
+      LDAP_DOMAIN: "${LDAP_DOMAIN}"
+      LDAP_ADMIN_PASSWORD: "${LDAP_ADMIN_PASSWORD}"
+      LDAP_CONFIG_PASSWORD: "${LDAP_CONFIG_PASSWORD}"
+      LDAP_READONLY_USER: "${LDAP_READONLY_USER}"
+      LDAP_READONLY_USER_USERNAME: "${LDAP_READONLY_USER_USERNAME}"
+      LDAP_READONLY_USER_PASSWORD: "${LDAP_READONLY_USER_PASSWORD}"
+      LDAP_BASE_DN: "${LDAP_BASE_DN}"
+      LDAP_TLS: "${LDAP_TLS}"
+      LDAP_RFC2307BIS_SCHEMA: "${LDAP_RFC2307BIS_SCHEMA}"
+    ports:
+      - "${LDAP_PORT_389}:389"
+      - "${LDAP_PORT_636}:636"
+    volumes:
+      - ./data/slapd/database:/var/lib/ldap
+      - ./data/slapd/config:/etc/ldap/slapd.d
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b ${LDAP_BASE_DN} -D ${LDAP_ADMIN_DN} -w ${LDAP_ADMIN_PASSWORD} -s base || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    container_name: ${COMPOSE_PROJECT_NAME:-openldap}_phpldapadmin
+    restart: unless-stopped
+    depends_on:
+      openldap:
+        condition: service_started
+    environment:
+      PHPLDAPADMIN_HTTPS: "${PHPLDAPADMIN_HTTPS}"
+      PHPLDAPADMIN_LDAP_HOSTS: "${PHPLDAPADMIN_LDAP_HOSTS}"
+      # Advanced config examples (uncomment to customize):
+      # PHPLDAPADMIN_SERVER_PATH: "/"
+      # PHPLDAPADMIN_LOGIN_ATTR: "cn"
+      # PHPLDAPADMIN_HIDE_ATTRIBUTES: "userPassword"
+    ports:
+      - "${PHPLDAPADMIN_HTTP_PORT}:80"
+      - "${PHPLDAPADMIN_HTTPS_PORT}:443"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-openldap}_net

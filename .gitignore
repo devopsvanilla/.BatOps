@@ -138,3 +138,5 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 /docker/zap/zap-results/*
+
+docker/openldap+phpLDAPadmin/data/*
