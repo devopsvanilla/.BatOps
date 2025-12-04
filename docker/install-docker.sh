@@ -11,6 +11,23 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Função para verificar se Docker está instalado
+is_docker_installed() {
+    if command -v docker >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Função para verificar se usuário está no grupo docker
+is_user_in_docker_group() {
+    if id -nG "$USER" | grep -qw "docker"; then
+        return 0
+    else
+        return 1
+    fi
+}
 # Diretório para certificados
 CERT_DIR="/etc/docker/certs"
 CLIENT_CERT_DIR="$HOME/docker-client-certs"
