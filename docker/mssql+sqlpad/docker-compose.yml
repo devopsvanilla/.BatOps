@@ -14,18 +14,23 @@ services:
     ports:
       - "${MSSQL_PORT}:1433"
     volumes:
-      - ${MSSQL_DATA_VOLUME:-mssql-data}:/var/opt/mssql
+      - ${MSSQL_DATA_VOLUME:-mssql-data}:/var/opt/mssql/data
       - ${MSSQL_LOG_VOLUME:-mssql-log}:/var/opt/mssql/log
       - ${MSSQL_SECRETS_VOLUME:-mssql-secrets}:/var/opt/mssql/secrets
     networks:
       - ${MSSQL_NETWORK:-mssql-network}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    dns_search:
+      - .
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $${MSSQL_SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
       interval: ${MSSQL_HEALTHCHECK_INTERVAL:-10s}
       timeout: ${MSSQL_HEALTHCHECK_TIMEOUT:-5s}
       retries: ${MSSQL_HEALTHCHECK_RETRIES:-5}
-      start_period: ${MSSQL_HEALTHCHECK_START_PERIOD:-30s}
+      start_period: ${MSSQL_HEALTHCHECK_START_PERIOD:-60s}
 
   sqlpad:
     image: sqlpad/sqlpad:latest
@@ -51,6 +56,11 @@ services:
       - ${SQLPAD_DATA_VOLUME:-sqlpad-data}:/var/lib/sqlpad
     networks:
       - ${SQLPAD_NETWORK:-mssql-network}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    dns_search:
+      - .
     depends_on:
       mssql:
         condition: service_healthy
@@ -65,13 +75,17 @@ services:
 
 volumes:
   mssql-data:
-    driver: local
+    name: ${MSSQL_DATA_VOLUME:-mssql-data}
+    external: true
   mssql-log:
-    driver: local
+    name: ${MSSQL_LOG_VOLUME:-mssql-log}
+    external: true
   mssql-secrets:
-    driver: local
+    name: ${MSSQL_SECRETS_VOLUME:-mssql-secrets}
+    external: true
   sqlpad-data:
-    driver: local
+    name: ${SQLPAD_DATA_VOLUME:-sqlpad-data}
+    external: true
 
 networks:
   mssql-network:

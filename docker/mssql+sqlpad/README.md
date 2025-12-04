@@ -14,6 +14,12 @@ Esta configuração fornece uma implantação completa do Microsoft SQL Server 2
 - Mínimo 2GB de RAM disponível
 - Mínimo 10GB de espaço em disco
 
+**Para uso com contexto remoto (adicional):**
+
+- Servidor remoto com Docker instalado
+- Acesso SSH configurado com chave pública (sem senha)
+- Contexto Docker remoto configurado (veja [REMOTE-SETUP.md](REMOTE-SETUP.md))
+
 ## ⚙️ Configuração
 
 1. **Copie o arquivo `.env-sample` para `.env`**:
@@ -33,35 +39,125 @@ Esta configuração fornece uma implantação completa do Microsoft SQL Server 2
 
 ## 🎯 Uso
 
-### Iniciar os serviços
+### Método Recomendado: Script up.sh
+
+O script `up.sh` facilita a inicialização dos serviços com seleção interativa de rede Docker e suporte para contextos locais e remotos:
 
 ```bash
-docker-compose up -d
+./up.sh
 ```
 
-### Parar os serviços
+**Funcionalidades do up.sh:**
+
+- 🧭 Lista todos os **contextos Docker** disponíveis e permite trocar para o desejado antes do deploy
+- 🔍 Mostra as redes Docker do contexto selecionado, permitindo escolher ou criar uma nova na hora
+- 🧱 Prepara automaticamente os volumes persistentes (cria, ajusta permissões 10001:0 e garante compatibilidade Linux)
+- 🌐 Detecta automaticamente se o contexto é local ou remoto (SSH) e ajusta todo o fluxo
+- 🔁 Sincroniza arquivos com hosts remotos e executa o `docker compose` diretamente neles
+- 🔧 Mantém DNS e variáveis de ambiente atualizadas, inclusive a rede escolhida no `.env`
+- 📊 Exibe um resumo com URLs de acesso, portas e contexto ativo ao final
+- 🔑 Usa as chaves SSH existentes (sem necessidade de senha) para contextos remotos
+
+**Fluxo automatizado:**
+
+1. Detecta o contexto Docker atual, lista os demais e permite trocar antes do deploy.
+2. Lista as redes disponíveis nesse contexto (local ou remoto), sugere a configurada no `.env` e abre opção para criar outra.
+3. Cria/ajusta os volumes nomeados exigidos (inclusive permissões corretas para o usuário `mssql`, garantindo compatibilidade total com Linux).
+4. Executa `docker compose up -d` no local correto (shell atual ou host remoto via SSH) e valida o health check antes de exibir as URLs finais.
+
+**Ideal para:**
+
+- Integrar containers em redes Docker existentes
+- Trabalhar com contextos Docker remotos
+- Evitar problemas de resolução de DNS em builds remotos
+- Ter controle total sobre a rede utilizada
+- Deploy automatizado em servidores remotos
+
+#### Usando com Contexto Docker Remoto (SSH)
+
+O script possui suporte completo para contextos Docker remotos configurados via SSH. Ele automaticamente:
+
+1. Detecta se o contexto atual é remoto
+2. Identifica o host e usuário SSH
+3. Sincroniza os arquivos necessários (`docker-compose.yml`, `.env`, etc.) com o servidor remoto
+4. Executa o `docker compose` no servidor remoto
+5. Exibe URLs de acesso corretas (usando o IP/hostname do servidor remoto)
+
+**📘 Para instruções detalhadas sobre configuração e uso de contextos remotos, consulte: [REMOTE-SETUP.md](REMOTE-SETUP.md)**
+
+**Pré-requisitos para uso remoto:**
+
+- Chave SSH configurada no servidor remoto (autenticação sem senha)
+- Contexto Docker remoto configurado
+
+**Exemplo rápido de configuração de contexto Docker remoto:**
 
 ```bash
-docker-compose down
+# Criar contexto Docker via SSH
+docker context create remote-server \
+  --docker "host=ssh://user@remote-host"
+
+# Ativar o contexto remoto
+docker context use remote-server
+
+# Executar o script (ele detectará automaticamente que é remoto)
+./up.sh
 ```
 
-### Parar e remover volumes (CUIDADO: apaga dados!)
+O script solicitará o caminho do projeto no servidor remoto ou tentará detectá-lo automaticamente nos seguintes locais:
+
+- `~/docker/mssql+sqlpad/`
+- `~/.BatOps/docker/mssql+sqlpad/`
+
+**Comandos úteis para contextos remotos:**
 
 ```bash
-docker-compose down -v
+# Listar contextos disponíveis
+docker context ls
+
+# Ver contexto atual
+docker context show
+
+# Alternar entre contextos
+docker context use <nome-do-contexto>
+
+# Voltar ao contexto local
+docker context use default
 ```
 
-### Ver logs
+### Método Tradicional: `docker compose`
+
+> 💡 Use esta abordagem apenas se já tiver criado os volumes nomeados manualmente (veja seção de volumes). O script `up.sh` cuida disso automaticamente.
+
+#### Iniciar os serviços
+
+```bash
+docker compose up -d
+```
+
+#### Parar os serviços
+
+```bash
+docker compose down
+```
+
+#### Parar e remover volumes (CUIDADO: apaga dados!)
+
+```bash
+docker compose down -v
+```
+
+#### Ver logs
 
 ```bash
 # Todos os serviços
-docker-compose logs -f
+docker compose logs -f
 
 # Apenas SQL Server
-docker-compose logs -f mssql
+docker compose logs -f mssql
 
 # Apenas SQLPad
-docker-compose logs -f sqlpad
+docker compose logs -f sqlpad
 ```
 
 ## 🌐 Acesso
@@ -98,48 +194,51 @@ docker exec -it mssql-server /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '
 
 ## 📊 Volumes e Persistência de Dados
 
-Esta configuração utiliza **volumes nomeados do Docker** para persistência de dados. Os volumes são criados automaticamente pelo Docker e armazenados em:
+O `docker-compose.yml` utiliza **volumes nomeados externos** para garantir compatibilidade total com Linux e permitir que o `up.sh` prepare permissões antes do deploy. Por padrão, o script cria (ou reaproveita) os seguintes volumes:
 
-```
-/var/lib/docker/volumes/
-```
+- `mssql-data` → `/var/lib/docker/volumes/mssql-data/_data` — arquivos de banco
+- `mssql-log` → `/var/lib/docker/volumes/mssql-log/_data` — logs do SQL Server
+- `mssql-secrets` → `/var/lib/docker/volumes/mssql-secrets/_data` — secrets/certificados
+- `sqlpad-data` → `/var/lib/docker/volumes/sqlpad-data/_data` — dados do SQLPad
 
-### Volumes criados:
+> 🛠️ O `up.sh` garante que esses volumes existam e aplica `chown 10001:0` (usuário do SQL Server) automaticamente usando uma imagem utilitária Linux. Evite criar/editá-los manualmente se estiver usando o script.
 
-- `mssql-data` → `/var/lib/docker/volumes/mssql_mssql-data/_data` - Dados do banco
-- `mssql-log` → `/var/lib/docker/volumes/mssql_mssql-log/_data` - Logs do SQL Server
-- `mssql-secrets` → `/var/lib/docker/volumes/mssql_mssql-secrets/_data` - Certificados e segredos
-- `sqlpad-data` → `/var/lib/docker/volumes/mssql_sqlpad-data/_data` - Dados e configurações do SQLPad
-
-**Nota:** O prefixo `mssql_` vem do nome do diretório onde está o `docker-compose.yml`.
-
-### Usar diretórios locais (bind mounts)
-
-Se preferir armazenar os dados em diretórios específicos no host, você pode configurar as variáveis de ambiente no `.env`:
+### Criar volumes manualmente (caso não execute o script)
 
 ```bash
-MSSQL_DATA_VOLUME=./data/mssql-data
-MSSQL_LOG_VOLUME=./data/mssql-log
-MSSQL_SECRETS_VOLUME=./data/mssql-secrets
-SQLPAD_DATA_VOLUME=./data/sqlpad-data
+docker volume create mssql-data
+docker volume create mssql-log
+docker volume create mssql-secrets
+docker volume create sqlpad-data
+
+# Ajustar permissões para o usuário mssql (10001)
+docker run --rm -v mssql-data:/mnt busybox:1.36.1 chown -R 10001:0 /mnt
+docker run --rm -v mssql-log:/mnt busybox:1.36.1 chown -R 10001:0 /mnt
+docker run --rm -v mssql-secrets:/mnt busybox:1.36.1 chown -R 10001:0 /mnt
 ```
 
-Isso criará os dados nos diretórios relativos ao `docker-compose.yml`.
+Só depois execute `docker compose up -d`. Sem esse preparo o container falhará ao copiar os arquivos iniciais (erro `Access is denied`).
 
-### Comandos úteis para gerenciar volumes:
+### Bind mounts (opcional)
+
+Se realmente precisar usar diretórios locais em vez de volumes nomeados, será necessário editar o `docker-compose.yml` para remover o `external: true` e apontar para o caminho desejado. O script `up.sh` **não** dá suporte a essa variação.
+
+### Comandos úteis para gerenciar volumes
 
 ```bash
-# Listar volumes
+# Listar volumes gerenciados
 docker volume ls
 
 # Inspecionar um volume
-docker volume inspect mssql_mssql-data
+docker volume inspect mssql-data
 
-# Backup de um volume
-docker run --rm -v mssql_mssql-data:/data -v $(pwd):/backup ubuntu tar czf /backup/mssql-backup.tar.gz /data
+# Backup de um volume nomeado
+docker run --rm -v mssql-data:/data -v $(pwd):/backup ubuntu \
+  tar czf /backup/mssql-data-backup.tar.gz /data
 
 # Restaurar um volume
-docker run --rm -v mssql_mssql-data:/data -v $(pwd):/backup ubuntu tar xzf /backup/mssql-backup.tar.gz -C /
+docker run --rm -v mssql-data:/data -v $(pwd):/backup ubuntu \
+  tar xzf /backup/mssql-data-backup.tar.gz -C /
 ```
 
 ## 🔧 Configurações Disponíveis
@@ -176,7 +275,7 @@ Todas as configurações podem ser ajustadas no arquivo `.env`. Abaixo está a l
 | `MSSQL_HEALTHCHECK_INTERVAL` | Intervalo entre verificações | `10s` |
 | `MSSQL_HEALTHCHECK_TIMEOUT` | Timeout da verificação | `5s` |
 | `MSSQL_HEALTHCHECK_RETRIES` | Tentativas antes de unhealthy | `5` |
-| `MSSQL_HEALTHCHECK_START_PERIOD` | Período de grace inicial | `30s` |
+| `MSSQL_HEALTHCHECK_START_PERIOD` | Período de grace inicial | `60s` |
 
 ### SQLPad - Configurações Principais
 
@@ -227,8 +326,9 @@ Ambos os serviços incluem health checks configurados:
 - **SQLPad:** Verifica disponibilidade da API a cada 10s
 
 Para verificar o status:
+
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ## ⚠️ Notas de Segurança
@@ -248,29 +348,86 @@ docker-compose ps
 ## 🆘 Troubleshooting
 
 ### SQL Server não inicia
-- Verifique se a senha atende aos requisitos de complexidade
-- Verifique memória disponível (mínimo 2GB): `free -h`
-- Verifique os logs: `docker-compose logs mssql`
-- Verifique se `ACCEPT_EULA=Y` está configurado
+
+- Verifique se a senha atende aos requisitos de complexidade.
+- Garanta memória suficiente (mínimo 2 GB): `free -h`.
+- Consulte os logs: `docker compose logs mssql`.
+- Confira se `ACCEPT_EULA=Y` está definido.
 
 ### SQLPad não conecta ao SQL Server
-- Aguarde o SQL Server estar healthy: `docker-compose ps`
-- Verifique se a senha no `.env` está correta em ambas as seções (MSSQL e SQLPad)
-- Verifique os logs: `docker-compose logs sqlpad`
-- Verifique a conectividade de rede: `docker exec sqlpad ping mssql`
+
+- Aguarde o SQL Server ficar **healthy**: `docker compose ps`.
+- Verifique se as senhas do `.env` são consistentes entre MSSQL e SQLPad.
+- Consulte os logs: `docker compose logs sqlpad`.
+- Teste conectividade interna: `docker exec sqlpad ping -c1 mssql`.
 
 ### Porta já em uso
-- Altere as portas no arquivo `.env` (`MSSQL_PORT` e `SQLPAD_PORT`)
-- Verifique processos usando as portas: `sudo netstat -tlnp | grep -E ':(1433|3000)'`
-- Ou use: `sudo lsof -i :1433` e `sudo lsof -i :3000`
+
+- Ajuste `MSSQL_PORT` ou `SQLPAD_PORT` no `.env`.
+- Descubra quem usa a porta: `sudo netstat -tlnp | grep -E ':(1433|3000)'`.
+- Alternativa: `sudo lsof -i :1433` e `sudo lsof -i :3000`.
 
 ### Problemas de permissão nos volumes
-- Verifique permissões: `ls -la /var/lib/docker/volumes/`
-- Se usar bind mounts, garanta que o diretório tenha permissões adequadas
-- O container roda como usuário `mssql` (UID 10001)
+
+- Liste e inspecione volumes: `docker volume ls`, `docker volume inspect mssql-data`.
+- Garanta que cada volume tenha proprietário `10001:0` (use o script ou os comandos da seção de volumes).
+- Para bind mounts customizados, ajuste manualmente as permissões do diretório host.
 
 ### Esqueci a senha do SA
-- Pare o container: `docker-compose down`
-- Edite o `.env` com nova senha
-- Remova os volumes: `docker-compose down -v` (ATENÇÃO: apaga os dados!)
-- Inicie novamente: `docker-compose up -d`
+
+- Pare os serviços: `docker compose down`.
+- Atualize a senha no `.env`.
+- (Opcional) Remova volumes para criar usuário/DB do zero: `docker compose down -v` (⚠️ apaga dados!).
+- Suba novamente: `docker compose up -d`.
+
+### Problemas de DNS em contexto remoto
+
+- Prefira `./up.sh`, que injeta os servidores DNS automaticamente.
+- Alternativa manual (por serviço no `docker-compose.yml`):
+
+  ```yaml
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+  dns_search:
+    - .
+  ```
+
+- Refaça o deploy para aplicar mudanças: `docker compose up -d --build`.
+
+### Problemas com contexto Docker remoto via SSH
+
+#### Arquivos não encontrados no host remoto
+
+- O `up.sh` sincroniza tudo automaticamente; verifique o caminho informado.
+- Confirme permissões de escrita no diretório remoto.
+
+#### Autenticação SSH falha
+
+- Teste acesso direto: `ssh user@remote-host`.
+- Gere/Copie a chave se necessário:
+
+  ```bash
+  ssh-keygen -t ed25519 -C "seu-email@example.com"
+  ssh-copy-id user@remote-host
+  ssh user@remote-host
+  ```
+
+#### Contexto Docker não conecta
+
+- Inspecione o contexto: `docker context inspect nome-do-contexto`.
+- Recrie se preciso:
+
+  ```bash
+  docker context rm nome-do-contexto
+  docker context create nome-do-contexto --docker "host=ssh://user@remote-host"
+  docker context use nome-do-contexto
+  ```
+
+#### Rede não encontrada no host remoto
+
+- O script cria a rede automaticamente; se falhar, crie manualmente:
+
+  ```bash
+  ssh user@remote-host "docker network create mssql-network"
+  ```
