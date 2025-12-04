@@ -1,6 +1,7 @@
 #!/bin/bash
-# setup-remote-docker.sh: Configura cliente para acessar Docker remoto via TLS
-# Uso: ./setup-remote-docker.sh
+# setup-docker-remote.sh: Configura cliente para acessar Docker remoto via TLS usando Docker Contexts
+# EXECUTE ESTE SCRIPT NO COMPUTADOR CLIENTE (que deseja usar Docker remoto)
+# Uso: ./setup-docker-remote.sh
 
 set -e
 
@@ -15,8 +16,9 @@ NC='\033[0m' # No Color
 # Diretórios
 DOCKER_BASE_DIR="$HOME/docker"
 DOCKER_CONFIG_DIR="$HOME/.docker"
-BASHRC="$HOME/.bashrc"
-ZSHRC="$HOME/.zshrc"
+
+# Constantes
+REMOTE_CONTEXT_PREFIX="remote"
 
 # Função para exibir mensagens
 log() {
@@ -37,6 +39,34 @@ info() {
 
 prompt() {
     echo -e "${CYAN}[PERGUNTA]${NC} $1"
+}
+
+# Função para limpar variáveis de ambiente antigas
+clean_old_env_vars() {
+    local bashrc="$HOME/.bashrc"
+    local zshrc="$HOME/.zshrc"
+    
+    # Remover variáveis de ambiente antigas dos arquivos de configuração
+    for rc in "$bashrc" "$zshrc"; do
+        if [ -f "$rc" ]; then
+            if grep -q "DOCKER_HOST\|DOCKER_TLS_VERIFY\|DOCKER_CERT_PATH" "$rc" 2>/dev/null; then
+                warn "Removendo variáveis de ambiente Docker antigas de $(basename "$rc")..."
+                sed -i '/# Docker Remote Configuration/d' "$rc"
+                sed -i '/export DOCKER_HOST=/d' "$rc"
+                sed -i '/export DOCKER_TLS_VERIFY=/d' "$rc"
+                sed -i '/export DOCKER_CERT_PATH=/d' "$rc"
+            fi
+        fi
+    done
+    
+    # Limpar variáveis da sessão atual
+    if [ -n "$DOCKER_HOST" ] || [ -n "$DOCKER_TLS_VERIFY" ] || [ -n "$DOCKER_CERT_PATH" ]; then
+        warn "Limpando variáveis de ambiente Docker da sessão atual..."
+        unset DOCKER_HOST
+        unset DOCKER_TLS_VERIFY
+        unset DOCKER_CERT_PATH
+        info "Variáveis limpas. Se necessário, reinicie o terminal para aplicar completamente."
+    fi
 }
 
 # Função para verificar requisitos
@@ -107,6 +137,55 @@ check_local_docker() {
     fi
 }
 
+# Função para listar contexts disponíveis
+list_docker_contexts() {
+    docker context ls --format "{{.Name}}" 2>/dev/null || echo ""
+}
+
+# Função para verificar se um context existe
+context_exists() {
+    local context_name=$1
+    docker context inspect "$context_name" &>/dev/null
+}
+
+# Função para obter context atual
+get_current_context() {
+    docker context show 2>/dev/null || echo "default"
+}
+
+# Função para criar Docker Context remoto
+create_remote_context() {
+    local context_name=$1
+    local host_ip=$2
+    local certs_dir=$3
+    
+    log "Criando Docker Context: $context_name..."
+    
+    if context_exists "$context_name"; then
+        warn "Context '$context_name' já existe. Removendo o antigo..."
+        docker context rm -f "$context_name" &>/dev/null
+    fi
+    
+    docker context create "$context_name" \
+        --docker "host=tcp://${host_ip}:2376,ca=${certs_dir}/ca.pem,cert=${certs_dir}/cert.pem,key=${certs_dir}/key.pem" \
+        --description "Docker remoto em ${host_ip}"
+    
+    log "Context '$context_name' criado com sucesso!"
+}
+
+# Função para trocar para um context
+switch_context() {
+    local context_name=$1
+    
+    if ! context_exists "$context_name"; then
+        error "Context '$context_name' não existe."
+        return 1
+    fi
+    
+    docker context use "$context_name"
+    log "Trocado para context: $context_name"
+}
+
 # Função para detectar configuração remota existente
 check_existing_remote_config() {
     if [ -f "$DOCKER_CONFIG_DIR/remote-docker-host.conf" ]; then
@@ -136,7 +215,8 @@ choose_docker_mode() {
     
     if check_existing_remote_config; then
         has_remote=true
-        local remote_host=$(read_existing_config)
+        local remote_host
+        remote_host=$(read_existing_config)
         info "Configuração remota existente detectada: $remote_host"
     fi
     
@@ -206,28 +286,16 @@ choose_docker_mode() {
 use_local_docker() {
     log "Configurando para usar Docker local..."
     
-    # Remover variáveis de ambiente do shell config
-    for rc in "$BASHRC" "$ZSHRC"; do
-        if [ -f "$rc" ]; then
-            sed -i '/# Docker Remote Configuration/d' "$rc"
-            sed -i '/export DOCKER_HOST=/d' "$rc"
-            sed -i '/export DOCKER_TLS_VERIFY=/d' "$rc"
-            sed -i '/export DOCKER_CERT_PATH=/d' "$rc"
-        fi
-    done
+    switch_context "default"
     
-    # Limpar variáveis da sessão atual
-    unset DOCKER_HOST
-    unset DOCKER_TLS_VERIFY
-    unset DOCKER_CERT_PATH
-    
-    log "Docker local configurado."
-    info "Faça logout/login ou execute: source ~/.bashrc"
+    log "✓ Docker local ativado!"
+    info "Você já pode usar 'docker ps' para testar."
 }
 
 # Função para usar Docker remoto
 use_remote_docker() {
     local remote_host=$1
+    local context_name="${REMOTE_CONTEXT_PREFIX}-${remote_host}"
     local DOCKER_CERTS_DIR="$DOCKER_BASE_DIR/$remote_host/docker-client-certs"
     
     log "Configurando para usar Docker remoto: $remote_host..."
@@ -239,11 +307,16 @@ use_remote_docker() {
         exit 1
     fi
     
-    # Configurar variáveis de ambiente
-    configure_environment "$remote_host" "$DOCKER_CERTS_DIR"
+    # Verificar se context existe, senão criar
+    if ! context_exists "$context_name"; then
+        create_remote_context "$context_name" "$remote_host" "$DOCKER_CERTS_DIR"
+    fi
     
-    log "Docker remoto configurado: $remote_host"
-    info "Faça logout/login ou execute: source ~/.bashrc"
+    # Trocar para o context remoto
+    switch_context "$context_name"
+    
+    log "✓ Docker remoto ativado: $remote_host"
+    info "Você já pode usar 'docker ps' para testar."
 }
 
 # Função para configurar novo servidor remoto
@@ -349,77 +422,31 @@ REMOTE_DOCKER_USER=$SSH_USER
 REMOTE_DOCKER_CERTS=$DOCKER_CERTS_DIR
 EOF
     
-    # Configurar variáveis de ambiente no .bashrc
-    configure_environment "$DOCKER_HOST_IP" "$DOCKER_CERTS_DIR"
+    # Criar Docker Context
+    local context_name="${REMOTE_CONTEXT_PREFIX}-${DOCKER_HOST_IP}"
+    create_remote_context "$context_name" "$DOCKER_HOST_IP" "$DOCKER_CERTS_DIR"
     
-    # Testar conexão
+    # Testar conexão trocando temporariamente de context
     log "Testando conexão com Docker remoto..."
-    if docker --tlsverify \
-        --tlscacert="$DOCKER_CERTS_DIR/ca.pem" \
-        --tlscert="$DOCKER_CERTS_DIR/cert.pem" \
-        --tlskey="$DOCKER_CERTS_DIR/key.pem" \
-        -H="tcp://$DOCKER_HOST_IP:2376" \
-        version &>/dev/null; then
+    if switch_context "$context_name" && docker version &>/dev/null; then
         log "✓ Conexão com Docker remoto bem-sucedida!"
         echo ""
-        docker --tlsverify \
-            --tlscacert="$DOCKER_CERTS_DIR/ca.pem" \
-            --tlscert="$DOCKER_CERTS_DIR/cert.pem" \
-            --tlskey="$DOCKER_CERTS_DIR/key.pem" \
-            -H="tcp://$DOCKER_HOST_IP:2376" \
-            version
+        docker version
     else
         error "Falha ao conectar ao Docker remoto."
         error "Verifique se o Docker está rodando no servidor e se a porta 2376 está acessível."
+        # Voltar para context anterior
+        docker context use default &>/dev/null || true
         exit 1
     fi
     
     echo ""
     log "Configuração concluída com sucesso!"
-    
-    # Perguntar se quer fazer source do .bashrc
-    echo ""
-    prompt "Deseja aplicar as configurações agora? (source ~/.bashrc) (s/N): "
-    read -r apply_now
-    if [[ "$apply_now" =~ ^[Ss]$ ]]; then
-        source "$BASHRC"
-        log "Configurações aplicadas! Você já pode usar 'docker ps' para testar."
-    else
-        info "Para aplicar as alterações manualmente, execute: source ~/.bashrc"
-    fi
+    info "Context Docker criado: $context_name"
+    info "Você já pode usar 'docker ps' para testar."
 }
 
-# Função para configurar variáveis de ambiente
-configure_environment() {
-    local host_ip=$1
-    local certs_dir=$2
-    
-    log "Configurando variáveis de ambiente no ~/.bashrc..."
-    
-    # Remover configurações antigas do .bashrc
-    if [ -f "$BASHRC" ]; then
-        sed -i '/# Docker Remote Configuration/d' "$BASHRC"
-        sed -i '/export DOCKER_HOST=/d' "$BASHRC"
-        sed -i '/export DOCKER_TLS_VERIFY=/d' "$BASHRC"
-        sed -i '/export DOCKER_CERT_PATH=/d' "$BASHRC"
-    fi
-    
-    # Adicionar novas configurações ao .bashrc
-    cat >> "$BASHRC" <<EOF
 
-# Docker Remote Configuration
-export DOCKER_HOST=tcp://${host_ip}:2376
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=${certs_dir}
-EOF
-    
-    log "Variáveis de ambiente configuradas em ~/.bashrc"
-    
-    # Configurar para a sessão atual
-    export DOCKER_HOST="tcp://${host_ip}:2376"
-    export DOCKER_TLS_VERIFY=1
-    export DOCKER_CERT_PATH="${certs_dir}"
-}
 
 # Banner
 echo ""
@@ -427,6 +454,9 @@ echo "================================================="
 echo "   Configuração de Docker Remoto com TLS"
 echo "================================================="
 echo ""
+
+# Limpar variáveis de ambiente antigas
+clean_old_env_vars
 
 # Executar verificações e configuração
 check_requirements
@@ -438,20 +468,23 @@ echo "================================================="
 log "Configuração finalizada!"
 echo "================================================="
 echo ""
-info "Para aplicar as alterações:"
-echo "  source ~/.bashrc"
+info "Contexts Docker disponíveis:"
+docker context ls
+echo ""
+info "Para trocar entre Docker local e remoto:"
+echo "  docker context use default        # Docker local"
+echo "  docker context use remote-<IP>    # Docker remoto"
 echo ""
 info "Para testar a conexão:"
 echo "  docker ps"
 echo "  docker info"
 echo ""
+info "Para listar contexts:"
+echo "  docker context ls"
+echo ""
+info "Para remover um context remoto:"
+echo "  docker context rm remote-<IP>"
+echo ""
 info "Os certificados estão em:"
 echo "  ~/docker/<IP_SERVIDOR>/docker-client-certs/"
-echo ""
-info "Para criar um context Docker (recomendado):"
-echo "  docker context create remote --docker \"host=tcp://<IP>:2376,ca=~/docker/<IP>/docker-client-certs/ca.pem,cert=~/docker/<IP>/docker-client-certs/cert.pem,key=~/docker/<IP>/docker-client-certs/key.pem\""
-echo "  docker context use remote"
-echo ""
-info "Para voltar ao Docker local (se disponível):"
-echo "  Execute este script novamente e escolha a opção 'Docker Local'"
 echo "================================================="

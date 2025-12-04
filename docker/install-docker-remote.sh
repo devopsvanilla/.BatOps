@@ -1,6 +1,7 @@
 #!/bin/bash
-# install-docker.sh: Instala e configura Docker no Ubuntu para uso como host remoto com TLS
-# Uso: sudo ./install-docker.sh
+# install-docker-remote.sh: Instala e configura Docker no Ubuntu para uso como host remoto com TLS
+# EXECUTE ESTE SCRIPT NO SERVIDOR REMOTO (Host Docker)
+# Uso: sudo ./install-docker-remote.sh
 
 set -e
 
@@ -48,6 +49,28 @@ error() {
 info() {
     echo -e "${BLUE}[DETALHE]${NC} $1"
 }
+
+# --- INÍCIO DO FLUXO PRINCIPAL ---
+
+# Verificar se está sendo executado como root
+if [[ "$EUID" -ne 0 ]]; then
+    error "Este script deve ser executado com sudo"
+    error "Use: sudo ./install-docker-remote.sh"
+    exit 1
+fi
+
+if is_docker_installed; then
+    warn "Docker já está instalado no sistema."
+    echo -n "Deseja continuar apenas com a configuração para acesso remoto (TLS)? (s/N): "
+    read -r docker_config_response
+    if [[ ! "$docker_config_response" =~ ^[Ss]$ ]]; then
+        log "Instalação/Configuração cancelada pelo usuário."
+        exit 0
+    fi
+    log "Prosseguindo apenas com a configuração para acesso remoto..."
+else
+    log "Docker não está instalado. Prosseguindo com a instalação..."
+fi
 
 # Função para verificar requisitos
 check_requirements() {
@@ -179,37 +202,51 @@ copy_client_certificates() {
 }
 
 # Verificar requisitos
-check_requirements
+if ! is_docker_installed; then
+    check_requirements
 
-# Detectar informações do host
-detect_host_info
+    # Detectar informações do host
+    detect_host_info
 
-log "Atualizando lista de pacotes..."
-sudo apt-get update
+    log "Atualizando lista de pacotes..."
+    sudo apt-get update
 
-log "Instalando dependências do Docker..."
-sudo apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release
+    log "Instalando dependências do Docker..."
+    for pkg in ca-certificates curl gnupg lsb-release; do
+        if ! dpkg -l | grep -q "^ii  $pkg "; then
+            warn "Pacote $pkg não está instalado. Deseja instalar? (s/N): "
+            read -r pkg_response
+            if [[ "$pkg_response" =~ ^[Ss]$ ]]; then
+                sudo apt-get install -y "$pkg"
+            else
+                error "Instalação cancelada. Instale o pacote $pkg e execute novamente."
+                exit 1
+            fi
+        fi
+    done
 
-log "Adicionando repositório oficial do Docker..."
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    log "Adicionando repositório oficial do Docker..."
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-log "Atualizando lista de pacotes..."
-sudo apt-get update
+    log "Atualizando lista de pacotes..."
+    sudo apt-get update
 
-log "Instalando Docker Engine..."
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    log "Instalando Docker Engine..."
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-log "Adicionando usuário atual ao grupo docker..."
-sudo usermod -aG docker "$USER"
+    # Garantir que o grupo docker existe
+    if ! getent group docker >/dev/null; then
+        log "Grupo docker não existe. Criando grupo..."
+        sudo groupadd docker
+    fi
+    log "Adicionando usuário atual ao grupo docker..."
+    sudo usermod -aG docker "$USER"
+fi
 
 # Gerar certificados TLS
 generate_certificates
@@ -251,6 +288,48 @@ sleep 3
 
 log "Configurando firewall para liberar porta 2376 (TLS)..."
 sudo ufw allow 2376/tcp 2>/dev/null || warn "UFW não está ativo. Configure o firewall manualmente se necessário."
+
+# --- Dockly ---
+
+# Função para instalar nvm, node, npm e dockly
+install_dockly() {
+    log "Instalando requisitos para Dockly (nvm, node, npm)..."
+    if ! command -v nvm >/dev/null 2>&1; then
+        log "Instalando nvm..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    else
+        log "nvm já instalado."
+    fi
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    nvm install node --latest-npm
+    nvm use node
+    log "Instalando Dockly..."
+    npm install -g dockly
+}
+
+if command -v dockly >/dev/null 2>&1; then
+    log "Dockly já está instalado."
+else
+    echo -n "Deseja instalar o Dockly (dashboard CLI para Docker)? (s/N): "
+    read -r dockly_response
+    if [[ "$dockly_response" =~ ^[Ss]$ ]]; then
+        install_dockly
+    else
+        warn "Instalação do Dockly ignorada pelo usuário."
+    fi
+fi
+
+echo -n "Deseja testar a instalação e funcionamento do Dockly agora? (s/N): "
+read -r dockly_test_response
+if [[ "$dockly_test_response" =~ ^[Ss]$ ]]; then
+    log "Executando Dockly..."
+    dockly
+else
+    log "Teste do Dockly ignorado pelo usuário."
+fi
 
 # Exibir instruções finais
 echo ""
