@@ -4,45 +4,86 @@ Este guia descreve como instalar e configurar o Docker com acesso remoto seguro 
 
 ## 📋 Índice
 
+- [Visão Geral](#visão-geral)
 - [Arquitetura](#arquitetura)
 - [Pré-requisitos](#pré-requisitos)
 - [Parte 1: Servidor Remoto](#parte-1-servidor-remoto)
+  - [O que o Script Instala](#o-que-o-script-instala)
+  - [O que o Script Configura](#o-que-o-script-configura)
+  - [Instalação Passo a Passo](#instalação-passo-a-passo)
 - [Parte 2: Computador Cliente](#parte-2-computador-cliente)
+  - [O que o Script Faz](#o-que-o-script-faz-no-cliente)
+  - [Configuração Passo a Passo](#configuração-passo-a-passo)
 - [Uso Prático](#uso-prático)
 - [Solução de Problemas](#solução-de-problemas)
 - [Segurança](#segurança)
+- [Referências](#referências)
+
+## 🎯 Visão Geral
+
+Este projeto fornece dois scripts automatizados para configurar Docker com acesso remoto seguro via TLS:
+
+1. **`install-docker-remote.sh`** - Executado no servidor Ubuntu para instalar Docker e configurar acesso remoto seguro
+2. **`setup-docker-remote.sh`** - Executado no cliente para configurar conexão remota usando Docker Contexts
+
+**Principais Características:**
+- ✅ Instalação automatizada do Docker Engine
+- ✅ Configuração TLS com certificados auto-assinados
+- ✅ Uso de Docker Contexts para gerenciar múltiplos hosts
+- ✅ Suporte a Dockly (dashboard CLI interativo)
+- ✅ Configuração automática de firewall
+- ✅ Validação e testes integrados
 
 ## 🏗️ Arquitetura
 
 ```mermaid
 flowchart TD
    A["SERVIDOR REMOTO (Linux)"]
-   subgraph SR[" "]
-      D["Docker Daemon (dockerd)\nEscuta: tcp://0.0.0.0:2376 (TLS)\nCertificados: /etc/docker/certs/\nCertificados cliente: ~/docker-client-certs/"]
-   end
-   B["COMPUTADOR CLIENTE (qualquer SO)"]
-   subgraph CC[" "]
-      C["Docker CLI + Certificados Cliente\nca.pem, cert.pem, key.pem: ~/docker/certs/\nDocker Contexts\nUso: docker --tlsverify -H tcp://<IP>:2376 ps"]
-   end
-   D <--> |"Conexão TLS/SSL\nPorta 2376"| C
+   B["Docker Engine + TLS"]
+   C["COMPUTADOR CLIENTE"]
+   D["Docker CLI + Contexts"]
+   
+   A --> B
+   B --> |"Porta 2376/TCP\n(TLS obrigatório)"| D
+   C --> D
+   D <--> |"Conexão TLS/SSL\nPorta 2376"| B
+   
+   style A fill:#e1f5dd
+   style B fill:#fff3cd
+   style C fill:#d1ecf1
+   style D fill:#f8d7da
 ```
+
+**Componentes:**
+- **Servidor**: Docker Engine configurado para aceitar conexões remotas via TLS
+- **Cliente**: Docker CLI configurado com certificados TLS para conectar ao servidor
+- **Comunicação**: Criptografada via TLS/SSL na porta 2376
+- **Gerenciamento**: Docker Contexts para alternar entre diferentes hosts
 
 ## 🔧 Pré-requisitos
 
 ### Servidor Remoto
 
-- **OS**: Ubuntu 20.04 LTS ou superior
+- **Sistema Operacional**: Ubuntu 20.04 LTS ou superior
 - **Acesso**: Usuário com privilégios `sudo`
-- **Conectividade**: Porta 2376 aberta/acessível
-- **Pacotes**: Instalados automaticamente pelo script
-  - curl, ca-certificates, gnupg, lsb-release, openssl
+- **Conectividade**: Porta 2376 aberta/acessível na rede
+- **Pacotes** (instalados automaticamente pelo script):
+  - `curl` - Download de recursos
+  - `ca-certificates` - Certificados de autoridade
+  - `gnupg` - Gerenciamento de chaves GPG
+  - `lsb-release` - Informações da distribuição Linux
+  - `openssl` - Geração de certificados TLS
 
 ### Computador Cliente
 
-- **Docker CLI**: Instalado localmente
-- **Conectividade**: Rede com acesso ao servidor na porta 2376
-- **Certificados**: Copiados do servidor
-- **SO**: Linux, macOS ou Windows (com WSL2)
+- **Docker CLI**: Instalado localmente (o script pode instalar automaticamente)
+- **Conectividade**: Acesso de rede ao servidor na porta 2376
+- **Certificados**: Copiados do servidor (automatizado via SSH/SCP)
+- **Sistemas Suportados**: Linux, macOS, Windows (com WSL2)
+- **Pacotes Necessários**:
+  - `openssl` - Validação de certificados
+  - `curl` - Download de recursos
+  - `sshpass` (opcional) - Autenticação SSH com senha
 
 ---
 
@@ -50,82 +91,174 @@ flowchart TD
 
 Execute esta parte **no servidor Linux** onde o Docker será instalado.
 
-## 1️⃣ Download do Script
+## 🎯 O que o Script Instala
+
+O script `install-docker-remote.sh` instala e configura automaticamente:
+
+### 1. **Docker Engine e Componentes**
+- **Docker Engine** (`docker-ce`) - Motor de execução de containers
+- **Docker CLI** (`docker-ce-cli`) - Interface de linha de comando
+- **Containerd** (`containerd.io`) - Runtime de containers
+- **Docker Buildx Plugin** - Build avançado de imagens (multi-plataforma)
+- **Docker Compose Plugin** - Orquestração de multi-containers
+
+### 2. **Dependências do Sistema**
+- `curl` - Cliente HTTP para downloads
+- `ca-certificates` - Certificados raiz confiáveis
+- `gnupg` - GNU Privacy Guard para validação de assinaturas
+- `lsb-release` - Informações da distribuição Linux
+- `openssl` - Toolkit de criptografia SSL/TLS
+
+### 3. **Certificados TLS** (Auto-assinados)
+- **Certificate Authority (CA)** própria:
+  - `ca-key.pem` - Chave privada da CA (4096 bits, AES-256)
+  - `ca.pem` - Certificado raiz da CA (validade: 365 dias)
+- **Certificados do Servidor**:
+  - `server-key.pem` - Chave privada do servidor (4096 bits)
+  - `server-cert.pem` - Certificado do servidor (SHA-256, com SAN)
+- **Certificados do Cliente**:
+  - `key.pem` - Chave privada do cliente (4096 bits)
+  - `cert.pem` - Certificado do cliente (SHA-256)
+
+### 4. **Ferramentas Opcionais**
+- **NVM** (Node Version Manager) - Gerenciador de versões do Node.js
+- **Node.js** - Runtime JavaScript (versão mais recente via nvm)
+- **npm** - Gerenciador de pacotes do Node.js
+- **Dockly** - Dashboard interativo CLI para gerenciamento Docker
+
+#### Sobre o Dockly
+
+> **Dockly** é uma ferramenta de dashboard interativo para Docker, acessível via terminal. Permite visualizar, gerenciar e interagir com containers, imagens, volumes e redes de forma intuitiva, tudo em modo texto. Ideal para administradores que preferem uma interface rápida sem depender de GUIs pesadas.
+
+**Recursos do Dockly:**
+- 📊 Visualização em tempo real de containers, imagens, volumes e redes
+- 🔄 Iniciar, parar e remover containers
+- 📝 Visualizar logs em tempo real
+- 💻 Executar comandos dentro de containers
+- 📈 Monitorar uso de recursos (CPU, memória)
+
+## ⚙️ O que o Script Configura
+
+### 1. **Docker Daemon** (`/etc/docker/daemon.json`)
+```json
+{
+  "hosts": [
+    "unix:///var/run/docker.sock",  // Socket local (mantém compatibilidade)
+    "tcp://0.0.0.0:2376"             // Escuta remota TLS na porta 2376
+  ],
+  "tls": true,                        // Habilita TLS
+  "tlscacert": "/etc/docker/certs/ca.pem",
+  "tlscert": "/etc/docker/certs/server-cert.pem",
+  "tlskey": "/etc/docker/certs/server-key.pem",
+  "tlsverify": true                   // Exige verificação mútua TLS
+}
+```
+
+**Configurações aplicadas:**
+- ✅ Acesso local via socket Unix (`/var/run/docker.sock`)
+- ✅ Acesso remoto na porta 2376 com TLS obrigatório
+- ✅ Verificação mútua de certificados (cliente e servidor)
+- ✅ Criptografia TLS 1.2+ para toda comunicação remota
+
+### 2. **Systemd Override** (`/etc/systemd/system/docker.service.d/override.conf`)
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock
+```
+
+**Motivo:** Remove conflitos entre `daemon.json` e parâmetros de linha de comando do systemd.
+
+### 3. **Firewall (UFW)**
+```bash
+sudo ufw allow 2376/tcp
+```
+
+**Configuração:**
+- ✅ Libera porta 2376/TCP para conexões remotas TLS
+- ⚠️ Apenas se UFW estiver ativo (caso contrário, requer configuração manual)
+
+### 4. **Grupos e Permissões**
+- Adiciona usuário ao grupo `docker` para acesso sem `sudo`
+- Ajusta permissões dos certificados:
+  - Chaves privadas: `0400` (leitura apenas pelo proprietário)
+  - Certificados públicos: `0444` (leitura por todos)
+
+### 5. **Certificados do Cliente**
+- Copia certificados para `~/docker-client-certs/` para transferência ao cliente
+- Arquivos: `ca.pem`, `cert.pem`, `key.pem`
+
+## 📥 Instalação Passo a Passo
+
+### 1️⃣ Download do Repositório
 
 ```bash
-# Clonar ou fazer download do repositório
+# Clonar repositório
 git clone https://github.com/devopsvanilla/.BatOps.git
 cd .BatOps/docker
 
-# Ou se já tiver o arquivo
+# Ou se já tiver o repositório
 cd /caminho/para/.BatOps/docker
 ```
 
-## 2️⃣ Dar Permissão de Execução
+### 2️⃣ Dar Permissão de Execução
 
 ```bash
 chmod +x install-docker-remote.sh
 ```
 
-## 3️⃣ Executar o Script
+### 3️⃣ Executar o Script
 
 ```bash
 sudo ./install-docker-remote.sh
 ```
 
-## O que o Script Faz (No Servidor)
-## 🧰 O que é Instalado pelo Script
+### 4️⃣ Fluxo de Instalação
 
-O script `install-docker-remote.sh` instala e configura automaticamente:
+O script executa automaticamente:
 
-- **Docker Engine, CLI e plugins**: Para execução e gerenciamento de containers.
-- **Certificados TLS**: Para acesso remoto seguro.
-- **Dependências essenciais**: curl, ca-certificates, gnupg, lsb-release, openssl, firewall (UFW).
-- **Node.js e npm (via nvm)**: Necessários para instalar ferramentas baseadas em Node.
-- **Dockly**: Um dashboard interativo para gerenciar containers Docker diretamente pelo terminal.
+1. **Verificação de Requisitos**
+   - ✅ Confirma que é Ubuntu
+   - ✅ Verifica se está rodando com `sudo`
+   - ✅ Detecta pacotes faltantes
+   - ❓ Pergunta se deseja instalar dependências faltantes
 
-### Sobre o Dockly
+2. **Detecção de Ambiente**
+   - 🔍 Captura hostname do servidor
+   - 🔍 Identifica IP da interface de rede principal (`ip route get`)
+   - 📝 Exibe informações detectadas
 
-> **Dockly** é uma ferramenta de dashboard interativo para Docker, acessível via terminal. Permite visualizar, gerenciar e interagir com containers, imagens, volumes e redes de forma intuitiva, tudo em modo texto. Ideal para administradores que preferem uma interface rápida e sem depender de GUIs pesadas.
+3. **Instalação do Docker** (se não instalado)
+   - 📦 Adiciona repositório oficial do Docker
+   - 📦 Instala Docker Engine, CLI, plugins (Buildx, Compose)
+   - 👥 Cria grupo `docker` e adiciona usuário
 
-Instalação do Dockly é opcional e pode ser feita durante a execução do script. Após instalado, basta executar `dockly` no terminal para abrir o dashboard.
+4. **Geração de Certificados TLS**
+   - 🔐 Cria CA privada com chave AES-256 (4096 bits)
+   - 🔐 Gera certificado servidor com SAN (hostname + IP + localhost)
+   - 🔐 Gera certificado cliente com extensão `clientAuth`
+   - 🗑️ Remove arquivos temporários (CSRs, extensões)
+   - 🔒 Ajusta permissões de segurança
 
-O script `install-docker-remote.sh` executa automaticamente:
+5. **Configuração do Docker Daemon**
+   - ⚙️ Cria `/etc/docker/daemon.json` com configuração TLS
+   - ⚙️ Cria override do systemd
+   - 🔄 Recarrega daemon e reinicia Docker
 
-1. ✅ **Verifica requisitos**
-   - Confirma que é Ubuntu
-   - Verifica/instala pacotes necessários
-   - Valida permissões de sudo
+6. **Configuração de Firewall**
+   - 🔥 Libera porta 2376/TCP no UFW (se ativo)
 
-2. 🔍 **Detecta informações do host**
-   - Captura hostname do servidor
-   - Identifica endereço IP da interface de rede
+7. **Preparação de Certificados**
+   - 📂 Copia certificados para `~/docker-client-certs`
+   - 🔒 Ajusta permissões apropriadas
 
-3 🐳 **Instala Docker** (se necessário)
-   - Adiciona repositório oficial do Docker
-   - Instala Docker Engine, CLI e plugins
-   - Adiciona usuário ao grupo docker
+8. **Instalação do Dockly** (opcional)
+   - ❓ Pergunta se deseja instalar
+   - 📦 Instala nvm, Node.js, npm
+   - 📦 Instala Dockly via npm global
+   - ❓ Oferece testar Dockly
 
-4. 🔐 **Gera certificados TLS auto-assinados**
-   - Cria Certificate Authority (CA) privada
-   - Gera certificado do servidor (com IP e hostname)
-   - Gera certificado do cliente para autenticação
-   - Salva em `/etc/docker/certs` (servidor)
-   - Salva em `~/docker-client-certs` (para copiar ao cliente)
-
-5. ⚙️ **Configura Docker Daemon**
-   - Habilita TLS com verificação obrigatória
-   - Libera porta 2376/TCP
-   - Mantém socket Unix para acesso local
-
-6. 🔥 **Configura Firewall**
-   - Libera porta 2376/TCP (se UFW está ativo)
-
-7. 📦 **Prepara certificados para cliente**
-   - Copia certificados para `~/docker-client-certs`
-   - Ajusta permissões apropriadas
-
-## 4️⃣ Verificar a Instalação (No Servidor)
+### 5️⃣ Verificar a Instalação
 
 ```bash
 # Verificar status do Docker
@@ -133,41 +266,94 @@ sudo systemctl status docker
 
 # Testar Docker localmente
 docker ps
+docker version
 
-# Verificar porta TLS
+# Verificar porta TLS escutando
 sudo netstat -tlnp | grep 2376
 # ou
 sudo ss -tlnp | grep dockerd
 ```
 
-**Output esperado**:
+**Output esperado:**
 ```
 tcp6       0      0 :::2376                 :::*                    LISTEN      1234/dockerd
 ```
 
-## 5️⃣ Preparar Certificados para o Cliente
+### 6️⃣ Testar Docker Localmente
 
-Os certificados do cliente estão em:
+```bash
+# Rodar container de teste
+docker run hello-world
+
+# Verificar informações
+docker info
+```
+
+### 7️⃣ Preparar Certificados para o Cliente
+
+Os certificados do cliente foram salvos em:
 ```
 ~/docker-client-certs/
-├── ca.pem          (Certificado da CA)
-├── cert.pem        (Certificado do cliente)
-└── key.pem         (Chave privada do cliente)
+├── ca.pem          # Certificado da CA
+├── cert.pem        # Certificado do cliente
+└── key.pem         # Chave privada do cliente
 ```
 
-**Próximo passo**: Copie estes 3 arquivos para o computador cliente.
+**Próximo passo**: Copie estes 3 arquivos para o computador cliente (veja Parte 2).
 
 ---
 
 # PARTE 2: COMPUTADOR CLIENTE
 
-Execute esta parte **no seu computador** (Linux, macOS ou Windows com WSL2) que deseja usar Docker remoto.
+Execute esta parte **no seu computador** (Linux, macOS ou Windows/WSL2) que deseja usar Docker remoto.
 
-## 1️⃣ Pré-requisito: Instalar Docker CLI
+## 🎯 O que o Script Faz (no Cliente)
 
-Se já tiver Docker instalado, pule este passo.
+O script `setup-docker-remote.sh` realiza:
 
-### No Linux (Ubuntu/Debian)
+### 1. **Limpeza de Configurações Antigas**
+- Remove variáveis de ambiente `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, `DOCKER_CERT_PATH` de `~/.bashrc` e `~/.zshrc`
+- Limpa variáveis da sessão atual
+- Garante configuração limpa usando Docker Contexts
+
+### 2. **Verificação de Requisitos**
+- Verifica se `docker` CLI está instalado
+- Oferece instalar Docker CLI se ausente (apenas CLI, sem daemon)
+- Verifica pacotes: `openssl`, `curl`
+- Instala automaticamente dependências faltantes
+
+### 3. **Detecção de Ambientes**
+- Detecta se existe Docker local rodando
+- Detecta configurações remotas existentes
+- Oferece menu interativo para escolher modo de operação
+
+### 4. **Configuração de Novo Servidor Remoto**
+- Solicita IP do servidor Docker
+- Solicita usuário SSH
+- Oferece autenticação via senha ou chave SSH
+- Testa conectividade (ping)
+- Copia certificados automaticamente via SCP/SFTP
+- Ajusta permissões dos certificados
+- Salva configuração em `~/.docker/remote-docker-host.conf`
+
+### 5. **Docker Contexts**
+- Cria Docker Context com nome `remote-<IP>`
+- Configura Context com certificados TLS
+- Permite trocar entre contexts facilmente
+- Testa conexão automática após criação
+
+### 6. **Validação**
+- Testa conexão executando `docker version`
+- Exibe informações do servidor remoto
+- Lista contexts disponíveis
+
+## 📥 Configuração Passo a Passo
+
+### 1️⃣ Pré-requisito: Docker CLI
+
+O script pode instalar automaticamente. Se preferir instalar manualmente:
+
+#### No Linux (Ubuntu/Debian)
 
 ```bash
 # Adicionar repositório
@@ -175,482 +361,871 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Instalar
+# Instalar apenas CLI
 sudo apt-get update
 sudo apt-get install -y docker-ce-cli
 ```
 
-### No macOS
+#### No macOS
 
 ```bash
 brew install docker
 ```
 
-### No Windows (WSL2)
+#### No Windows (WSL2)
+
+Execute os mesmos comandos do Linux dentro do WSL2.
+
+### 2️⃣ Download do Script
 
 ```bash
-# Dentro do WSL2
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt-get update
-sudo apt-get install -y docker-ce-cli
-```
-
-## 2️⃣ Copiar Certificados do Servidor
-
-Você tem 3 opções para copiar os arquivos:
-
-### Opção A: Usar SCP (Recomendado)
-
-```bash
-# No computador cliente
-mkdir -p ~/docker/certs
-scp usuario@IP_SERVIDOR:~/docker-client-certs/* ~/docker/certs/
-```
-
-### Opção B: Usar Outro Método
-
-- Pendrive USB
-- SFTP/SCP via interface gráfica
-- Compartilhamento de rede
-- Qualquer outro método disponível
-
-### Opção C: Usar o Script de Setup
-
-O script `setup-docker-remote.sh` pode copiar os certificados automaticamente via SSH/SCP.
-
-## 3️⃣ Ajustar Permissões dos Certificados
-
-```bash
-# No computador cliente, após copiar os certificados
-chmod 0400 ~/docker/certs/key.pem
-chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
-
-# Verificar permissões
-ls -la ~/docker/certs/
-```
-
-## 4️⃣ Download do Script de Setup (Recomendado)
-
-```bash
-# Clone o repositório no cliente
+# Clonar repositório no cliente
 git clone https://github.com/devopsvanilla/.BatOps.git
 cd .BatOps/docker
 
-# Ou se já tiver o arquivo
+# Ou se já tiver
 cd /caminho/para/.BatOps/docker
 ```
 
-## 5️⃣ Executar o Script de Setup (Opcional Automatizado)
+### 3️⃣ Executar o Script de Setup
 
 ```bash
 chmod +x setup-docker-remote.sh
 ./setup-docker-remote.sh
 ```
 
-O script vai:
-- ✅ Verificar requisitos (Docker CLI)
-- ✅ Oferecer copiar certificados automaticamente via SSH
-- ✅ Criar Docker Context remoto
-- ✅ Testar a conexão
-- ✅ Listar contexts disponíveis
+### 4️⃣ Fluxo Interativo
 
-### Ou Configurar Manualmente
+O script apresenta um menu interativo:
 
-Se preferir configurar sem o script, siga a próxima seção.
+**Cenário 1: Apenas Docker Local Detectado**
+```
+Docker local detectado. Deseja configurar Docker remoto? (s/N):
+```
 
----
+**Cenário 2: Docker Local + Remoto Configurado**
+```
+Qual Docker você deseja usar?
+  1) Docker Local
+  2) Docker Remoto (192.168.1.100)
+  3) Configurar novo Docker Remoto
+Escolha (1/2/3):
+```
 
-# USO PRÁTICO
+**Cenário 3: Apenas Remoto Configurado**
+```
+Configuração remota existente: 192.168.1.100
+  1) Usar configuração existente
+  2) Configurar novo servidor
+Escolha (1/2):
+```
 
-## Opção 1: Usar Docker Contexts (Recomendado ⭐)
+### 5️⃣ Configuração de Novo Servidor
 
-### Criar um Context Remoto
+Se escolher configurar novo servidor:
 
 ```bash
-docker context create remote-docker \
-  --docker "host=tcp://IP_SERVIDOR:2376,ca=~/docker/certs/ca.pem,cert=~/docker/certs/cert.pem,key=~/docker/certs/key.pem"
+Digite o IP do servidor Docker remoto: 192.168.1.100
+Digite o usuário SSH do servidor [devopsvanilla]: 
+Digite a senha SSH (ou ENTER para usar chave SSH): [senha oculta]
 ```
 
-### Listar Contexts
+O script então:
+1. ✅ Testa conectividade (ping)
+2. ✅ Cria diretório `~/docker/<IP>/docker-client-certs`
+3. ✅ Copia certificados via SCP automaticamente
+4. ✅ Ajusta permissões (`0400` para key.pem, `0444` para ca.pem e cert.pem)
+5. ✅ Cria Docker Context `remote-<IP>`
+6. ✅ Testa conexão
+7. ✅ Exibe informações de sucesso
+
+### 6️⃣ Configuração Manual de Certificados (Opcional)
+
+Se preferir copiar certificados manualmente:
 
 ```bash
-docker context ls
-```
-
-**Output esperado**:
-```
-NAME                DESCRIPTION                     DOCKER ENDPOINT
-default             Current DOCKER_HOST             unix:///var/run/docker.sock
-remote-docker       Docker remoto em 192.168.1.100  tcp://192.168.1.100:2376
-```
-
-### Trocar para o Context Remoto
-
-```bash
-# Usar Docker remoto
-docker context use remote-docker
-
-# Agora todos os comandos vão para o servidor
-docker ps
-docker images
-docker run hello-world
-
-# Voltar para Docker local
-docker context use default
-```
-
-### Usar Sem Trocar Context
-
-```bash
-# Especificar o context no comando
-docker -c remote-docker ps
-docker -c remote-docker images
-```
-
-## Opção 2: Usar Variáveis de Ambiente
-
-### Temporário (apenas esta sessão)
-
-```bash
-export DOCKER_HOST=tcp://IP_SERVIDOR:2376
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=~/docker/certs
-
-# Agora docker usa o servidor remoto
-docker ps
-docker version
-```
-
-### Permanente (adicionar ao ~/.bashrc ou ~/.zshrc)
-
-```bash
-# Para bash
-echo 'export DOCKER_HOST=tcp://IP_SERVIDOR:2376' >> ~/.bashrc
-echo 'export DOCKER_TLS_VERIFY=1' >> ~/.bashrc
-echo 'export DOCKER_CERT_PATH=~/docker/certs' >> ~/.bashrc
-source ~/.bashrc
-
-# Para zsh
-echo 'export DOCKER_HOST=tcp://IP_SERVIDOR:2376' >> ~/.zshrc
-echo 'export DOCKER_TLS_VERIFY=1' >> ~/.zshrc
-echo 'export DOCKER_CERT_PATH=~/docker/certs' >> ~/.zshrc
-source ~/.zshrc
-```
-
-## Opção 3: Parâmetros na Linha de Comando
-
-```bash
-docker --tlsverify \
-  --tlscacert=~/docker/certs/ca.pem \
-  --tlscert=~/docker/certs/cert.pem \
-  --tlskey=~/docker/certs/key.pem \
-  -H=tcp://IP_SERVIDOR:2376 \
-  ps
-```
-
-## Exemplos Práticos
-
-### Listar Containers no Servidor Remoto
-
-```bash
-# Com context ativado
-docker context use remote-docker
-docker ps
-
-# Com variáveis de ambiente
-export DOCKER_HOST=tcp://192.168.1.100:2376
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=~/docker/certs
-docker ps
-
-# Na linha de comando
-docker --tlsverify -H=tcp://192.168.1.100:2376 -c remote-docker ps
-```
-
-### Executar um Container
-
-```bash
-docker context use remote-docker
-docker run -d -p 8080:80 nginx
-docker ps
-```
-
-### Usar Docker Compose
-
-```bash
-docker context use remote-docker
-docker compose -f docker-compose.yml up -d
-docker compose ps
-```
-
-### Copiar Arquivos para/do Container Remoto
-
-```bash
-docker context use remote-docker
-docker cp arquivo.txt container_id:/path/to/file
-docker cp container_id:/path/to/file arquivo.txt
-```
-
-### Ver Logs de Container Remoto
-
-```bash
-docker context use remote-docker
-docker logs -f container_id
-```
-
----
-
-## 🔧 Solução de Problemas
-
-### Erro: "Cannot connect to the Docker daemon"
-
-**Teste de conectividade**:
-```bash
-# No cliente, testar porta TLS
-telnet IP_SERVIDOR 2376
-
-# Ou com OpenSSL
-openssl s_client -connect IP_SERVIDOR:2376 -CAfile ~/docker/certs/ca.pem
-
-# Verificar firewall no servidor
-sudo ufw status
-sudo ufw allow 2376/tcp
-```
-
-**Solução no servidor**:
-```bash
-# Verificar se Docker está rodando
-sudo systemctl status docker
-sudo systemctl restart docker
-
-# Ver logs
-sudo journalctl -u docker.service -f
-```
-
-### Erro: "certificate signed by unknown authority"
-
-**Causa**: Certificados incorretos ou caminho errado.
-
-**Solução**:
-```bash
-# Verificar se arquivos existem
-ls -la ~/docker/certs/
-
-# Verificar permissões
-chmod 0400 ~/docker/certs/key.pem
-chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
-
-# Se usando variáveis, verificar
-echo $DOCKER_CERT_PATH
-echo $DOCKER_TLS_VERIFY
-echo $DOCKER_HOST
-
-# Testar certificado
-openssl x509 -in ~/docker/certs/cert.pem -text -noout
-```
-
-### Erro: "connection refused"
-
-**Causa**: Firewall ou Docker não está escutando.
-
-**Teste no servidor**:
-```bash
-# Verificar porta
-sudo netstat -tlnp | grep 2376
-sudo ss -tlnp | grep dockerd
-
-# Verificar daemon.json
-sudo cat /etc/docker/daemon.json
-
-# Verificar firewall
-sudo ufw status
-```
-
-**Solução**:
-```bash
-# Abrir porta no firewall
-sudo ufw allow 2376/tcp
-
-# Reiniciar Docker
-sudo systemctl restart docker
-
-# Verificar logs
-sudo journalctl -u docker.service -f
-```
-
-### Erro: "Permission denied while trying to connect"
-
-**Causa**: Permissões de certificado incorretas.
-
-**Solução no cliente**:
-```bash
-# Corrigir permissões
-chmod 0400 ~/docker/certs/key.pem
-chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
-
-# Testar novamente
-docker ps
-```
-
-### Verificar se Certificados Estão Válidos
-
-```bash
-# Data de expiração
-openssl x509 -in ~/docker/certs/cert.pem -noout -dates
-
-# Informações completas
-openssl x509 -in ~/docker/certs/cert.pem -text -noout
-
-# No servidor
-openssl x509 -in /etc/docker/certs/server-cert.pem -noout -dates
-```
-
-### Listar Contexts do Docker
-
-```bash
-docker context ls
-
-# Ver detalhes de um context
-docker context inspect remote-docker
-
-# Remover um context
-docker context rm remote-docker
-```
-
-### Testar Manualmente a Conexão
-
-```bash
-# Com OpenSSL
-openssl s_client -connect IP_SERVIDOR:2376 \
-  -CAfile ~/docker/certs/ca.pem \
-  -cert ~/docker/certs/cert.pem \
-  -key ~/docker/certs/key.pem
-
-# Com curl
-curl --tlsv1.2 \
-  --cacert ~/docker/certs/ca.pem \
-  --cert ~/docker/certs/cert.pem \
-  --key ~/docker/certs/key.pem \
-  https://IP_SERVIDOR:2376/_ping
-```
-
----
-
-## 🔒 Segurança
-
-### Boas Práticas
-
-1. **Proteja os Certificados** ⚠️
-   - Nunca compartilhe `key.pem` publicamente
-   - Use permissões restritivas (0400 para chaves privadas)
-   - Faça backup em local seguro
-   - Considere armazenar em drive criptografado
-
-2. **Firewall** 🔥
-   - Limite o acesso à porta 2376 apenas a IPs confiáveis
-   ```bash
-   # No servidor
-   sudo ufw delete allow 2376/tcp
-   sudo ufw allow from 192.168.1.0/24 to any port 2376
-   
-   # Ou IP específico
-   sudo ufw allow from 192.168.1.50 to any port 2376
-   ```
-
-3. **Monitoramento** 📊
-   - Monitore logs do Docker regularmente
-   ```bash
-   sudo journalctl -u docker.service -f
-   ```
-   - Audite containers e imagens periodicamente
-   ```bash
-   docker ps -a
-   docker images
-   ```
-
-4. **Rotação de Certificados** 🔄
-   - Certificados gerados são válidos por 365 dias
-   - Planeje renovação antes do vencimento
-   - Para renovar: execute `install-docker-remote.sh` novamente no servidor
-
-5. **Atualizações** 📦
-   - Mantenha Docker atualizado
-   ```bash
-   # No servidor
-   sudo apt update
-   sudo apt upgrade docker-ce docker-ce-cli containerd.io
-   
-   # No cliente
-   sudo apt update
-   sudo apt upgrade docker-ce-cli
-   ```
-
-6. **Revogar Acesso**
-   - Para bloquear um cliente:
-     1. Regenere certificados: `sudo ./install-docker-remote.sh` (no servidor)
-     2. Reinicie Docker: `sudo systemctl restart docker`
-     3. Distribua novos certificados apenas para clientes autorizados
-
-### Verificar Certificados
-
-```bash
-# Expiração
-openssl x509 -in ~/docker/certs/cert.pem -noout -dates
-openssl x509 -in /etc/docker/certs/server-cert.pem -noout -dates
-
-# Detalhes completos
-openssl x509 -in ~/docker/certs/cert.pem -noout -text
-
-# Validar chain
-openssl verify -CAfile ~/docker/certs/ca.pem ~/docker/certs/cert.pem
-```
-
----
-
-## 📚 Referências
-
-- [Docker Official Documentation - Protect the Docker daemon socket](https://docs.docker.com/engine/security/protect-access/)
-- [Docker TLS Configuration](https://docs.docker.com/engine/security/https/)
-- [Docker Context Documentation](https://docs.docker.com/engine/context/working-with-contexts/)
-- [OpenSSL Documentation](https://www.openssl.org/docs/)
-- [Docker Compose with Remote Hosts](https://docs.docker.com/compose/how-tos/multi-compose-files/)
-
----
-
-## 📝 Resumo Rápido
-
-### No Servidor Remoto (UMA ÚNICA VEZ)
-
-```bash
-chmod +x install-docker-remote.sh
-sudo ./install-docker-remote.sh
-# Certificados criados em ~/docker-client-certs/
-```
-
-### No Computador Cliente (UMA ÚNICA VEZ)
-
-```bash
-# Copiar certificados
+# Criar diretório
 mkdir -p ~/docker/certs
+
+# Copiar via SCP
 scp usuario@IP_SERVIDOR:~/docker-client-certs/* ~/docker/certs/
 
 # Ajustar permissões
 chmod 0400 ~/docker/certs/key.pem
 chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
 
-# Criar context (opcional, mas recomendado)
+# Criar context manualmente
 docker context create remote-docker \
   --docker "host=tcp://IP_SERVIDOR:2376,ca=~/docker/certs/ca.pem,cert=~/docker/certs/cert.pem,key=~/docker/certs/key.pem"
 ```
 
-### Usar Docker Remoto
+---
+
+# USO PRÁTICO
+
+## 🎮 Gerenciamento de Docker Contexts
+
+Docker Contexts permitem alternar facilmente entre diferentes hosts Docker.
+
+### Listar Contexts Disponíveis
 
 ```bash
-# Trocar para remote
-docker context use remote-docker
+docker context ls
+```
+
+**Output esperado:**
+```
+NAME                DESCRIPTION                     DOCKER ENDPOINT
+default             Current DOCKER_HOST             unix:///var/run/docker.sock
+remote-192.168.1.100 Docker remoto em 192.168.1.100 tcp://192.168.1.100:2376
+```
+
+### Trocar para Docker Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Agora todos os comandos vão para o servidor remoto
+docker ps
+docker images
+docker info
+```
+
+### Voltar para Docker Local
+
+```bash
+docker context use default
+```
+
+### Usar Context Temporariamente (Sem Trocar)
+
+```bash
+# Executar comando em context específico
+docker -c remote-192.168.1.100 ps
+docker -c remote-192.168.1.100 images
+```
+
+### Inspecionar um Context
+
+```bash
+docker context inspect remote-192.168.1.100
+```
+
+### Remover um Context
+
+```bash
+docker context rm remote-192.168.1.100
+```
+
+## 📦 Exemplos Práticos
+
+### Executar Container Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Executar Nginx
+docker run -d -p 8080:80 --name webserver nginx
+
+# Verificar
+docker ps
+
+# Acessar logs
+docker logs -f webserver
+```
+
+### Docker Compose Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Deploy com Compose
+docker compose -f docker-compose.yml up -d
+
+# Ver status
+docker compose ps
+
+# Ver logs
+docker compose logs -f
+```
+
+### Copiar Arquivos para/de Container Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Copiar arquivo local para container
+docker cp arquivo.txt container_id:/path/to/file
+
+# Copiar arquivo de container para local
+docker cp container_id:/path/to/file arquivo.txt
+```
+
+### Executar Comando em Container Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Executar shell interativo
+docker exec -it container_id bash
+
+# Executar comando único
+docker exec container_id ls -la /var/www
+```
+
+### Build de Imagem Remoto
+
+```bash
+# Ativar context remoto
+docker context use remote-192.168.1.100
+
+# Build de imagem no servidor remoto
+docker build -t minha-app:latest .
+
+# Push para registry
+docker push minha-app:latest
+```
+
+## 🔄 Método Alternativo: Variáveis de Ambiente (Legado)
+
+**Nota:** Docker Contexts é o método recomendado. Use variáveis de ambiente apenas se necessário.
+
+### Temporário (Apenas Sessão Atual)
+
+```bash
+export DOCKER_HOST=tcp://192.168.1.100:2376
+export DOCKER_TLS_VERIFY=1
+export DOCKER_CERT_PATH=~/docker/192.168.1.100/docker-client-certs
+
+# Agora docker usa o servidor remoto
+docker ps
+docker version
+```
+
+### Permanente (Adicionar ao ~/.bashrc ou ~/.zshrc)
+
+```bash
+# Para bash
+echo 'export DOCKER_HOST=tcp://192.168.1.100:2376' >> ~/.bashrc
+echo 'export DOCKER_TLS_VERIFY=1' >> ~/.bashrc
+echo 'export DOCKER_CERT_PATH=~/docker/192.168.1.100/docker-client-certs' >> ~/.bashrc
+source ~/.bashrc
+
+# Para zsh
+echo 'export DOCKER_HOST=tcp://192.168.1.100:2376' >> ~/.zshrc
+echo 'export DOCKER_TLS_VERIFY=1' >> ~/.zshrc
+echo 'export DOCKER_CERT_PATH=~/docker/192.168.1.100/docker-client-certs' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### Limpar Variáveis de Ambiente
+
+```bash
+unset DOCKER_HOST
+unset DOCKER_TLS_VERIFY
+unset DOCKER_CERT_PATH
+```
+
+## 🔧 Método Alternativo: Parâmetros na Linha de Comando
+
+```bash
+docker --tlsverify \
+  --tlscacert=~/docker/certs/ca.pem \
+  --tlscert=~/docker/certs/cert.pem \
+  --tlskey=~/docker/certs/key.pem \
+  -H=tcp://192.168.1.100:2376 \
+  ps
+```
+
+---
+
+# SOLUÇÃO DE PROBLEMAS
+
+## 🔍 Diagnóstico Geral
+
+### Verificar Context Atual
+
+```bash
+docker context show
+```
+
+### Verificar Configuração do Context
+
+```bash
+docker context inspect <context_name>
+```
+
+### Testar Conectividade Manual
+
+```bash
+# Com ping
+ping -c 3 192.168.1.100
+
+# Com telnet
+telnet 192.168.1.100 2376
+
+# Com OpenSSL
+openssl s_client -connect 192.168.1.100:2376 \
+  -CAfile ~/docker/certs/ca.pem \
+  -cert ~/docker/certs/cert.pem \
+  -key ~/docker/certs/key.pem
+```
+
+## ❌ Erro: "Cannot connect to the Docker daemon"
+
+**Possíveis Causas:**
+- Docker não está rodando no servidor
+- Firewall bloqueando porta 2376
+- Context incorreto selecionado
+- Certificados incorretos
+
+**Soluções:**
+
+### 1. Verificar Docker no Servidor
+
+```bash
+# No servidor
+sudo systemctl status docker
+sudo systemctl restart docker
+
+# Ver logs
+sudo journalctl -xeu docker.service
+```
+
+### 2. Verificar Porta no Servidor
+
+```bash
+# No servidor
+sudo netstat -tlnp | grep 2376
+sudo ss -tlnp | grep dockerd
+
+# Deve mostrar:
+# tcp6  0  0 :::2376  :::*  LISTEN  1234/dockerd
+```
+
+### 3. Verificar Firewall no Servidor
+
+```bash
+# No servidor
+sudo ufw status
+
+# Se bloqueado, liberar
+sudo ufw allow 2376/tcp
+sudo ufw reload
+```
+
+### 4. Verificar Context no Cliente
+
+```bash
+# No cliente
+docker context ls
+docker context use remote-192.168.1.100
+```
+
+## ❌ Erro: "certificate signed by unknown authority"
+
+**Causa:** Certificados incorretos ou caminho errado.
+
+**Soluções:**
+
+### 1. Verificar Certificados Existem
+
+```bash
+ls -la ~/docker/certs/
+# ou
+ls -la ~/docker/192.168.1.100/docker-client-certs/
+```
+
+### 2. Verificar Permissões
+
+```bash
+chmod 0400 ~/docker/certs/key.pem
+chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
+```
+
+### 3. Validar Certificados
+
+```bash
+# Verificar certificado do cliente
+openssl x509 -in ~/docker/certs/cert.pem -text -noout
+
+# Verificar expiração
+openssl x509 -in ~/docker/certs/cert.pem -noout -dates
+
+# Validar chain
+openssl verify -CAfile ~/docker/certs/ca.pem ~/docker/certs/cert.pem
+```
+
+### 4. Recriar Context
+
+```bash
+# Remover context antigo
+docker context rm remote-192.168.1.100
+
+# Criar novamente
+docker context create remote-192.168.1.100 \
+  --docker "host=tcp://192.168.1.100:2376,ca=~/docker/certs/ca.pem,cert=~/docker/certs/cert.pem,key=~/docker/certs/key.pem"
+```
+
+## ❌ Erro: "connection refused"
+
+**Causa:** Firewall bloqueando ou Docker não escutando.
+
+**Soluções:**
+
+### 1. Teste no Servidor
+
+```bash
+# No servidor, verificar se está escutando
+sudo ss -tlnp | grep 2376
+
+# Testar localmente no servidor
+curl --insecure https://localhost:2376/_ping
+```
+
+### 2. Verificar daemon.json
+
+```bash
+# No servidor
+sudo cat /etc/docker/daemon.json
+```
+
+**Deve conter:**
+```json
+{
+  "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2376"],
+  "tls": true,
+  "tlsverify": true,
+  ...
+}
+```
+
+### 3. Verificar Override do Systemd
+
+```bash
+# No servidor
+sudo cat /etc/systemd/system/docker.service.d/override.conf
+```
+
+**Deve conter:**
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock
+```
+
+### 4. Reiniciar Docker
+
+```bash
+# No servidor
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+## ❌ Erro: "Permission denied while trying to connect"
+
+**Causa:** Permissões de certificado incorretas ou usuário não no grupo docker.
+
+**Soluções:**
+
+### 1. Ajustar Permissões de Certificados
+
+```bash
+chmod 0400 ~/docker/certs/key.pem
+chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
+```
+
+### 2. Adicionar Usuário ao Grupo Docker (No Servidor)
+
+```bash
+# No servidor
+sudo usermod -aG docker $USER
+
+# Fazer logout/login
+exit
+# (reconectar via SSH)
+
+# Verificar
+id -nG | grep docker
+```
+
+## ❌ Certificados Expirados
+
+**Verificar Expiração:**
+
+```bash
+# No cliente
+openssl x509 -in ~/docker/certs/cert.pem -noout -dates
+
+# No servidor
+sudo openssl x509 -in /etc/docker/certs/server-cert.pem -noout -dates
+```
+
+**Solução:** Regenerar certificados no servidor executando novamente `install-docker-remote.sh` e copiar novos certificados para cliente.
+
+## ❌ Erro: "x509: cannot validate certificate"
+
+**Causa:** SAN (Subject Alternative Name) não inclui IP ou hostname usado.
+
+**Verificar SAN:**
+
+```bash
+# No servidor
+sudo openssl x509 -in /etc/docker/certs/server-cert.pem -text -noout | grep -A1 "Subject Alternative Name"
+```
+
+**Deve mostrar:**
+```
+X509v3 Subject Alternative Name:
+    DNS:hostname, IP Address:192.168.1.100, IP Address:127.0.0.1
+```
+
+**Solução:** Regenerar certificados no servidor com o IP/hostname correto.
+
+## ⚠️ Docker Local e Remoto Conflitando
+
+**Sintoma:** Comandos docker não funcionam após configurar remoto.
+
+**Solução:**
+
+```bash
+# Verificar context atual
+docker context show
+
+# Trocar para local
+docker context use default
+
+# Verificar
+docker ps
+```
+
+## 🧹 Limpar Configuração e Recomeçar
+
+```bash
+# No cliente
+# Remover todos os contexts remotos
+docker context rm $(docker context ls -q | grep -v default)
+
+# Limpar variáveis de ambiente
+unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+
+# Remover configuração
+rm -f ~/.docker/remote-docker-host.conf
+
+# Remover certificados (se necessário)
+rm -rf ~/docker/*/docker-client-certs
+
+# Executar setup novamente
+./setup-docker-remote.sh
+```
+
+---
+
+# SEGURANÇA
+
+## 🔒 Boas Práticas
+
+### 1. **Proteção de Certificados** ⚠️
+
+**Crítico:**
+- ❌ **NUNCA** compartilhe `key.pem` publicamente
+- ❌ **NUNCA** commite certificados em repositórios Git
+- ✅ Armazene certificados em local seguro (criptografado se possível)
+- ✅ Use permissões restritivas (`0400` para chaves privadas)
+
+```bash
+# Verificar permissões
+ls -la ~/docker/certs/
+
+# Corrigir se necessário
+chmod 0400 ~/docker/certs/key.pem
+chmod 0444 ~/docker/certs/ca.pem ~/docker/certs/cert.pem
+```
+
+### 2. **Firewall** 🔥
+
+Limite acesso à porta 2376 apenas a IPs confiáveis:
+
+```bash
+# No servidor - Remover regra genérica
+sudo ufw delete allow 2376/tcp
+
+# Adicionar regras específicas por IP
+sudo ufw allow from 192.168.1.50 to any port 2376 proto tcp
+sudo ufw allow from 192.168.1.51 to any port 2376 proto tcp
+
+# Ou por subnet
+sudo ufw allow from 192.168.1.0/24 to any port 2376 proto tcp
+
+# Verificar
+sudo ufw status numbered
+```
+
+### 3. **Monitoramento** 📊
+
+Monitore acessos e atividades:
+
+```bash
+# No servidor - Ver logs do Docker
+sudo journalctl -u docker.service -f
+
+# Filtrar conexões TLS
+sudo journalctl -u docker.service | grep "TLS"
+
+# Ver conexões ativas
+sudo netstat -tnp | grep :2376
+
+# Logs de autenticação
+sudo tail -f /var/log/auth.log | grep docker
+```
+
+### 4. **Rotação de Certificados** 🔄
+
+Certificados gerados são válidos por **365 dias**.
+
+**Verificar Expiração:**
+
+```bash
+# No servidor
+sudo openssl x509 -in /etc/docker/certs/server-cert.pem -noout -enddate
+
+# No cliente
+openssl x509 -in ~/docker/certs/cert.pem -noout -enddate
+```
+
+**Renovar Certificados:**
+
+```bash
+# No servidor
+sudo ./install-docker-remote.sh
+# (Escolher apenas configuração TLS)
+
+# Copiar novos certificados para clientes
+scp ~/docker-client-certs/* usuario@cliente:~/docker/certs/
+
+# No cliente - Recriar context
+docker context rm remote-192.168.1.100
+./setup-docker-remote.sh
+```
+
+### 5. **Atualizações** 📦
+
+Mantenha Docker atualizado:
+
+```bash
+# No servidor
+sudo apt-get update
+sudo apt-get install --only-upgrade docker-ce docker-ce-cli containerd.io
+
+# Verificar versão
+docker version
+```
+
+### 6. **Auditoria de Acessos**
+
+Habilite auditoria detalhada:
+
+```bash
+# No servidor - Editar daemon.json
+sudo nano /etc/docker/daemon.json
+```
+
+Adicionar:
+```json
+{
+  ...
+  "log-level": "info",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+
+```bash
+# Reiniciar Docker
+sudo systemctl restart docker
+```
+
+### 7. **Revogar Acesso de Cliente**
+
+Para bloquear um cliente específico:
+
+**Opção 1: Regenerar CA** (bloqueia todos)
+```bash
+# No servidor
+sudo ./install-docker-remote.sh
+# Distribuir novos certificados apenas para clientes autorizados
+```
+
+**Opção 2: Firewall** (bloquear IP específico)
+```bash
+# No servidor
+sudo ufw deny from 192.168.1.50 to any port 2376
+```
+
+### 8. **Certificados em Produção**
+
+Para ambientes de produção, considere:
+
+- ✅ Usar CA confiável (Let's Encrypt, CA interna)
+- ✅ Implementar mutual TLS (mTLS) com validação rigorosa
+- ✅ Usar ferramentas de gestão de certificados (Vault, cert-manager)
+- ✅ Implementar rotação automática de certificados
+- ✅ Monitorar expiração com alertas automatizados
+
+### 9. **Princípio do Menor Privilégio**
+
+```bash
+# No servidor
+# Criar usuário dedicado apenas para Docker
+sudo useradd -m -s /bin/bash dockeruser
+sudo usermod -aG docker dockeruser
+
+# Usar esse usuário para conexões remotas
+# Evitar usar usuário com sudo
+```
+
+### 10. **Network Segmentation**
+
+Coloque Docker em subnet separada:
+
+```bash
+# No servidor - Configurar rede isolada
+# /etc/docker/daemon.json
+{
+  ...
+  "bip": "172.26.0.1/16",
+  "default-address-pools": [
+    {"base": "172.27.0.0/16", "size": 24}
+  ]
+}
+```
+
+---
+
+# REFERÊNCIAS
+
+## 📚 Documentação Oficial
+
+### Docker
+- [Protect the Docker daemon socket](https://docs.docker.com/engine/security/protect-access/) - Documentação oficial sobre segurança do daemon Docker
+- [Docker TLS Configuration](https://docs.docker.com/engine/security/https/) - Guia completo de configuração TLS
+- [Docker Context Documentation](https://docs.docker.com/engine/context/working-with-contexts/) - Documentação sobre Docker Contexts
+- [Docker Daemon Configuration](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file) - Referência do daemon.json
+- [Docker Compose](https://docs.docker.com/compose/) - Documentação oficial do Docker Compose
+- [Docker CLI Reference](https://docs.docker.com/engine/reference/commandline/cli/) - Referência completa da CLI
+
+### OpenSSL
+- [OpenSSL Documentation](https://www.openssl.org/docs/) - Documentação oficial do OpenSSL
+- [OpenSSL Command-Line Howto](https://www.madboa.com/geek/openssl/) - Guia prático de comandos
+- [X.509 Certificates](https://datatracker.ietf.org/doc/html/rfc5280) - RFC 5280 - Padrão de certificados
+
+### Segurança
+- [Docker Security Best Practices](https://docs.docker.com/engine/security/) - Práticas recomendadas de segurança
+- [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker) - Benchmark de segurança para Docker
+- [NIST Container Security Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf) - Guia de segurança para containers
+
+## 🛠️ Ferramentas Utilizadas
+
+### Dockly
+- [Dockly - GitHub](https://github.com/lirantal/dockly) - Dashboard interativo CLI para Docker
+- [Dockly - npm](https://www.npmjs.com/package/dockly) - Pacote npm oficial
+
+### NVM (Node Version Manager)
+- [NVM - GitHub](https://github.com/nvm-sh/nvm) - Node Version Manager
+- [NVM Installation Guide](https://github.com/nvm-sh/nvm#installing-and-updating) - Guia de instalação
+
+### Ferramentas de Sistema
+- [UFW (Uncomplicated Firewall)](https://help.ubuntu.com/community/UFW) - Firewall simplificado para Ubuntu
+- [Systemd](https://systemd.io/) - System and service manager
+- [OpenSSH](https://www.openssh.com/) - Conectividade segura
+
+## 📖 Tutoriais e Artigos
+
+### Docker Remoto
+- [How to Set Up a Remote Docker Daemon](https://www.howtogeek.com/devops/how-to-set-up-a-remote-docker-daemon/) - Tutorial prático
+- [Secure Docker Remote API](https://medium.com/@ssmak/how-to-enable-docker-remote-api-on-docker-host-7b73bd3278c6) - Artigo detalhado
+- [Docker Contexts Deep Dive](https://www.docker.com/blog/how-to-deploy-on-remote-docker-hosts-with-docker-compose/) - Blog oficial Docker
+
+### Certificados TLS
+- [Understanding TLS Certificates](https://www.digicert.com/what-is-ssl-tls-https) - Guia sobre TLS/SSL
+- [Self-Signed Certificates](https://www.digitalocean.com/community/tutorials/openssl-essentials-working-with-ssl-certificates-private-keys-and-csrs) - Tutorial Digital Ocean
+- [Certificate Authority (CA) Basics](https://www.ssl.com/faqs/what-is-a-certificate-authority/) - Fundamentos de CA
+
+## 🔧 Troubleshooting Resources
+
+- [Docker Troubleshooting Guide](https://docs.docker.com/config/daemon/troubleshoot/) - Guia oficial de troubleshooting
+- [Common Docker Issues](https://stackoverflow.com/questions/tagged/docker) - Stack Overflow
+- [Docker Forums](https://forums.docker.com/) - Fóruns oficiais Docker
+- [Docker Subreddit](https://www.reddit.com/r/docker/) - Comunidade no Reddit
+
+## 🎓 Cursos e Recursos de Aprendizado
+
+- [Docker Official Training](https://www.docker.com/products/docker-training/) - Treinamento oficial
+- [Play with Docker](https://labs.play-with-docker.com/) - Ambiente de prática online
+- [Docker Curriculum](https://docker-curriculum.com/) - Tutorial interativo gratuito
+
+## 🏢 Produção e Enterprise
+
+- [Docker Enterprise Documentation](https://docs.docker.com/ee/) - Documentação Enterprise
+- [Kubernetes](https://kubernetes.io/) - Orquestração de containers em produção
+- [Docker Swarm](https://docs.docker.com/engine/swarm/) - Orquestração nativa do Docker
+- [Portainer](https://www.portainer.io/) - Interface gráfica para gerenciamento Docker
+
+## 📜 Padrões e Especificações
+
+- [OCI (Open Container Initiative)](https://opencontainers.org/) - Padrões de containers
+- [CNI (Container Network Interface)](https://github.com/containernetworking/cni) - Padrão de rede para containers
+- [CRI (Container Runtime Interface)](https://kubernetes.io/docs/concepts/architecture/cri/) - Interface de runtime
+
+---
+
+## 📝 Resumo Rápido de Comandos
+
+### No Servidor (Uma Única Vez)
+
+```bash
+# Clonar repositório
+git clone https://github.com/devopsvanilla/.BatOps.git
+cd .BatOps/docker
+
+# Executar instalação
+chmod +x install-docker-remote.sh
+sudo ./install-docker-remote.sh
+
+# Certificados salvos em:
+# ~/docker-client-certs/
+```
+
+### No Cliente (Uma Única Vez)
+
+```bash
+# Clonar repositório
+git clone https://github.com/devopsvanilla/.BatOps.git
+cd .BatOps/docker
+
+# Executar configuração
+chmod +x setup-docker-remote.sh
+./setup-docker-remote.sh
+
+# Seguir menu interativo
+```
+
+### Uso Diário
+
+```bash
+# Ver contexts disponíveis
+docker context ls
+
+# Trocar para remoto
+docker context use remote-192.168.1.100
 
 # Usar normalmente
 docker ps
@@ -663,382 +1238,7 @@ docker context use default
 
 ---
 
-**Última atualização**: Dezembro 2025  
-**Versão**: 2.0 - Atualizado com instruções claras de servidor vs cliente
-
-## 🔧 Pré-requisitos
-
-### No Servidor (Host Docker)
-
-- Ubuntu 20.04 LTS ou superior
-- Usuário com privilégios sudo
-- Pacotes necessários (o script verifica e oferece instalação):
-  - `curl`
-  - `ca-certificates`
-  - `gnupg`
-  - `lsb-release`
-  - `openssl`
-
-### No Cliente (Computador que irá acessar)
-
-- Docker instalado (para usar comandos docker remotamente)
-- Certificados TLS copiados do servidor
-- Conectividade de rede com o servidor na porta 2376
-
-## 🚀 Instalação
-
-### Passo 1: Fazer Download do Script
-
-```bash
-cd /caminho/para/.BatOps/docker
-```
-
-### Passo 2: Dar Permissão de Execução
-
-```bash
-chmod +x install-docker.sh
-```
-
-### Passo 3: Executar o Script
-
-```bash
-sudo ./install-docker.sh
-```
-
-### O que o Script Faz
-
-O script executa automaticamente as seguintes tarefas:
-
-1. ✅ **Verifica requisitos do sistema**
-   - Confirma que é Ubuntu
-   - Verifica pacotes necessários
-   - Oferece instalação de pacotes faltantes
-
-2. 🔍 **Detecta informações do host**
-   - Captura o hostname do servidor
-   - Identifica o endereço IP da interface de rede principal
-
-3. 🐳 **Instala o Docker**
-   - Adiciona repositório oficial do Docker
-   - Instala Docker Engine, CLI e plugins
-   - Adiciona usuário ao grupo docker
-
-4. 🔐 **Gera certificados TLS**
-   - Cria uma Certificate Authority (CA) própria
-   - Gera certificado do servidor (incluindo IP e hostname)
-   - Gera certificado do cliente para autenticação mútua
-   - Salva certificados em `/etc/docker/certs`
-
-5. ⚙️ **Configura Docker Daemon**
-   - Configura TLS com verificação obrigatória
-   - Habilita acesso via TCP na porta 2376
-   - Mantém socket Unix local
-
-6. 🔥 **Configura Firewall**
-   - Libera porta 2376/TCP no UFW (se ativo)
-
-7. 📦 **Prepara certificados do cliente**
-   - Copia certificados para `~/docker-client-certs`
-   - Ajusta permissões adequadas
-
-## ✔️ Verificação
-
-### Verificar Status do Docker no Servidor
-
-```bash
-sudo systemctl status docker
-```
-
-### Testar Docker Localmente
-
-```bash
-# Pode ser necessário fazer logout/login primeiro para aplicar permissões do grupo
-docker ps
-```
-
-### Verificar Porta TLS
-
-```bash
-sudo netstat -tlnp | grep 2376
-```
-
-Deve mostrar algo como:
-```
-tcp6       0      0 :::2376                 :::*                    LISTEN      1234/dockerd
-```
-
-## 🖥️ Configuração do Cliente
-
-### Passo 1: Copiar Certificados do Servidor
-
-No **servidor**, os certificados do cliente estão em:
-```
-~/docker-client-certs/
-├── ca.pem
-├── cert.pem
-└── key.pem
-```
-
-Copie estes arquivos para o seu **computador cliente**. Você pode usar `scp`:
-
-```bash
-# No computador cliente, execute:
-mkdir -p ~/docker-certs
-scp usuario@IP_DO_SERVIDOR:~/docker-client-certs/* ~/docker-certs/
-```
-
-Ou use qualquer método de transferência de arquivos (USB, SFTP, etc.).
-
-### Passo 2: Ajustar Permissões dos Certificados
-
-No **computador cliente**:
-
-```bash
-chmod 0400 ~/docker-certs/key.pem
-chmod 0444 ~/docker-certs/ca.pem ~/docker-certs/cert.pem
-```
-
-### Passo 3: Configurar Variáveis de Ambiente
-
-#### Opção A: Temporário (apenas para a sessão atual)
-
-```bash
-export DOCKER_HOST=tcp://IP_DO_SERVIDOR:2376
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=~/docker-certs
-```
-
-#### Opção B: Permanente (adicionar ao ~/.bashrc ou ~/.zshrc)
-
-```bash
-echo 'export DOCKER_HOST=tcp://IP_DO_SERVIDOR:2376' >> ~/.bashrc
-echo 'export DOCKER_TLS_VERIFY=1' >> ~/.bashrc
-echo 'export DOCKER_CERT_PATH=~/docker-certs' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Passo 4: Testar Conexão
-
-```bash
-docker ps
-docker info
-docker version
-```
-
-## 📝 Exemplos de Uso
-
-### Usar Variáveis de Ambiente
-
-```bash
-export DOCKER_HOST=tcp://192.168.1.100:2376
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH=~/docker-certs
-
-docker ps
-docker images
-docker run hello-world
-```
-
-### Usar Parâmetros na Linha de Comando
-
-```bash
-docker --tlsverify \
-  --tlscacert=~/docker-certs/ca.pem \
-  --tlscert=~/docker-certs/cert.pem \
-  --tlskey=~/docker-certs/key.pem \
-  -H=tcp://192.168.1.100:2376 \
-  ps
-```
-
-### Executar Container Remoto
-
-```bash
-docker run -d -p 80:80 nginx
-```
-
-### Docker Compose com Host Remoto
-
-```bash
-# Com variáveis de ambiente configuradas
-docker compose up -d
-
-# Ou especificando o host
-docker --tlsverify -H=tcp://192.168.1.100:2376 compose up -d
-```
-
-### Criar Context do Docker (Recomendado)
-
-Contextos permitem alternar facilmente entre diferentes hosts Docker:
-
-```bash
-# Criar contexto
-docker context create remote-docker \
-  --docker "host=tcp://192.168.1.100:2376,ca=~/docker-certs/ca.pem,cert=~/docker-certs/cert.pem,key=~/docker-certs/key.pem"
-
-# Listar contextos
-docker context ls
-
-# Usar contexto
-docker context use remote-docker
-
-# Agora todos os comandos docker vão para o servidor remoto
-docker ps
-
-# Voltar para o contexto local
-docker context use default
-```
-
-## 🔧 Solução de Problemas
-
-### Erro: "Cannot connect to the Docker daemon"
-
-**Causa**: Docker não está rodando ou não está acessível.
-
-**Solução no servidor**:
-```bash
-sudo systemctl status docker
-sudo systemctl restart docker
-sudo journalctl -xeu docker
-```
-
-### Erro: "certificate signed by unknown authority"
-
-**Causa**: Certificados não estão corretos ou o caminho está errado.
-
-**Solução**:
-```bash
-# Verificar se os arquivos existem
-ls -la ~/docker-certs/
-
-# Verificar permissões
-chmod 0400 ~/docker-certs/key.pem
-chmod 0444 ~/docker-certs/ca.pem ~/docker-certs/cert.pem
-
-# Verificar variáveis de ambiente
-echo $DOCKER_CERT_PATH
-echo $DOCKER_TLS_VERIFY
-echo $DOCKER_HOST
-```
-
-### Erro: "connection refused"
-
-**Causa**: Firewall bloqueando ou porta incorreta.
-
-**Solução no servidor**:
-```bash
-# Verificar se a porta está aberta
-sudo netstat -tlnp | grep 2376
-
-# Verificar firewall
-sudo ufw status
-sudo ufw allow 2376/tcp
-
-# Verificar se o Docker está escutando na porta correta
-sudo ss -tlnp | grep dockerd
-```
-
-### Permissões do Grupo Docker Não Aplicadas
-
-**Causa**: Precisa fazer logout/login após ser adicionado ao grupo docker.
-
-**Solução**:
-```bash
-# Verificar se está no grupo
-groups
-
-# Fazer logout e login novamente, ou usar:
-newgrp docker
-```
-
-### Verificar Logs do Docker
-
-```bash
-# No servidor
-sudo journalctl -u docker.service -f
-sudo journalctl -u docker.service --no-pager | tail -100
-```
-
-### Testar Certificados Manualmente
-
-```bash
-# Verificar certificado do servidor
-openssl s_client -connect IP_DO_SERVIDOR:2376 -CAfile ~/docker-certs/ca.pem
-
-# Verificar detalhes do certificado
-openssl x509 -in ~/docker-certs/cert.pem -text -noout
-```
-
-## 🔒 Segurança
-
-### Boas Práticas
-
-1. **Proteja os Certificados**
-   - Nunca compartilhe `key.pem` publicamente
-   - Use permissões restritivas (0400 para chaves privadas)
-   - Faça backup em local seguro
-
-2. **Firewall**
-   - Limite o acesso à porta 2376 apenas a IPs confiáveis
-   ```bash
-   sudo ufw allow from 192.168.1.0/24 to any port 2376
-   ```
-
-3. **Rotação de Certificados**
-   - Os certificados gerados são válidos por 365 dias
-   - Planeje renovação antes do vencimento
-   - Considere usar certificados de curta duração
-
-4. **Monitoramento**
-   - Monitore logs do Docker regularmente
-   - Audite containers e imagens periodicamente
-
-5. **Atualizações**
-   - Mantenha o Docker atualizado
-   ```bash
-   sudo apt update
-   sudo apt upgrade docker-ce docker-ce-cli containerd.io
-   ```
-
-### Verificar Data de Expiração dos Certificados
-
-```bash
-openssl x509 -in /etc/docker/certs/server-cert.pem -noout -dates
-openssl x509 -in ~/docker-certs/cert.pem -noout -dates
-```
-
-### Revogar Acesso
-
-Para revogar o acesso de um cliente:
-1. Gere novos certificados no servidor
-2. Reinicie o Docker daemon
-3. Distribua novos certificados apenas para clientes autorizados
-
-### Limitar Acesso por IP (Recomendado)
-
-```bash
-# Permitir apenas rede local
-sudo ufw delete allow 2376/tcp
-sudo ufw allow from 192.168.1.0/24 to any port 2376
-
-# Ou permitir IP específico
-sudo ufw allow from 192.168.1.50 to any port 2376
-```
-
-## 📚 Referências
-
-- [Docker Documentation - Protect the Docker daemon socket](https://docs.docker.com/engine/security/protect-access/)
-- [Docker TLS Configuration](https://docs.docker.com/engine/security/https/)
-- [OpenSSL Documentation](https://www.openssl.org/docs/)
-
-## 🆘 Suporte
-
-Se encontrar problemas:
-
-1. Verifique os logs: `sudo journalctl -u docker.service`
-2. Verifique a configuração: `cat /etc/docker/daemon.json`
-3. Teste a conectividade: `telnet IP_DO_SERVIDOR 2376`
-4. Valide os certificados conforme seção de troubleshooting
-
----
-
-**Nota**: Este setup usa certificados auto-assinados adequados para redes internas. Para ambientes de produção expostos à internet, considere usar certificados de uma CA reconhecida.
+**Última atualização**: Dezembro 2024  
+**Versão**: 3.0 - Documentação completa regenerada  
+**Autor**: DevOps Vanilla  
+**Repositório**: [github.com/devopsvanilla/.BatOps](https://github.com/devopsvanilla/.BatOps)
