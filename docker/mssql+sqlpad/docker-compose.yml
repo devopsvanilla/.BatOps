@@ -1,0 +1,78 @@
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ${MSSQL_CONTAINER_NAME:-mssql-server}
+    hostname: ${MSSQL_HOSTNAME:-mssql}
+    environment:
+      - ACCEPT_EULA=${ACCEPT_EULA}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_PID=${MSSQL_PID}
+      - MSSQL_AGENT_ENABLED=${MSSQL_AGENT_ENABLED}
+      - MSSQL_COLLATION=${MSSQL_COLLATION}
+      - MSSQL_MEMORY_LIMIT_MB=${MSSQL_MEMORY_LIMIT_MB}
+    ports:
+      - "${MSSQL_PORT}:1433"
+    volumes:
+      - ${MSSQL_DATA_VOLUME:-mssql-data}:/var/opt/mssql
+      - ${MSSQL_LOG_VOLUME:-mssql-log}:/var/opt/mssql/log
+      - ${MSSQL_SECRETS_VOLUME:-mssql-secrets}:/var/opt/mssql/secrets
+    networks:
+      - ${MSSQL_NETWORK:-mssql-network}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $${MSSQL_SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+      interval: ${MSSQL_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${MSSQL_HEALTHCHECK_TIMEOUT:-5s}
+      retries: ${MSSQL_HEALTHCHECK_RETRIES:-5}
+      start_period: ${MSSQL_HEALTHCHECK_START_PERIOD:-30s}
+
+  sqlpad:
+    image: sqlpad/sqlpad:latest
+    container_name: ${SQLPAD_CONTAINER_NAME:-sqlpad}
+    hostname: ${SQLPAD_HOSTNAME:-sqlpad}
+    environment:
+      - SQLPAD_ADMIN=${SQLPAD_ADMIN}
+      - SQLPAD_ADMIN_PASSWORD=${SQLPAD_ADMIN_PASSWORD}
+      - SQLPAD_APP_LOG_LEVEL=${SQLPAD_APP_LOG_LEVEL}
+      - SQLPAD_WEB_LOG_LEVEL=${SQLPAD_WEB_LOG_LEVEL}
+      - SQLPAD_SEED_DATA_PATH=${SQLPAD_SEED_DATA_PATH}
+      - SQLPAD_CONNECTIONS__mssql__name=${SQLPAD_CONNECTION_NAME}
+      - SQLPAD_CONNECTIONS__mssql__driver=sqlserver
+      - SQLPAD_CONNECTIONS__mssql__host=${SQLPAD_CONNECTION_HOST:-mssql}
+      - SQLPAD_CONNECTIONS__mssql__port=${SQLPAD_CONNECTION_PORT:-1433}
+      - SQLPAD_CONNECTIONS__mssql__database=${SQLPAD_DATABASE}
+      - SQLPAD_CONNECTIONS__mssql__username=${SQLPAD_CONNECTION_USERNAME:-sa}
+      - SQLPAD_CONNECTIONS__mssql__password=${MSSQL_SA_PASSWORD}
+      - SQLPAD_CONNECTIONS__mssql__multiStatementTransactionEnabled=${SQLPAD_CONNECTION_MULTI_STATEMENT:-true}
+    ports:
+      - "${SQLPAD_PORT}:3000"
+    volumes:
+      - ${SQLPAD_DATA_VOLUME:-sqlpad-data}:/var/lib/sqlpad
+    networks:
+      - ${SQLPAD_NETWORK:-mssql-network}
+    depends_on:
+      mssql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/app"]
+      interval: ${SQLPAD_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${SQLPAD_HEALTHCHECK_TIMEOUT:-5s}
+      retries: ${SQLPAD_HEALTHCHECK_RETRIES:-3}
+      start_period: ${SQLPAD_HEALTHCHECK_START_PERIOD:-10s}
+
+
+volumes:
+  mssql-data:
+    driver: local
+  mssql-log:
+    driver: local
+  mssql-secrets:
+    driver: local
+  sqlpad-data:
+    driver: local
+
+networks:
+  mssql-network:
+    driver: bridge
