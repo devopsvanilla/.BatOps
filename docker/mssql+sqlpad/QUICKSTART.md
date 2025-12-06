@@ -1,19 +1,6 @@
 # Quick Start Guide
 
-## 🚀 Início Rápido - Contexto Local
-
-```bash
-# 1. Criar arquivo .env a partir do exemplo
-cp .env-sample .env
-
-# 2. Editar senhas no .env
-nano .env  # ou seu editor preferido
-
-# 3. Executar o script
-./up.sh
-```
-
-## 🌐 Início Rápido - Contexto Remoto (SSH)
+## 🚀 Início Rápido (qualquer contexto)
 
 ```bash
 # 1. Criar arquivo .env a partir do exemplo
@@ -22,27 +9,15 @@ cp .env-sample .env
 # 2. Editar senhas no .env
 nano .env
 
-# 3. Configurar contexto Docker remoto
-docker context create meu-servidor \
-  --docker "host=ssh://usuario@ip-do-servidor"
+# 3. (Opcional) configurar/selecionar contexto
+docker context ls
+docker context use <contexto>
 
-# 4. Ativar o contexto remoto
-docker context use meu-servidor
-
-# 5. Executar o script
+# 4. Executar o script
 ./up.sh
-
-# O script irá sincronizar automaticamente os arquivos
-# e executar no servidor remoto!
 ```
 
-### O que o script faz automaticamente
-
-- Detecta e, se necessário, troca o contexto Docker ativo (local ou remoto).
-- Lista as redes disponíveis no contexto, permitindo escolher ou criar na hora.
-- Cria/ajusta os volumes externos exigidos e aplica permissões compatíveis com o usuário `mssql` (10001).
-- Sincroniza `.env`, `docker-compose.yml` e demais arquivos com o host remoto quando aplicável.
-- Executa `docker compose up -d` no local correto e aguarda os health checks antes de mostrar as URLs de acesso.
+O script mostra todos os contextos disponíveis, permite trocar o contexto padrão e executa o `docker compose` usando a flag `--context`, garantindo que tudo rode diretamente no Docker Engine selecionado (local ou remoto). Não há cópia de arquivos para hosts remotos, apenas comandos Docker via contexto.
 
 ## 🧪 Validar Configuração
 
@@ -58,22 +33,7 @@ docker context use meu-servidor
 
 ## 🔑 Acesso Padrão
 
-Após executar `./up.sh` com sucesso:
-
-### Local
-
-- **SQLPad:** [http://localhost:3000](http://localhost:3000)
-- **SQL Server:** `localhost:1433`
-
-### Remoto
-
-- **SQLPad:** [http://IP-DO-SERVIDOR:3000](http://IP-DO-SERVIDOR:3000)
-- **SQL Server:** `IP-DO-SERVIDOR:1433`
-
-**Credenciais padrão:**
-
-- SQLPad: `admin@sqlpad.com` / (senha do .env)
-- SQL Server: `sa` / (senha do .env)
+O resumo final do script informa URLs e host/porta conforme o contexto utilizado. Em contextos locais o endereço padrão continua sendo `http://localhost:3000` e `localhost:1433`. Em contextos remotos os endpoints seguem o host configurado para o contexto (ex.: `http://meu-servidor:3000`).
 
 ## ⚡ Comandos Úteis (após `./up.sh`)
 

@@ -86,38 +86,13 @@ Se tudo estiver correto, você verá os containers e imagens do **servidor remot
 
 ## 🚀 Usar o Script up.sh com Contexto Remoto
 
-Com o contexto remoto ativado, basta executar:
+Após criar/selecionar um contexto remoto (`docker context create ...` + `docker context use ...`), execute:
 
-```bash
+```
 ./up.sh
 ```
 
-O script **automaticamente**:
-
-1. ✅ Detecta que você está usando contexto remoto
-2. ✅ Identifica o host SSH e usuário
-3. ✅ Sincroniza os arquivos necessários (`docker-compose.yml`, `.env`)
-4. ✅ Cria o diretório remoto se necessário
-5. ✅ Lista as redes Docker disponíveis no servidor remoto
-6. ✅ Permite selecionar ou criar uma rede
-7. ✅ Prepara volumes nomeados e aplica permissões compatíveis com Linux (UID 10001)
-8. ✅ Executa `docker compose up -d` no servidor remoto
-9. ✅ Exibe URLs de acesso corretas (usando o IP do servidor remoto)
-
-### Caminho do Projeto no Servidor Remoto
-
-O script tentará detectar automaticamente o caminho em:
-
-- `~/docker/mssql+sqlpad/`
-- `~/.BatOps/docker/mssql+sqlpad/`
-
-Se não encontrar, solicitará que você informe o caminho.
-
-**Dica:** Crie o diretório previamente:
-
-```bash
-ssh user@remote-host "mkdir -p ~/docker/mssql+sqlpad"
-```
+O script lista todos os contextos, permite trocar o contexto padrão e executa `docker compose` com `--context <nome>`. Nada é copiado para o host remoto; o Docker CLI envia o compose diretamente ao daemon daquele contexto.
 
 ## 🌐 Acessar os Serviços
 
@@ -164,64 +139,24 @@ docker context show
 
 ## 📊 Gerenciar Containers Remotos
 
-Com o contexto remoto ativo, todos os comandos Docker são executados no servidor remoto:
+Com o contexto remoto ativo, todos os comandos Docker são automaticamente direcionados ao servidor remoto. Exemplos:
 
 ```bash
-# Ver status dos containers
-docker compose ps
-
-# Ver logs
-docker compose logs -f
-
-# Parar containers
-docker compose down
-
-# Reiniciar containers
-docker compose restart
-
-# Ver logs de um serviço específico
-docker compose logs -f mssql
+docker compose ps             # status dos serviços
+docker compose logs -f        # logs
+docker compose down           # parar serviços
+docker compose restart        # reiniciar
 ```
 
-### Comandos diretos via SSH (alternativa)
-
-Se preferir executar comandos diretamente via SSH:
+Se desejar ver o contexto usado em qualquer momento:
 
 ```bash
-# Ver containers
-ssh user@remote-host "cd ~/docker/mssql+sqlpad && docker compose ps"
-
-# Ver logs
-ssh user@remote-host "cd ~/docker/mssql+sqlpad && docker compose logs -f"
-
-# Parar containers
-ssh user@remote-host "cd ~/docker/mssql+sqlpad && docker compose down"
+docker context show
 ```
 
 ## 🔧 Atualizar Configurações
 
-Se você modificar o `.env` ou `docker-compose.yml` localmente:
-
-1. **Execute novamente o script:**
-
-   ```bash
-   ./up.sh
-   ```
-
-   O script sincronizará automaticamente os arquivos atualizados.
-
-2. **Ou sincronize manualmente:**
-
-   ```bash
-   scp .env user@remote-host:~/docker/mssql+sqlpad/.env
-   scp docker-compose.yml user@remote-host:~/docker/mssql+sqlpad/docker-compose.yml
-   ```
-
-3. **Reinicie os containers:**
-
-  ```bash
-  docker compose up -d --force-recreate
-  ```
+Edite `.env` ou `docker-compose.yml` localmente e execute `./up.sh` novamente. O compose atualizado será aplicado diretamente ao contexto selecionado, sem necessidade de copiar arquivos para o host remoto.
 
 ## 🛡️ Segurança
 
@@ -308,12 +243,7 @@ ssh user@remote-host "docker network create mssql-network"
 
 ### Arquivos não sincronizados
 
-```bash
-# Sincronizar manualmente
-scp docker-compose.yml user@remote-host:~/docker/mssql+sqlpad/
-scp .env user@remote-host:~/docker/mssql+sqlpad/
-scp .env-sample user@remote-host:~/docker/mssql+sqlpad/
-```
+Não é preciso sincronizar manualmente; o compose é enviado via contexto. Se ainda assim preferir copiar arquivos, use `scp`, mas não é requisito para o script.
 
 ## 📝 Exemplo Completo
 

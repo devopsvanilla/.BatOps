@@ -1,3 +1,412 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="${PROJECT_DIR}/docker-compose.yml"
+ENV_FILE="${PROJECT_DIR}/.env"
+OVERRIDE_FILE=""
+SELECTED_CONTEXT=""
+SELECTED_NETWORK=""
+UTILITY_IMAGE="busybox:1.36.1"
+RESET_MSSQL_VOLUMES="prompt"
+FULL_REDEPLOY=false
+
+trap '[[ -n "$OVERRIDE_FILE" && -f "$OVERRIDE_FILE" ]] && rm -f "$OVERRIDE_FILE"' EXIT
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+erro() { echo -e "${RED}[erro]${NC} $1" >&2; }
+aviso() { echo -e "${YELLOW}[aviso]${NC} $1"; }
+info() { echo -e "${BLUE}[info]${NC} $1"; }
+sucesso() { echo -e "${GREEN}[ok]${NC} $1"; }
+
+mostrar_ajuda() {
+        cat <<EOF
+Uso: $(basename "$0") [opções]
+
+Opções disponíveis:
+    --reset-volumes      Recria os volumes do MSSQL antes do deploy (perda de dados).
+    --no-reset-volumes   Nunca recria volumes automaticamente.
+    --redeploy           Remove a implantação anterior (containers, volumes e imagem buildada) antes de recriar.
+    -h, --help           Exibe esta mensagem e sai.
+
+Use --reset-volumes quando encontrar o erro 'Access is denied' durante a cópia de master.mdf.
+EOF
+}
+
+sanitizar_nome_projeto() {
+        local base
+        base="$(basename "$PROJECT_DIR")"
+        base="${base,,}"
+        base="${base//[^a-z0-9]/}"
+        [[ -z "$base" ]] && base="composeproject"
+        echo "$base"
+}
+
+get_env_var() {
+    local var_name="$1"
+    if [[ -f "$ENV_FILE" ]]; then
+        local value
+        value=$(grep -E "^${var_name}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f2- || true)
+        value="${value%$'\r'}"
+        value="${value%\"}"; value="${value#\"}"
+        value="${value%\'}"; value="${value#\'}"
+        echo "$value"
+    fi
+}
+
+ensure_image_available() {
+    local image="$1"
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+        info "Baixando imagem utilitária '$image'..."
+        docker pull "$image" >/dev/null
+    fi
+}
+
+ensure_volume_exists() {
+    local volume_name="$1"
+    if ! docker volume inspect "$volume_name" >/dev/null 2>&1; then
+        info "Criando volume Docker '${volume_name}'..."
+        docker volume create "$volume_name" >/dev/null
+    fi
+}
+
+prepare_volume_permissions() {
+    local volume_name="$1"
+    local uid_gid="${2:-10001:0}"
+    ensure_image_available "$UTILITY_IMAGE"
+    ensure_volume_exists "$volume_name"
+
+    info "Ajustando permissões do volume '${volume_name}' para ${uid_gid}..."
+    docker run --rm -v "${volume_name}:/mnt/volume" "$UTILITY_IMAGE" \
+        sh -c "mkdir -p /mnt/volume && chown -R ${uid_gid} /mnt/volume"
+}
+
+preparar_volumes_persistentes() {
+    local data_vol="mssql-data" log_vol="mssql-log" secrets_vol="mssql-secrets"
+    info "Preparando volumes persistentes do MSSQL para execução sem root..."
+
+    prepare_volume_permissions "$data_vol" "10001:0"
+    prepare_volume_permissions "$log_vol" "10001:0"
+    prepare_volume_permissions "$secrets_vol" "10001:0"
+}
+
+remover_implantacao_anterior() {
+    aviso "Removendo implantação anterior (containers, volumes e imagem local do SQLPad)..."
+
+    docker --context "$SELECTED_CONTEXT" compose -f "$COMPOSE_FILE" down --remove-orphans --volumes >/dev/null 2>&1 || true
+
+    local volumes=("mssql-data" "mssql-log" "mssql-secrets" "sqlpad-data")
+    for volume in "${volumes[@]}"; do
+        if docker volume inspect "$volume" >/dev/null 2>&1; then
+            info "Removendo volume '$volume'..."
+            docker volume rm "$volume" >/dev/null || aviso "Não foi possível remover o volume '$volume'."
+        fi
+    done
+
+    local project_name
+    project_name="$(sanitizar_nome_projeto)"
+    local sqlpad_image="${project_name}-sqlpad"
+    if docker --context "$SELECTED_CONTEXT" image inspect "$sqlpad_image" >/dev/null 2>&1; then
+        info "Removendo imagem '${sqlpad_image}' gerada anteriormente..."
+        docker --context "$SELECTED_CONTEXT" image rm "$sqlpad_image" >/dev/null || aviso "Não foi possível remover a imagem '${sqlpad_image}'."
+    fi
+
+    sucesso "Implantação anterior removida."
+}
+
+resetar_volumes_mssql() {
+    local volumes=("mssql-data" "mssql-log" "mssql-secrets")
+    aviso "Recriando volumes MSSQL (todos os dados serão descartados)."
+
+    info "Parando serviços antes de remover volumes..."
+    docker --context "$SELECTED_CONTEXT" compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true
+
+    for volume in "${volumes[@]}"; do
+        if docker volume inspect "$volume" >/dev/null 2>&1; then
+            info "Removendo volume '$volume'..."
+            docker volume rm "$volume" >/dev/null
+        fi
+        prepare_volume_permissions "$volume" "10001:0"
+    done
+
+    sucesso "Volumes MSSQL recriados com permissões corretas."
+}
+
+talvez_resetar_volumes_mssql() {
+    case "$RESET_MSSQL_VOLUMES" in
+        force)
+            resetar_volumes_mssql
+            ;;
+        never)
+            info "Mantendo volumes MSSQL existentes."
+            ;;
+        *)
+            echo ""
+            aviso "Erros 'Access is denied' geralmente indicam permissões incorretas nos volumes."
+            read -rp "Deseja recriar os volumes do MSSQL agora? (s/N): " resposta
+            if [[ "$resposta" =~ ^[sS]$ ]]; then
+                resetar_volumes_mssql
+            else
+                info "Mantendo volumes MSSQL existentes."
+            fi
+            ;;
+    esac
+}
+
+checar_dependencias() {
+    command -v docker >/dev/null 2>&1 || { erro "Docker não encontrado no PATH."; exit 1; }
+    if ! docker compose version >/dev/null 2>&1; then
+        erro "Este script exige o plugin 'docker compose' (v2+)."; exit 1;
+    fi
+}
+
+checar_arquivos() {
+    [[ -f "$COMPOSE_FILE" ]] || { erro "docker-compose.yml não encontrado em $PROJECT_DIR"; exit 1; }
+    if [[ ! -f "$ENV_FILE" ]]; then
+        if [[ -f "${PROJECT_DIR}/.env-sample" ]]; then
+            aviso "Arquivo .env não encontrado. Copiando .env-sample..."
+            cp "${PROJECT_DIR}/.env-sample" "$ENV_FILE"
+            aviso "Atualize as senhas no arquivo .env antes de prosseguir."
+        else
+            erro "Arquivo .env não encontrado e .env-sample indisponível."; exit 1;
+        fi
+    fi
+}
+
+listar_contextos() {
+    mapfile -t CONTEXT_DATA < <(docker context ls --format '{{.Name}}|{{if .Current}}true{{else}}false{{end}}|{{.DockerEndpoint}}')
+    ((${#CONTEXT_DATA[@]} > 0)) || { erro "Nenhum contexto Docker encontrado."; exit 1; }
+
+    echo "\nContextos disponíveis:"
+    for i in "${!CONTEXT_DATA[@]}"; do
+        IFS='|' read -r name is_current endpoint <<< "${CONTEXT_DATA[$i]}"
+        local marker=""
+        [[ "$is_current" == "true" ]] && marker="(atual)"
+        printf "  %2d. %s %s\n" "$((i+1))" "$name" "$marker"
+        [[ -n "$endpoint" ]] && printf "       Endpoint: %s\n" "$endpoint"
+    done
+}
+
+selecionar_contexto() {
+    local current_context
+    current_context="$(docker context show 2>/dev/null || echo "default")"
+    listar_contextos
+
+    local escolha
+    while true; do
+        read -rp "\nSelecione um contexto [1-${#CONTEXT_DATA[@]}] ou ENTER para manter '$current_context': " escolha
+        if [[ -z "$escolha" ]]; then
+            SELECTED_CONTEXT="$current_context"
+            break
+        fi
+        if [[ "$escolha" =~ ^[0-9]+$ ]] && (( escolha >= 1 && escolha <= ${#CONTEXT_DATA[@]} )); then
+            IFS='|' read -r name _ <<< "${CONTEXT_DATA[$((escolha-1))]}"
+            SELECTED_CONTEXT="$name"
+            break
+        fi
+        aviso "Opção inválida."
+    done
+
+    if [[ "$SELECTED_CONTEXT" != "$current_context" ]]; then
+        info "Alterando contexto padrão para '$SELECTED_CONTEXT'..."
+        docker context use "$SELECTED_CONTEXT"
+    fi
+
+    sucesso "Contexto ativo: $SELECTED_CONTEXT"
+}
+
+obter_endpoint_host() {
+    local endpoint
+    endpoint="$(docker context inspect "$SELECTED_CONTEXT" --format '{{.Endpoints.docker.Host}}' 2>/dev/null || echo "unix:///var/run/docker.sock")"
+    case "$endpoint" in
+        ssh://*)
+            local host_part="${endpoint#ssh://}"
+            host_part="${host_part#*@}"
+            echo "${host_part%%:*}"
+            ;;
+        tcp://*)
+            local host_part="${endpoint#tcp://}"
+            echo "${host_part%%:*}"
+            ;;
+        *)
+            echo "localhost"
+            ;;
+    esac
+}
+
+possui_redes_definidas() {
+    grep -q '^networks:' "$COMPOSE_FILE"
+}
+
+listar_redes_disponiveis() {
+    docker --context "$SELECTED_CONTEXT" network ls --format '{{.Name}}|{{.Driver}}|{{.Scope}}'
+}
+
+criar_rede() {
+    local nome driver
+    while true; do
+        read -rp "Informe o nome da nova rede: " nome
+        [[ -n "$nome" ]] && break
+        aviso "O nome não pode ser vazio."
+    done
+    read -rp "Driver da rede [bridge]: " driver
+    driver="${driver:-bridge}"
+    docker --context "$SELECTED_CONTEXT" network create --driver "$driver" "$nome" >/dev/null
+    sucesso "Rede '$nome' criada com driver '$driver'."
+    SELECTED_NETWORK="$nome"
+}
+
+selecionar_rede() {
+    info "Nenhuma rede definida no docker-compose.yml."
+    info "Você pode usar a rede padrão do projeto ou anexar os serviços a uma rede existente."
+
+    mapfile -t NETWORKS < <(listar_redes_disponiveis)
+
+    echo "\nRedes detectadas no contexto '$SELECTED_CONTEXT':"
+    printf "  0. Usar rede padrão do Compose (será criada automaticamente)\n"
+    for i in "${!NETWORKS[@]}"; do
+        IFS='|' read -r name driver scope <<< "${NETWORKS[$i]}"
+        printf "  %2d. %s (driver: %s, scope: %s)\n" "$((i+1))" "$name" "$driver" "$scope"
+    done
+    printf "  n. Criar nova rede\n"
+
+    local escolha
+    while true; do
+        read -rp "Selecione uma opção: " escolha
+        if [[ -z "$escolha" || "$escolha" == "0" ]]; then
+            SELECTED_NETWORK=""
+            return
+        fi
+        if [[ "$escolha" =~ ^[0-9]+$ ]] && (( escolha >= 1 && escolha <= ${#NETWORKS[@]} )); then
+            IFS='|' read -r name _ <<< "${NETWORKS[$((escolha-1))]}"
+            SELECTED_NETWORK="$name"
+            return
+        fi
+        if [[ "$escolha" =~ ^[nN]$ ]]; then
+            criar_rede
+            return
+        fi
+        aviso "Opção inválida."
+    done
+}
+
+criar_override_de_rede() {
+    mapfile -t services < <(docker compose -f "$COMPOSE_FILE" config --services)
+    ((${#services[@]} > 0)) || { erro "Não foi possível identificar os serviços no docker-compose."; exit 1; }
+
+    OVERRIDE_FILE="$(mktemp "$PROJECT_DIR/.network-override.XXXXXX.yml")"
+    {
+        echo "services:"
+        for svc in "${services[@]}"; do
+            cat <<EOF
+  $svc:
+    networks:
+      - $SELECTED_NETWORK
+EOF
+        done
+        cat <<EOF
+networks:
+  $SELECTED_NETWORK:
+    external: true
+EOF
+    } > "$OVERRIDE_FILE"
+
+    info "Arquivo temporário de rede criado em $OVERRIDE_FILE"
+}
+
+deploy() {
+    local compose_args=(-f "$COMPOSE_FILE")
+    if [[ -n "$SELECTED_NETWORK" ]]; then
+        criar_override_de_rede
+        compose_args+=(-f "$OVERRIDE_FILE")
+    fi
+
+    info "Executando docker compose no contexto '$SELECTED_CONTEXT'..."
+    docker --context "$SELECTED_CONTEXT" compose "${compose_args[@]}" up -d --build
+    sucesso "Serviços implantados com sucesso."
+
+    docker --context "$SELECTED_CONTEXT" compose "${compose_args[@]}" ps
+}
+
+resumo_final() {
+    local host
+    host="$(obter_endpoint_host)"
+
+    echo "\nResumo:"
+    echo "  Contexto Docker : $SELECTED_CONTEXT"
+    if [[ -n "$SELECTED_NETWORK" ]]; then
+        echo "  Rede utilizada  : $SELECTED_NETWORK (externa)"
+    else
+        echo "  Rede utilizada  : padrão do Compose"
+    fi
+    echo "  SQLPad          : http://${host}:3000"
+    echo "  SQL Server      : ${host}:1433"
+
+    echo "\nComandos úteis:"
+    echo "  docker --context $SELECTED_CONTEXT compose ps"
+    echo "  docker --context $SELECTED_CONTEXT compose logs -f"
+}
+
+main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --reset-volumes)
+                RESET_MSSQL_VOLUMES="force"
+                shift
+                ;;
+            --no-reset-volumes)
+                RESET_MSSQL_VOLUMES="never"
+                shift
+                ;;
+            --redeploy)
+                FULL_REDEPLOY=true
+                RESET_MSSQL_VOLUMES="force"
+                shift
+                ;;
+            -h|--help)
+                mostrar_ajuda
+                exit 0
+                ;;
+            *)
+                erro "Opção desconhecida: $1"
+                mostrar_ajuda
+                exit 1
+                ;;
+        esac
+    done
+
+    checar_dependencias
+    checar_arquivos
+    selecionar_contexto
+
+    if $FULL_REDEPLOY; then
+        remover_implantacao_anterior
+    fi
+
+    if ! possui_redes_definidas; then
+        selecionar_rede
+        [[ -n "$SELECTED_NETWORK" ]] && info "Os serviços serão anexados à rede '$SELECTED_NETWORK'."
+    else
+        info "O docker-compose já define redes. Nenhuma ação adicional necessária."
+    fi
+
+    talvez_resetar_volumes_mssql
+    preparar_volumes_persistentes
+    deploy
+    resumo_final
+}
+
+main "$@"
+
+exit 0
+
+: <<'LEGACY'
 #!/bin/bash
 
 # Script para iniciar MSSQL + SQLPad com seleção de rede Docker
@@ -290,6 +699,23 @@ copy_to_remote() {
     fi
 }
 
+# Função para copiar diretórios para o host remoto
+copy_dir_to_remote() {
+    local local_dir="$1"
+    local remote_parent="$2"
+
+    if [ "$IS_REMOTE" = true ] && [ -n "$REMOTE_HOST" ]; then
+        if [ ! -d "$local_dir" ]; then
+            warning "Diretório $local_dir não encontrado localmente; ignorando cópia."
+            return 0
+        fi
+
+        info "Copiando diretório $local_dir para ${REMOTE_USER}@${REMOTE_HOST}:${remote_parent}"
+        remote_exec "mkdir -p ${remote_parent}"
+        scp -r "$local_dir" "${REMOTE_USER}@${REMOTE_HOST}:${remote_parent}"
+    fi
+}
+
 # Função para copiar arquivo do host remoto
 copy_from_remote() {
     local remote_file="$1"
@@ -411,6 +837,11 @@ sync_project_to_remote() {
         # Copiar sample se existir
         if [ -f ".env-sample" ]; then
             copy_to_remote ".env-sample" "${REMOTE_PATH}/.env-sample"
+        fi
+
+        # Copiar diretório do build do SQLPad
+        if [ -d "sqlpad" ]; then
+            copy_dir_to_remote "sqlpad" "${REMOTE_PATH}"
         fi
         
         success "Projeto sincronizado com host remoto!"
@@ -607,7 +1038,7 @@ main() {
             run_local_compose up -d --build
         fi
     else
-        run_local_compose up -d
+        run_local_compose up -d --build
     fi
     
     echo ""
@@ -710,3 +1141,5 @@ main() {
 
 # Executar função principal
 main "$@"
+
+LEGACY

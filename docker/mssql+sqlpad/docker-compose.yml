@@ -14,11 +14,9 @@ services:
     ports:
       - "${MSSQL_PORT}:1433"
     volumes:
-      - ${MSSQL_DATA_VOLUME:-mssql-data}:/var/opt/mssql/data
-      - ${MSSQL_LOG_VOLUME:-mssql-log}:/var/opt/mssql/log
-      - ${MSSQL_SECRETS_VOLUME:-mssql-secrets}:/var/opt/mssql/secrets
-    networks:
-      - ${MSSQL_NETWORK:-mssql-network}
+      - mssql-data:/var/opt/mssql/data
+      - mssql-log:/var/opt/mssql/log
+      - mssql-secrets:/var/opt/mssql/secrets
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -33,7 +31,10 @@ services:
       start_period: ${MSSQL_HEALTHCHECK_START_PERIOD:-60s}
 
   sqlpad:
-    image: sqlpad/sqlpad:latest
+    build:
+      context: ./sqlpad
+      args:
+        APT_NAMESERVERS: "${SQLPAD_BUILD_NAMESERVERS:-8.8.8.8,8.8.4.4}"
     container_name: ${SQLPAD_CONTAINER_NAME:-sqlpad}
     hostname: ${SQLPAD_HOSTNAME:-sqlpad}
     environment:
@@ -53,9 +54,7 @@ services:
     ports:
       - "${SQLPAD_PORT}:3000"
     volumes:
-      - ${SQLPAD_DATA_VOLUME:-sqlpad-data}:/var/lib/sqlpad
-    networks:
-      - ${SQLPAD_NETWORK:-mssql-network}
+      - sqlpad-data:/var/lib/sqlpad
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -75,18 +74,6 @@ services:
 
 volumes:
   mssql-data:
-    name: ${MSSQL_DATA_VOLUME:-mssql-data}
-    external: true
   mssql-log:
-    name: ${MSSQL_LOG_VOLUME:-mssql-log}
-    external: true
   mssql-secrets:
-    name: ${MSSQL_SECRETS_VOLUME:-mssql-secrets}
-    external: true
   sqlpad-data:
-    name: ${SQLPAD_DATA_VOLUME:-sqlpad-data}
-    external: true
-
-networks:
-  mssql-network:
-    driver: bridge
