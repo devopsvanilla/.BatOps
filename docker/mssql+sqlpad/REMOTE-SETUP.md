@@ -94,6 +94,10 @@ Após criar/selecionar um contexto remoto (`docker context create ...` + `docker
 
 O script lista todos os contextos, permite trocar o contexto padrão e executa `docker compose` com `--context <nome>`. Nada é copiado para o host remoto; o Docker CLI envia o compose diretamente ao daemon daquele contexto.
 
+### 🔌 Escolha correta da rede Docker
+
+Quando o `up.sh` detectar que o `docker-compose.yml` não define redes, ele perguntará qual rede deve ser usada. Para expor as portas `1433` (SQL Server) e `3000` (SQLPad) no host remoto, escolha **0** (rede padrão do Compose, que gera automaticamente algo como `mssqlsqlpad_default`) ou selecione/crie uma rede **bridge** com nome próprio (ex.: `mssql-network`). A rede global chamada `bridge`, assim como `host`, `none`, `docker_gwbridge` ou `null`, é reservada do Docker e não aceita aliases usados pelo Compose — o script agora bloqueia essas escolhas. Mantenha-se em redes `bridge` personalizadas para que os serviços fiquem acessíveis.
+
 ## 🌐 Acessar os Serviços
 
 Após a execução bem-sucedida, acesse:

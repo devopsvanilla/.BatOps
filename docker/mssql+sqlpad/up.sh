@@ -96,6 +96,18 @@ preparar_volumes_persistentes() {
     prepare_volume_permissions "$secrets_vol" "10001:0"
 }
 
+rede_reservada() {
+    local nome="$1"
+    case "$nome" in
+        bridge|host|none|docker_gwbridge)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 remover_implantacao_anterior() {
     aviso "Removendo implantação anterior (containers, volumes e imagem local do SQLPad)..."
 
@@ -285,6 +297,10 @@ selecionar_rede() {
         fi
         if [[ "$escolha" =~ ^[0-9]+$ ]] && (( escolha >= 1 && escolha <= ${#NETWORKS[@]} )); then
             IFS='|' read -r name _ <<< "${NETWORKS[$((escolha-1))]}"
+            if rede_reservada "$name"; then
+                aviso "A rede '$name' é reservada pelo Docker e não suporta aliases/namespaces necessários. Escolha '0' (default) ou crie uma rede bridge personalizada."
+                continue
+            fi
             SELECTED_NETWORK="$name"
             return
         fi

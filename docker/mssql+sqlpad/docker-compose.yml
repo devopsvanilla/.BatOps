@@ -74,6 +74,10 @@ services:
 
 volumes:
   mssql-data:
+    name: mssql-data
   mssql-log:
+    name: mssql-log
   mssql-secrets:
+    name: mssql-secrets
   sqlpad-data:
+    name: sqlpad-data
