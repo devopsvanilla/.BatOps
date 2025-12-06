@@ -35,6 +35,7 @@ CERT_DIR="/etc/docker/certs"
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME=$(eval echo "~$REAL_USER")
 CLIENT_CERT_DIR="$REAL_HOME/docker-client-certs"
+BUSYBOX_IMAGE="busybox:1.36.1"
 
 # Função para exibir mensagens
 log() {
@@ -51,6 +52,46 @@ error() {
 
 info() {
     echo -e "${BLUE}[DETALHE]${NC} $1"
+}
+
+ensure_supported_filesystem() {
+    local target_dir="/var/lib/docker"
+    local fs_type
+    mkdir -p "$target_dir"
+    fs_type=$(df -PT "$target_dir" 2>/dev/null | awk 'NR==2 {print $2}')
+    case "$fs_type" in
+        ext2|ext3|ext4|xfs|btrfs)
+            log "Filesystem detectado em $target_dir: $fs_type (compatível)."
+            ;;
+        *)
+            error "Filesystem '$fs_type' em $target_dir não suporta corretamente permissões POSIX.";
+            error "Use um disco formatado em ext4/xfs ou reposicione /var/lib/docker antes de prosseguir."
+            exit 1
+            ;;
+    esac
+}
+
+ensure_busybox_available() {
+    if ! docker image inspect "$BUSYBOX_IMAGE" >/dev/null 2>&1; then
+        log "Baixando imagem utilitária '$BUSYBOX_IMAGE' para testes futuros..."
+        docker pull "$BUSYBOX_IMAGE" >/dev/null
+    fi
+}
+
+validate_volume_permissions() {
+    log "Validando possibilidade de aplicar chown 10001:0 em volumes Docker..."
+    ensure_busybox_available
+    local volume_name="batops-perm-test-$(date +%s)"
+    docker volume create "$volume_name" >/dev/null
+    if docker run --rm -v "$volume_name:/mnt" "$BUSYBOX_IMAGE" \
+        sh -c "mkdir -p /mnt/probe && chown 10001:0 /mnt/probe" >/dev/null 2>&1; then
+        log "Volume de teste aceitou chown sem erros."
+    else
+        docker volume rm "$volume_name" >/dev/null 2>&1 || true
+        error "Falha ao ajustar permissões em volumes Docker. Verifique se o host usa filesystem Linux (ext4/xfs) e não monta volumes em NTFS/SMB."
+        exit 1
+    fi
+    docker volume rm "$volume_name" >/dev/null 2>&1 || true
 }
 
 # Função para verificar requisitos
@@ -208,6 +249,8 @@ else
     detect_host_info
 fi
 
+ensure_supported_filesystem
+
 # Verificar requisitos
 if ! is_docker_installed; then
     check_requirements
@@ -286,6 +329,8 @@ log "Habilitando e reiniciando serviço Docker..."
 sudo systemctl daemon-reload
 sudo systemctl enable docker
 sudo systemctl restart docker
+
+validate_volume_permissions
 
 # Aguardar o Docker iniciar
 sleep 3

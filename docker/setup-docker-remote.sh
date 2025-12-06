@@ -19,6 +19,7 @@ DOCKER_CONFIG_DIR="$HOME/.docker"
 
 # Constantes
 REMOTE_CONTEXT_PREFIX="remote"
+BUSYBOX_IMAGE="busybox:1.36.1"
 
 # Função para exibir mensagens
 log() {
@@ -39,6 +40,31 @@ info() {
 
 prompt() {
     echo -e "${CYAN}[PERGUNTA]${NC} $1"
+}
+
+ensure_remote_busybox() {
+    local context_name="$1"
+    if ! docker --context "$context_name" image inspect "$BUSYBOX_IMAGE" >/dev/null 2>&1; then
+        log "Baixando imagem '$BUSYBOX_IMAGE' no host remoto (contexto $context_name)..."
+        docker --context "$context_name" pull "$BUSYBOX_IMAGE" >/dev/null
+    fi
+}
+
+validate_remote_volume_permissions() {
+    local context_name="$1"
+    log "Validando permissões de volume no host remoto (contexto $context_name)..."
+    ensure_remote_busybox "$context_name"
+    local test_volume="remote-perm-test-$(date +%s)"
+    docker --context "$context_name" volume create "$test_volume" >/dev/null
+    if docker --context "$context_name" run --rm -v "$test_volume:/mnt" "$BUSYBOX_IMAGE" \
+        sh -c "mkdir -p /mnt/probe && chown 10001:0 /mnt/probe" >/dev/null 2>&1; then
+        log "Host remoto aceitou chown 10001:0 nos volumes (pré-requisito atendido)."
+    else
+        docker --context "$context_name" volume rm "$test_volume" >/dev/null 2>&1 || true
+        error "O host remoto não permite ajustar permissões POSIX nos volumes. Verifique o filesystem (ext4/xfs)."
+        exit 1
+    fi
+    docker --context "$context_name" volume rm "$test_volume" >/dev/null 2>&1 || true
 }
 
 # Função para limpar variáveis de ambiente antigas
@@ -314,6 +340,7 @@ use_remote_docker() {
     
     # Trocar para o context remoto
     switch_context "$context_name"
+    validate_remote_volume_permissions "$context_name"
     
     log "✓ Docker remoto ativado: $remote_host"
     info "Você já pode usar 'docker ps' para testar."
@@ -429,6 +456,7 @@ EOF
     # Testar conexão trocando temporariamente de context
     log "Testando conexão com Docker remoto..."
     if switch_context "$context_name" && docker version &>/dev/null; then
+        validate_remote_volume_permissions "$context_name"
         log "✓ Conexão com Docker remoto bem-sucedida!"
         echo ""
         docker version

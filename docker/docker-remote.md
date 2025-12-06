@@ -67,12 +67,14 @@ flowchart TD
 - **Sistema Operacional**: Ubuntu 20.04 LTS ou superior
 - **Acesso**: Usuário com privilégios `sudo`
 - **Conectividade**: Porta 2376 aberta/acessível na rede
+- **Armazenamento**: `/var/lib/docker` precisa residir em filesystem Linux (ext4, xfs ou btrfs). O script interrompe caso detecte NTFS/SMB para evitar problemas de permissões.
 - **Pacotes** (instalados automaticamente pelo script):
   - `curl` - Download de recursos
   - `ca-certificates` - Certificados de autoridade
   - `gnupg` - Gerenciamento de chaves GPG
   - `lsb-release` - Informações da distribuição Linux
   - `openssl` - Geração de certificados TLS
+  - Imagem `busybox:1.36.1` (baixada automaticamente para testes de permissão)
 
 ### Computador Cliente
 
@@ -187,6 +189,7 @@ sudo ufw allow 2376/tcp
 ### 5. **Certificados do Cliente**
 - Copia certificados para `~/docker-client-certs/` para transferência ao cliente
 - Arquivos: `ca.pem`, `cert.pem`, `key.pem`
+- Executa automaticamente um teste com volume temporário + `chown 10001:0` para garantir compatibilidade com containers MSSQL não-root.
 
 ## 📥 Instalação Passo a Passo
 
@@ -251,6 +254,7 @@ O script executa automaticamente:
 7. **Preparação de Certificados**
    - 📂 Copia certificados para `~/docker-client-certs`
    - 🔒 Ajusta permissões apropriadas
+  - 🧪 Cria um volume temporário e executa `chown 10001:0` via BusyBox para validar o filesystem
 
 8. **Instalação do Dockly** (opcional)
    - ❓ Pergunta se deseja instalar
@@ -346,6 +350,7 @@ O script `setup-docker-remote.sh` realiza:
 - Testa conexão executando `docker version`
 - Exibe informações do servidor remoto
 - Lista contexts disponíveis
+- Executa automaticamente um teste de volume remoto (BusyBox + `chown 10001:0`) para garantir compatibilidade antes de usar o contexto
 
 ## 📥 Configuração Passo a Passo
 
