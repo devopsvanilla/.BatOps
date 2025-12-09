@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 #
 # Script para configurar Ubuntu com Logitech MX Keys
-# Layout: US (Internacional com suporte a Português do Brasil via SSH)
+# Layout: US com suporte a Português do Brasil e ç com AltGr+c
 # Autor: DevOpsVanilla
 # Data: $(date +%Y-%m-%d)
 #
@@ -89,51 +89,52 @@ XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
 
-# 5. Criar arquivo .Xmodmap para mapeamento de tecla + com ç
-log_info "Configurando mapeamento de teclado customizado (ç com +c)..."
+# 5. Criar arquivo .Xmodmap para mapeamento correto de teclas
+log_info "Configurando mapeamento de teclado customizado (ç com AltGr+c)..."
 
 # Criar script de inicialização para xmodmap
 cat > /etc/profile.d/xmodmap-init.sh << 'XEOF'
 #!/bin/bash
-# Arquivo de inicialização para xmodmap - ç com +c
+# Arquivo de inicialização para xmodmap - carrega configuração customizada
 
-if [ -f ~/.Xmodmap ]; then
-    xmodmap ~/.Xmodmap 2>/dev/null || true
+if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    if [ -f ~/.Xmodmap ]; then
+        xmodmap ~/.Xmodmap 2>/dev/null || true
+    fi
 fi
 XEOF
 
 chmod 644 /etc/profile.d/xmodmap-init.sh
 
 # Criar arquivo .Xmodmap para cada usuário (excluindo root)
-log_info "Gerando arquivo .Xmodmap para usuários..."
-
-# Criar template .Xmodmap baseado na configuração US padrão
-# Apenas remapeia: keycode 54 (c) para adicionar ç na terceira posição (AltGr)
-create_xmodmap() {
-    local xmodmap_file="$1"
-    
-    cat > "$xmodmap_file" << 'XEOF'
-! Arquivo de configuração XKeyboard para layout US com ç
-! Mapeamento customizado: AltGr+c = ç
-
-! Configuração padrão para layout US com pc105
-! Modificação: adicionar ç (ccedilla) ao keycode 54 (tecla c)
-! Posição: AltGr+c (terceira nível)
-
-! Original: keycode  54 = c C c C copyright cent copyright
-! Modificado: keycode  54 = c C c C ccedilla Ccedilla ccedilla
-
-keycode  54 = c C c C ccedilla Ccedilla ccedilla
-XEOF
-}
+log_info "Gerando arquivo .Xmodmap para usuários com layout US correto..."
 
 for home_dir in /home/*; do
     if [ -d "$home_dir" ]; then
         username=$(basename "$home_dir")
         xmodmap_file="$home_dir/.Xmodmap"
         
-        # Criar .Xmodmap
-        create_xmodmap "$xmodmap_file"
+        # Criar .Xmodmap com as teclas críticas configuradas corretamente
+        cat > "$xmodmap_file" << 'XEOF'
+! Arquivo de configuração XKeyboard para layout US com ç
+! Layout: US (padrão pc105) com AltGr+c = ç
+! 
+! Este arquivo garante que o teclado funcione corretamente
+! Especialmente importante para acesso SSH onde o servidor
+! pode remapear as teclas incorretamente
+
+! keycode 47: semicolon (;)
+keycode  47 = semicolon colon semicolon colon paragraph degree paragraph
+
+! keycode 54: c (adiciona ç na posição AltGr+c)
+keycode  54 = c C c C ccedilla Ccedilla ccedilla
+
+! keycode 59: comma (,) e cedilla (ç)
+keycode  59 = comma less comma less ccedilla Ccedilla ccedilla
+
+! keycode 61: slash (/) - CRÍTICO: deve permanecer como slash
+keycode  61 = slash question slash question questiondown dead_hook questiondown
+XEOF
         
         # Ajustar permissões para o usuário
         owner=$(stat -c '%U:%G' "$home_dir" 2>/dev/null | cut -d: -f1)
@@ -221,7 +222,8 @@ log_info "========================================="
 log_info ""
 log_info "Configurações aplicadas:"
 log_info "  • Layout de teclado: US (padrão pc105)"
-log_info "  • Mapeamento customizado: +c = ç (via xmodmap)"
+log_info "  • Mapeamento customizado: AltGr+c = ç"
+log_info "  • Tecla /: slash (/) - corrigida"
 log_info "  • Locale: Português do Brasil (pt_BR.UTF-8)"
 log_info "  • SSH: Configurado para aceitar locale remoto"
 log_info ""
@@ -236,7 +238,8 @@ log_info "  3. Ou fazer logout e login novamente"
 log_info ""
 log_info "Teste a configuração com:"
 log_info "  $ setxkbmap -query"
-log_info "  $ xmodmap -pke | grep 'keycode  54'"
+log_info "  $ xmodmap -pke | grep 'keycode  61'"
+log_info "  $ echo 'Teste / e ;'"
 log_info ""
-log_info "Para usar ç: pressione AltGr+c (ou Ctrl+Alt+c)"
+log_info "Para usar ç: pressione AltGr+c"
 log_info ""
