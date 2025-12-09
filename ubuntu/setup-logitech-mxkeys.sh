@@ -89,6 +89,25 @@ XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
 
+# Aplicar configuração imediatamente para console e X11
+log_info "Aplicando layout US no console e X11..."
+localectl set-keymap us || true
+localectl set-x11-keymap us pc105 "" "lv3:ralt_switch" || true
+udevadm trigger --subsystem-match=input --action=change || true
+
+# Garantir configuração X11 persistente (inclui AltGr como nível 3)
+mkdir -p /etc/X11/xorg.conf.d
+cat > /etc/X11/xorg.conf.d/00-keyboard.conf << 'EOF'
+Section "InputClass"
+    Identifier "system-keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbLayout" "us"
+    Option "XkbModel" "pc105"
+    Option "XkbVariant" ""
+    Option "XkbOptions" "lv3:ralt_switch"
+EndSection
+EOF
+
 # 5. Criar arquivo .Xmodmap para mapeamento correto de teclas
 log_info "Configurando mapeamento de teclado customizado (ç com AltGr+c)..."
 
