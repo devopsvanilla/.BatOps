@@ -71,8 +71,8 @@ else
     sed -i 's/^export LC_ALL=.*/export LC_ALL=pt_BR.UTF-8/' /etc/environment
 fi
 
-# 4. Configurar layout de teclado para US (International)
-log_info "Configurando layout de teclado para US (International)..."
+# 4. Configurar layout de teclado para US (padrão)
+log_info "Configurando layout de teclado para US (padrão)..."
 
 # Arquivo de configuração do console
 cat > /etc/default/keyboard << 'EOF'
@@ -81,30 +81,59 @@ cat > /etc/default/keyboard << 'EOF'
 # Consult the keyboard(5) manual page for more information
 # on keyboard configuration.
 
-XKBMODEL="logitech_mx"
+XKBMODEL="pc105"
 XKBLAYOUT="us"
-XKBVARIANT="intl"
+XKBVARIANT=""
 XKBOPTIONS=""
 
 BACKSPACE="guess"
 EOF
 
-# 5. Configurar X11 para SSH forwarding com teclado correto
-log_info "Configurando X11 para SSH forwarding..."
-if ! grep -q "XkbLayout" /etc/X11/xorg.conf.d/00-keyboard.conf 2>/dev/null; then
-    mkdir -p /etc/X11/xorg.conf.d
-    cat > /etc/X11/xorg.conf.d/00-keyboard.conf << 'EOF'
-# Read and parsed by systemd-localed. It's probably wise not to edit this file
-# manually too freely.
-Section "InputClass"
-        Identifier "system-keyboard"
-        MatchIsKeyboard "on"
-        Option "XkbLayout" "us"
-        Option "XkbVariant" "intl"
-        Option "XkbModel" "logitech_mx"
-EndSection
-EOF
+# 5. Criar arquivo .Xmodmap para mapeamento de tecla + com ç
+log_info "Configurando mapeamento de teclado customizado (ç com +c)..."
+
+# Criar script de inicialização para xmodmap
+cat > /etc/profile.d/xmodmap-init.sh << 'XEOF'
+#!/bin/bash
+# Arquivo de inicialização para xmodmap - ç com +c
+
+if [ -f ~/.Xmodmap ]; then
+    xmodmap ~/.Xmodmap 2>/dev/null || true
 fi
+XEOF
+
+chmod 644 /etc/profile.d/xmodmap-init.sh
+
+# Criar arquivo .Xmodmap para cada usuário (excluindo root)
+log_info "Gerando arquivo .Xmodmap para usuários..."
+for home_dir in /home/*; do
+    if [ -d "$home_dir" ]; then
+        username=$(basename "$home_dir")
+        xmodmap_file="$home_dir/.Xmodmap"
+        
+        # Criar .Xmodmap com mapeamento de ç
+        cat > "$xmodmap_file" << 'XEOF'
+! Mapeamento de tecla: +c = ç
+
+! Obter o xmodmap padrão com: xmodmap -pke > ~/.Xmodmap
+! A linha original do keycode 54 (tecla c) é:
+! keycode  54 = c C c C copyright cent copyright
+
+! Remapear para adicionar ç na terceira nível (AltGr+c)
+keycode  54 = c C c C ccedilla Ccedilla ccedilla
+XEOF
+        
+        # Ajustar permissões para o usuário
+        if [ -d "$home_dir" ]; then
+            owner=$(stat -c '%U:%G' "$home_dir" 2>/dev/null | cut -d: -f1)
+            if [ ! -z "$owner" ] && [ "$owner" != "root" ]; then
+                chown "$owner:$owner" "$xmodmap_file" 2>/dev/null || true
+                chmod 644 "$xmodmap_file"
+                log_info "  • .Xmodmap criado para $username"
+            fi
+        fi
+    fi
+done
 
 # 6. Configurar SSH para preservar locale
 log_info "Configurando SSH para preservar configurações de locale..."
@@ -114,6 +143,11 @@ elif ! grep -q "^AcceptLocale" /etc/ssh/sshd_config; then
     echo "" >> /etc/ssh/sshd_config
     echo "# Suporte a locale do cliente SSH" >> /etc/ssh/sshd_config
     echo "AcceptLocale pt_BR.UTF-8 en_US.UTF-8 C.UTF-8" >> /etc/ssh/sshd_config
+fi
+
+# Também aceitar XKBLAYOUT e variáveis relacionadas ao teclado via SSH
+if ! grep -q "^AcceptEnv XKBLAYOUT" /etc/ssh/sshd_config; then
+    echo "AcceptEnv XKBLAYOUT XKBVARIANT XKBMODEL XKBOPTIONS" >> /etc/ssh/sshd_config
 fi
 
 # Validar configuração SSH
@@ -139,10 +173,10 @@ EOF
     chmod 644 /etc/profile.d/pt_br.sh
 fi
 
-# 8. Configurar udev rules para Logitech MX Keys
-log_info "Configurando udev rules para Logitech MX Keys..."
-cat > /etc/udev/rules.d/10-logitech-mx.rules << 'EOF'
-# Logitech MX Keys
+# 8. Configurar udev rules para qualquer teclado USB
+log_info "Configurando udev rules para teclados USB..."
+cat > /etc/udev/rules.d/10-keyboard-usb.rules << 'EOF'
+# Teclados USB - Logitech MX Keys e outros modelos
 # USB Vendor ID: 046d (Logitech)
 
 # MX Keys standard
@@ -153,6 +187,9 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="408[3-9]", MODE="
 
 # MX Keys for Mac
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="409[0-9]", MODE="0666", ENV{ID_INPUT_KEYBOARD}="1"
+
+# Teclados USB genéricos
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="03", ATTRS{bInterfaceSubClass}=="01", MODE="0666", ENV{ID_INPUT_KEYBOARD}="1"
 EOF
 
 # Recarregar udev rules
@@ -173,16 +210,23 @@ log_info "Configuração concluída com sucesso!"
 log_info "========================================="
 log_info ""
 log_info "Configurações aplicadas:"
-log_info "  • Layout de teclado: US (International)"
-log_info "  • Modelo de teclado: Logitech MX Keys"
+log_info "  • Layout de teclado: US (padrão pc105)"
+log_info "  • Mapeamento customizado: +c = ç (via xmodmap)"
 log_info "  • Locale: Português do Brasil (pt_BR.UTF-8)"
 log_info "  • SSH: Configurado para aceitar locale remoto"
 log_info ""
-log_info "Para aplicar as mudanças:"
-log_info "  1. SSH: Logout e login novamente"
-log_info "  2. Console: Reinicie o sistema (sudo reboot)"
+log_info "Para aplicar as mudanças imediatamente:"
+log_info "  1. Carregar .Xmodmap:"
+log_info "     $ xmodmap ~/.Xmodmap"
+log_info ""
+log_info "  2. Para aplicar em novo login:"
+log_info "     $ source ~/.bashrc"
+log_info ""
+log_info "  3. Ou fazer logout e login novamente"
 log_info ""
 log_info "Teste a configuração com:"
-log_info "  $ localectl status"
 log_info "  $ setxkbmap -query"
+log_info "  $ xmodmap -pke | grep 'keycode  54'"
+log_info ""
+log_info "Para usar ç: pressione AltGr+c (ou Ctrl+Alt+c)"
 log_info ""
