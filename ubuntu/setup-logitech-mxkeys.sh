@@ -106,31 +106,41 @@ chmod 644 /etc/profile.d/xmodmap-init.sh
 
 # Criar arquivo .Xmodmap para cada usuário (excluindo root)
 log_info "Gerando arquivo .Xmodmap para usuários..."
+
+# Criar template .Xmodmap baseado na configuração US padrão
+# Apenas remapeia: keycode 54 (c) para adicionar ç na terceira posição (AltGr)
+create_xmodmap() {
+    local xmodmap_file="$1"
+    
+    cat > "$xmodmap_file" << 'XEOF'
+! Arquivo de configuração XKeyboard para layout US com ç
+! Mapeamento customizado: AltGr+c = ç
+
+! Configuração padrão para layout US com pc105
+! Modificação: adicionar ç (ccedilla) ao keycode 54 (tecla c)
+! Posição: AltGr+c (terceira nível)
+
+! Original: keycode  54 = c C c C copyright cent copyright
+! Modificado: keycode  54 = c C c C ccedilla Ccedilla ccedilla
+
+keycode  54 = c C c C ccedilla Ccedilla ccedilla
+XEOF
+}
+
 for home_dir in /home/*; do
     if [ -d "$home_dir" ]; then
         username=$(basename "$home_dir")
         xmodmap_file="$home_dir/.Xmodmap"
         
-        # Criar .Xmodmap com mapeamento de ç
-        cat > "$xmodmap_file" << 'XEOF'
-! Mapeamento de tecla: +c = ç
-
-! Obter o xmodmap padrão com: xmodmap -pke > ~/.Xmodmap
-! A linha original do keycode 54 (tecla c) é:
-! keycode  54 = c C c C copyright cent copyright
-
-! Remapear para adicionar ç na terceira nível (AltGr+c)
-keycode  54 = c C c C ccedilla Ccedilla ccedilla
-XEOF
+        # Criar .Xmodmap
+        create_xmodmap "$xmodmap_file"
         
         # Ajustar permissões para o usuário
-        if [ -d "$home_dir" ]; then
-            owner=$(stat -c '%U:%G' "$home_dir" 2>/dev/null | cut -d: -f1)
-            if [ ! -z "$owner" ] && [ "$owner" != "root" ]; then
-                chown "$owner:$owner" "$xmodmap_file" 2>/dev/null || true
-                chmod 644 "$xmodmap_file"
-                log_info "  • .Xmodmap criado para $username"
-            fi
+        owner=$(stat -c '%U:%G' "$home_dir" 2>/dev/null | cut -d: -f1)
+        if [ ! -z "$owner" ] && [ "$owner" != "root" ]; then
+            chown "$owner:$owner" "$xmodmap_file" 2>/dev/null || true
+            chmod 644 "$xmodmap_file"
+            log_info "  • .Xmodmap criado para $username"
         fi
     fi
 done
