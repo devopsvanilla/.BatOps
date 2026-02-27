@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Function to display usage
+usage() {
+    echo "Usage: $0 <script_path>"
+    echo "Example: $0 ./my-script.sh"
+    echo "This will install the script to /usr/local/bin/ without the .sh extension."
+    exit 1
+}
+
+# Function to check if running as root/sudo
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: Please run with sudo or as root"
+        exit 1
+    fi
+}
+
+# Function to validate script exists and is readable
+validate_script() {
+    local script_path="$1"
+    if [ ! -f "$script_path" ]; then
+        echo "Error: Script '$script_path' not found"
+        exit 1
+    fi
+
+    if [ ! -r "$script_path" ]; then
+        echo "Error: Cannot read script '$script_path'"
+        exit 1
+    fi
+}
+
+# Function to check if script already exists and handle replacement
+check_existing() {
+    local script_name="$1"
+    local install_path="/usr/local/bin/$script_name"
+
+    if [ -f "$install_path" ]; then
+        echo "⚠️  Warning: Script '$script_name' is already installed at $install_path"
+        read -p "Do you want to replace it? (y/N): " response
+
+        case "$response" in
+            [yY][eE][sS]|[yY])
+                echo "Proceeding with replacement..."
+                return 0
+                ;;
+            *)
+                echo "Installation aborted."
+                exit 0
+                ;;
+        esac
+    fi
+}
+
+# Check if parameter is provided
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+# Store script path
+SCRIPT_PATH="$1"
+
+# Get the script name without path and extension
+SCRIPT_NAME=$(basename "$SCRIPT_PATH" .sh) #remove .sh
+
+# Validate inputs
+check_root
+validate_script "$SCRIPT_PATH"
+
+# Check if script is already installed
+check_existing "$SCRIPT_NAME"
+
+# Make sure destination directory exists
+if [ ! -d "/usr/local/bin" ]; then
+    echo "Creating /usr/local/bin directory..."
+    mkdir -p /usr/local/bin
+fi
+
+# Copy the script
+echo "Installing $SCRIPT_NAME to /usr/local/bin/"
+cp "$SCRIPT_PATH" "/usr/local/bin/$SCRIPT_NAME"
+
+# Make it executable
+chmod +x "/usr/local/bin/$SCRIPT_NAME"
+
+# Verify installation
+if [ -x "/usr/local/bin/$SCRIPT_NAME" ]; then
+    echo "✅ Successfully installed $SCRIPT_NAME"
+    echo "You can now run it by typing: $SCRIPT_NAME"
+else
+    echo "❌ Installation failed"
+    exit 1
+fi
