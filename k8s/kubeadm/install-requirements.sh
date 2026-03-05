@@ -72,9 +72,27 @@ if [ "$KUBEADM_INSTALLED" = true ] || [ "$KUBECTL_INSTALLED" = true ] || [ "$KUB
             systemctl stop kubelet 2>/dev/null || true
             systemctl stop containerd 2>/dev/null || true
             
+            # Matar processos remanescentes
+            echo "Encerrando processos do Kubernetes..."
+            pkill -9 kube-apiserver 2>/dev/null || true
+            pkill -9 kube-controller 2>/dev/null || true
+            pkill -9 kube-scheduler 2>/dev/null || true
+            pkill -9 kubelet 2>/dev/null || true
+            pkill -9 kube-proxy 2>/dev/null || true
+            pkill -9 etcd 2>/dev/null || true
+            
+            # Aguardar liberação de portas
+            sleep 3
+            
             # Desmontar volumes montados
             echo "Desmontando volumes..."
             umount $(df -HT | grep '/var/lib/kubelet' | awk '{print $7}') 2>/dev/null || true
+            
+            # Remover interfaces de rede do Kubernetes
+            echo "Removendo interfaces de rede..."
+            ip link delete cni0 2>/dev/null || true
+            ip link delete flannel.1 2>/dev/null || true
+            ip link delete docker0 2>/dev/null || true
             
             # Remover pacotes
             apt-get remove -y kubeadm kubectl kubelet containerd 2>/dev/null || true
