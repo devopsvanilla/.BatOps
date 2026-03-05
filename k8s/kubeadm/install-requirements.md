@@ -6,6 +6,20 @@ Script para preparar um servidor Ubuntu 24.04 LTS com todos os requisitos necess
 
 Este script automatiza a preparação completa do sistema operacional Ubuntu 24.04 LTS para receber o Kubernetes. Ele executa as seguintes tarefas:
 
+### 0. **Detecção de Instalação Existente**
+- Verifica se kubeadm, kubectl, kubelet ou containerd já estão instalados
+- Exibe versões encontradas
+- Oferece 3 opções ao usuário:
+  - **Opção 1**: Reinstalar completamente (remove tudo e reinstala do zero)
+  - **Opção 2**: Atualizar apenas componentes faltantes (preserva configurações)
+  - **Opção 3**: Cancelar a execução
+- Se escolher reinstalação completa, limpa:
+  - Serviços (para kubelet e containerd)
+  - Pacotes instalados
+  - Configurações em /etc/kubernetes, /var/lib/kubelet, /etc/containerd
+  - Diretórios CNI e kubectl config
+  - Repositório e chaves antigas do Kubernetes
+
 ### 1. **Desabilita SWAP**
 - Remove a memória swap ativa
 - Comenta entradas de swap no `/etc/fstab`
@@ -26,16 +40,20 @@ Este script automatiza a preparação completa do sistema operacional Ubuntu 24.
 - curl
 - gpg
 - software-properties-common
+- conntrack (rastreamento de conexões - obrigatório)
+- socat (relay de sockets - usado por port-forwarding)
+- ipset (gerenciamento de conjuntos de IPs - usado por kube-proxy)
 
 ### 5. **Instala e Configura Containerd**
 - Instala o containerd como container runtime
 - Gera configuração padrão
 - Habilita SystemdCgroup (requerido pelo Kubernetes)
+- Atualiza imagem pause para versão 3.10 (compatível com K8s 1.35)
 - Reinicia e habilita o serviço
 
 ### 6. **Adiciona Repositório Oficial do Kubernetes**
 - Adiciona chave GPG do repositório
-- Configura repositório stable v1.31
+- Configura repositório stable v1.35 (versão mais recente)
 - Atualiza lista de pacotes
 
 ### 7. **Instala Ferramentas do Kubernetes**
@@ -63,7 +81,7 @@ Este script automatiza a preparação completa do sistema operacional Ubuntu 24.
 
 ```bash
 # Navegar até o diretório
-cd /home/devopsvanilla/.BatOps/k8s
+cd /home/devopsvanilla/.BatOps/k8s/kubeadm
 
 # Dar permissão de execução (se necessário)
 chmod +x install-requirements.sh
@@ -71,6 +89,35 @@ chmod +x install-requirements.sh
 # Executar o script com privilégios root
 sudo ./install-requirements.sh
 ```
+
+### Execução com Instalação Existente
+
+Se você já tiver componentes do Kubernetes instalados, o script detectará automaticamente e apresentará opções:
+
+```bash
+sudo ./install-requirements.sh
+
+# Saída esperada:
+Verificando instalações existentes...
+✓ kubeadm encontrado: v1.31.14
+✓ kubectl encontrado: v1.31.14
+✓ kubelet encontrado: v1.31.14
+✓ containerd encontrado: 1.7.x
+
+⚠️  ATENÇÃO: Componentes do Kubernetes já estão instalados!
+
+Opções:
+  1) Continuar e REINSTALAR (remove e reinstala tudo)
+  2) Atualizar somente componentes faltantes
+  3) Cancelar e sair
+
+Escolha uma opção [1/2/3]:
+```
+
+**Recomendações:**
+- **Opção 1**: Use quando quiser uma instalação limpa ou houver problemas de configuração
+- **Opção 2**: Use para adicionar apenas o que está faltando
+- **Opção 3**: Use para verificar o que está instalado sem fazer mudanças
 
 ### Tempo Estimado
 A execução completa leva aproximadamente **5-10 minutos**, dependendo da velocidade da conexão de internet e do hardware.
@@ -117,7 +164,7 @@ containerd --version
 kubeadm version
 kubelet --version
 kubectl version --client
-# Todas devem exibir a versão instalada (v1.31.x)
+# Todas devem exibir a versão instalada (v1.35.x)
 ```
 
 ### 6. Verificar kubelet está habilitado
