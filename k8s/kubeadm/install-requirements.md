@@ -115,8 +115,14 @@ Escolha uma opção [1/2/3]:
 ```
 
 **Recomendações:**
-- **Opção 1**: Use quando quiser uma instalação limpa ou houver problemas de configuração
-- **Opção 2**: Use para adicionar apenas o que está faltando
+- **Opção 1**: Use quando quiser uma instalação limpa ou houver problemas de configuração  - Executa `kubeadm reset` para desmanchar o cluster
+  - Desmonta volumes ativos
+  - Para serviços (kubelet e containerd)
+  - Remove pacotes instalados
+  - Limpa configurações em /etc/kubernetes, /var/lib/kubelet, /etc/containerd
+  - Limpa diretórios CNI e kubectl config
+  - Limpa repositório e chaves antigas do Kubernetes
+  - Limpa regras iptables do Kubernetes- **Opção 2**: Use para adicionar apenas o que está faltando
 - **Opção 3**: Use para verificar o que está instalado sem fazer mudanças
 
 ### Tempo Estimado
