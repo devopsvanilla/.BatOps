@@ -9,7 +9,7 @@
 
 ## 🎯 Quick Start
 
-Get a fully functional Kubernetes cluster up and running in under 10 minutes:
+Get a fully functional Kubernetes cluster up and running in under 15 minutes:
 
 ```bash
 # 1. Prepare the system
@@ -17,6 +17,12 @@ sudo bash ./install-requirements.sh
 
 # 2. Initialize the control plane
 sudo bash ./init-master.sh
+
+# 3. Configure kubectl for your user
+bash ./setup-kubectl.sh
+
+# 4. Install network plugin (Flannel)
+bash ./install-flannel.sh
 ```
 
 That's it! Your cluster is ready to deploy pods.
@@ -40,6 +46,9 @@ kubeadm/
 ├── RELEASE.md                   (release notes & features)
 ├── install-requirements.sh      (system preparation)
 ├── init-master.sh              (cluster initialization)
+├── setup-kubectl.sh            (user kubectl configuration)
+├── install-flannel.sh          (CNI network plugin installation)
+├── add-worker.sh               (secure worker node addition)
 └── install-requirements.md     (technical documentation)
 ```
 
@@ -60,6 +69,27 @@ kubeadm/
 - ✅ Initializes Kubernetes control plane
 - ✅ Configures kubectl
 - ✅ Provides worker node joining instructions
+
+### `add-worker.sh` - Secure Worker Addition
+- ✅ Generates fresh token on each run (24h validity)
+- ✅ Displays join command without saving to disk
+- ✅ No token file leaks or security risks
+- ✅ Optional clipboard copy (xclip support)
+
+### `setup-kubectl.sh` - User kubectl Configuration
+- ✅ Configures kubeconfig for current user
+- ✅ Sets correct file permissions (600)
+- ✅ Tests cluster connectivity
+- ✅ Optionally adds to shell profile (.bashrc, .zshrc, etc)
+- ✅ Security warnings and best practices
+
+### `install-flannel.sh` - Network Plugin Installation
+- ✅ Downloads and applies latest Flannel manifest
+- ✅ Detects and handles existing installations
+- ✅ Monitors pod deployment progress (with timeout)
+- ✅ Validates all nodes become Ready
+- ✅ Color-coded status messages
+- ✅ Comprehensive error reporting
 
 ---
 
@@ -85,12 +115,26 @@ sudo kubeadm init --pod-network-cidr=192.168.0.0/16
 ### Manual Step-by-Step Setup
 See [RELEASE.md - Method 2](RELEASE.md#method-2-step-by-step-manual-setup)
 
-### Add Worker Nodes
-After master initialization, run on each worker:
+### Configure kubectl for User
+After master initialization, configure kubectl access:
+
 ```bash
-kubeadm join <MASTER_IP>:6443 \
-  --token <TOKEN> \
-  --discovery-token-ca-cert-hash sha256:<HASH>
+# Setup kubeconfig in user profile
+bash ./setup-kubectl.sh
+
+# Optionally add to shell profile (.bashrc, .zshrc, etc)
+# Script will ask if you want to do this
+```
+
+### Add Worker Nodes
+The secure way to add worker nodes to your cluster:
+
+```bash
+# On MASTER node, generate a new token and join command
+sudo bash ./add-worker.sh
+
+# Copy the displayed command and run on WORKER node
+# The script generates a fresh token each time (24h validity)
 ```
 
 ---
@@ -113,8 +157,12 @@ kubectl get deployments
 
 ## 📖 Common Tasks
 
-### Install Network Plugin (if needed)
+### Install Network Plugin
 ```bash
+# Automated installation with validation
+bash ./install-flannel.sh
+
+# Or manual installation
 kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
 ```
 
@@ -124,10 +172,31 @@ kubectl cluster-info
 kubectl get cs  # Component status
 ```
 
+### Add Worker Nodes
+```bash
+# Securely generate join command (on MASTER)
+sudo bash ./add-worker.sh
+
+# Run the output command on each WORKER node
+```
+
+### Regenerate Worker Token
+```bash
+# If the worker token expires (24h), run again on MASTER
+sudo bash ./add-worker.sh
+```
+
 ### Reset a Failed Installation
 ```bash
 sudo kubeadm reset -f
 sudo bash ./install-requirements.sh  # Then try again
+```
+
+### Reconfigure kubectl (User)
+If kubeconfig gets corrupted or needs reset:
+```bash
+rm -rf ~/.kube
+bash ./setup-kubectl.sh  # Reconfigure
 ```
 
 ---
