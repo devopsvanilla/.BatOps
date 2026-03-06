@@ -55,6 +55,7 @@ Run scripts in this exact order:
 |----------|---------|
 | **[RELEASE.md](RELEASE.md)** | What's new, features, and detailed setup instructions |
 | **[install-requirements.md](install-requirements.md)** | System preparation details and troubleshooting |
+| **[UPGRADE-ORCHESTRATOR.md](UPGRADE-ORCHESTRATOR.md)** | Guided cluster upgrade orchestration and runbook |
 
 ---
 
@@ -68,7 +69,10 @@ kubeadm/
 ├── init-master.sh              (cluster initialization)
 ├── setup-kubectl.sh            (user kubectl configuration)
 ├── install-flannel.sh          (CNI network plugin installation)
+├── orchestrate-kubeadm-upgrade.sh (upgrade planner/orchestrator)
+├── upgrade-kubeadm.sh          (guided and safe cluster upgrade)
 ├── add-worker.sh               (secure worker node addition)
+├── UPGRADE-ORCHESTRATOR.md     (orchestrator usage documentation)
 └── install-requirements.md     (technical documentation)
 ```
 
@@ -240,6 +244,47 @@ sudo bash ./add-worker.sh
 # If the worker token expires (24h), run again on MASTER
 sudo bash ./add-worker.sh
 ```
+
+### Upgrade Cluster Safely (kubeadm)
+
+Use the guided script with one node at a time.
+
+```bash
+# 1) First control plane
+sudo bash ./upgrade-kubeadm.sh --role control-plane-first --target v1.35.2
+
+# 2) Additional control planes (if any)
+sudo bash ./upgrade-kubeadm.sh --role control-plane --target v1.35.2
+
+# 3) Each worker (one by one, with automatic drain/uncordon)
+sudo bash ./upgrade-kubeadm.sh --role worker --target v1.35.2 --manage-drain
+```
+
+Safety rules enforced by the script:
+- ✅ Requires root/sudo
+- ✅ Validates semantic version format
+- ✅ Blocks unsafe jumps (allows only +1 minor per upgrade)
+- ✅ Asks for confirmation before critical actions
+- ✅ Separates flow for first control plane, additional control planes, and workers
+
+> **Important:** keep Kubernetes repository for the target version configured before running upgrades.
+
+### Orchestrate Upgrade Plan (Recommended for Multi-Node)
+
+Generate an ordered upgrade plan (control planes first, then workers):
+
+```bash
+# Generate plan in markdown
+bash ./orchestrate-kubeadm-upgrade.sh --target v1.35.2
+
+# Optional: execute only on the local node based on detected role
+sudo bash ./orchestrate-kubeadm-upgrade.sh --target v1.35.2 --execute-local
+
+# Optional: generate remote-ready SSH commands in the markdown plan
+bash ./orchestrate-kubeadm-upgrade.sh --target v1.35.2 --ssh-user ubuntu --ssh-key ~/.ssh/id_ed25519
+```
+
+See full guide in [UPGRADE-ORCHESTRATOR.md](UPGRADE-ORCHESTRATOR.md).
 
 ### Reset a Failed Installation
 ```bash
