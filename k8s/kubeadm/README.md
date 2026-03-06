@@ -103,17 +103,52 @@ kubeadm/
 - ✅ Optionally adds to shell profile (.bashrc, .zshrc, etc)
 - ✅ Security warnings and best practices
 
-### `install-flannel.sh` - Network Plugin Installation
+### `install-flannel.sh` - Network Plugin Installation + CNI Setup
+- ✅ Checks and installs `kubernetes-cni` package (CNI prerequisites)
+- ✅ Creates required directories (`/etc/cni/net.d`, `/opt/cni/bin`)
+- ✅ Guarantees essential CNI plugins (`loopback`, `bridge`, `host-local`, `portmap`)
 - ✅ Downloads and applies latest Flannel manifest
 - ✅ Detects and handles existing installations
 - ✅ Monitors pod deployment progress (with timeout)
 - ✅ Validates all nodes become Ready
+- ✅ Restarts container runtime to apply CNI configuration
+- ✅ Validates CoreDNS rollout and reports actionable diagnostics
 - ✅ Color-coded status messages
 - ✅ Comprehensive error reporting
 
 ---
 
-## 🖥️ System Requirements
+## � Post-Installation Verification
+
+After running all 4 required scripts, verify your cluster:
+
+```bash
+# Check node status (should show "Ready")
+kubectl get nodes -o wide
+
+# Check all system pods
+kubectl get pods -A -o wide
+```
+
+**Expected Status:**
+- Node: `Ready`
+- Flannel DaemonSet: `1/1 Running`
+- CoreDNS: `Running` (or briefly `ContainerCreating`)
+- etcd, kube-apiserver, kube-controller-manager, kube-scheduler: `1/1 Running`
+
+### Single-Node Cluster Note
+
+If CoreDNS pods remain in `ContainerCreating` state briefly after setup, this is normal:
+- The control-plane taint is automatically removed after CNI initialization
+- CoreDNS will transition to `Running` within 30-60 seconds
+- The Flannel network plugin must be fully initialized before CoreDNS can start
+
+You can monitor this with:
+```bash
+kubectl get pods -n kube-system -w
+```
+
+---
 
 - **OS**: Ubuntu 24.04 LTS
 - **CPU**: 2+ cores (4+ recommended)
@@ -223,26 +258,57 @@ bash ./setup-kubectl.sh  # Reconfigure
 
 ## 🐛 Troubleshooting
 
-**Node showing "NotReady"?**
+### "Node stuck in NotReady state" / "cni plugin not initialized"
+
+**Symptom:**
 ```bash
-# Check network plugin
-kubectl get pods -n kube-system | grep flannel
+kubectl get nodes
+# Output: STATUS = NotReady
+
+kubectl describe node <node>
+# Message: "cni plugin not initialized"
 ```
 
-**Can't connect to cluster?**
+**Root cause:** Flannel or CNI plugins were not installed
+
+**Solution:**
 ```bash
-# Verify kubeconfig
-echo $KUBECONFIG
-kubectl config current-context
+# Ensure kubernetes-cni package is installed
+sudo apt-get install -y kubernetes-cni
+
+# Install Flannel (includes CNI setup)
+bash ./install-flannel.sh
+
+# Verify
+kubectl get nodes  # should show Ready
+kubectl get pods -n kube-flannel  # should show pods Running
 ```
 
-**Port conflicts?**
+### CoreDNS pods in ContainerCreating
+
+**Symptom:**
 ```bash
-# Check Kubernetes ports
-sudo netstat -tlnp | grep -E ':(6443|2379|10250)'
+kubectl get pods -n kube-system | grep coredns
+# STATUS = ContainerCreating (for 30-60 seconds)
 ```
 
-See [RELEASE.md](RELEASE.md#-troubleshooting) for more solutions.
+**Cause:** Normal behavior while Flannel network is initializing (single-node clusters)
+
+**Action:** Wait 1-2 minutes. If still `ContainerCreating`:
+```bash
+kubectl describe pod -n kube-system <coredns-pod-name>
+kubectl logs -n kube-system -l k8s-app=kube-dns --tail=50
+```
+
+### Network plugin check
+```bash
+# Verify Flannel is deployed
+kubectl get ds -n kube-flannel
+kubectl get pods -n kube-flannel -o wide
+
+# Check Flannel logs
+kubectl logs -n kube-flannel -l app=flannel --tail=100
+```
 
 ---
 
