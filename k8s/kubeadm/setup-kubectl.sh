@@ -58,13 +58,23 @@ echo "✓ Arquivo copiado"
 
 # Definir permissões corretas
 echo "[3/4] Configurando permissões..."
+
+# Aplicar permissões seguras ao kubeconfig
 if [ "$EUID" -eq 0 ]; then
+    # Rodando como root
     chmod 600 "$TARGET_HOME/.kube/config"
+    echo "   chmod 600 $TARGET_HOME/.kube/config"
 else
+    # Rodando como usuário normal
     sudo chmod 600 "$TARGET_HOME/.kube/config"
+    echo "   sudo chmod 600 $TARGET_HOME/.kube/config"
+    
+    # Ajustar ownership para o usuário atual
     sudo chown "$USER:$(id -g)" "$TARGET_HOME/.kube/config"
+    echo "   sudo chown $USER:$(id -g) $TARGET_HOME/.kube/config"
 fi
-echo "✓ Permissões configuradas"
+
+echo "✓ Permissões configuradas (rw-------, ninguém consegue ler)"
 
 # Testar a conexão
 echo "[4/4] Testando conexão com Kubernetes..."
@@ -144,9 +154,10 @@ echo ""
 
 # Aviso de segurança
 echo "🔐 AVISO DE SEGURANÇA:"
-echo "   ⚠️  O arquivo ~/.kube/config contém credenciais do cluster"
-echo "   ⚠️  Protejas este arquivo: chmod 600 ~/.kube/config"
+echo "   ✅ Arquivo kubeconfig protegido com chmod 600"
+echo "   ⚠️  Contém credenciais de administrador do cluster"
 echo "   ⚠️  Não compartilhe este arquivo nem via Git"
+echo "   ⚠️  Se comprometido: regenere token de acesso"
 echo ""
 
 echo "======================================"

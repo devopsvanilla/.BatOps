@@ -39,11 +39,48 @@ fi
 echo -e "${GREEN}✓ Conectado ao cluster${NC}"
 echo ""
 
+# Helper para executar comandos que exigem privilégio
+run_privileged() {
+    if [ "$EUID" -eq 0 ]; then
+        "$@"
+    elif command -v sudo &>/dev/null; then
+        sudo "$@"
+    else
+        echo -e "${RED}❌ Este passo requer root/sudo: $*${NC}"
+        exit 1
+    fi
+}
+
+echo "======================================"
+echo "[0/6] Preparando ambiente CNI..."
+echo "======================================"
+
+# Garantir diretórios CNI
+run_privileged mkdir -p /etc/cni/net.d
+run_privileged mkdir -p /opt/cni/bin
+
+# Garantir pacote de plugins CNI
+if ! dpkg -s kubernetes-cni &>/dev/null; then
+    echo "Pacote kubernetes-cni não encontrado. Instalando..."
+    run_privileged apt-get update
+    run_privileged apt-get install -y kubernetes-cni
+    echo -e "${GREEN}✓ kubernetes-cni instalado${NC}"
+else
+    echo -e "${GREEN}✓ kubernetes-cni já instalado${NC}"
+fi
+
+# Verificação rápida dos binários CNI
+if [ ! -x /opt/cni/bin/bridge ] && [ ! -x /opt/cni/bin/flannel ]; then
+    echo -e "${YELLOW}⚠️  Binários CNI esperados não encontrados em /opt/cni/bin${NC}"
+    echo "   Conteúdo atual:"
+    ls -lah /opt/cni/bin || true
+fi
+
 # URL do manifesto Flannel
 FLANNEL_URL="https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
 
 echo "======================================"
-echo "[1/5] Baixando manifesto do Flannel..."
+echo "[1/6] Baixando manifesto do Flannel..."
 echo "======================================"
 
 # Baixar manifesto para verificar antes
@@ -61,7 +98,7 @@ fi
 
 echo ""
 echo "======================================"
-echo "[2/5] Verificando instalações prévias..."
+echo "[2/6] Verificando instalações prévias..."
 echo "======================================"
 
 # Verificar se Flannel já está instalado
@@ -84,7 +121,7 @@ fi
 
 echo ""
 echo "======================================"
-echo "[3/5] Aplicando manifesto do Flannel..."
+echo "[3/6] Aplicando manifesto do Flannel..."
 echo "======================================"
 
 if kubectl apply -f "$TEMP_MANIFEST"; then
@@ -100,7 +137,7 @@ rm -f "$TEMP_MANIFEST"
 
 echo ""
 echo "======================================"
-echo "[4/5] Aguardando pods do Flannel..."
+echo "[4/6] Aguardando pods do Flannel..."
 echo "======================================"
 echo "Este processo pode levar até 2 minutos..."
 echo ""
@@ -129,9 +166,9 @@ MAX_WAIT=120  # 2 minutos
 WAIT_COUNT=0
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    # Pegar status dos pods
-    READY_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | grep -c "Running" || echo "0")
-    TOTAL_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | wc -l || echo "0")
+    # Pegar status dos pods (strip newlines with xargs)
+    READY_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | grep -c "Running" | xargs || echo "0")
+    TOTAL_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | wc -l | xargs || echo "0")
     
     # Mostrar progresso
     echo -ne "\rPods Flannel: $READY_PODS/$TOTAL_PODS prontos (esperando $TOTAL_NODES)..."
@@ -159,7 +196,7 @@ fi
 
 echo ""
 echo "======================================"
-echo "[5/5] Validando instalação..."
+echo "[5/6] Validando instalação..."
 echo "======================================"
 
 # Mostrar pods do Flannel
@@ -172,7 +209,7 @@ echo "Aguardando nodes ficarem Ready (até 30 segundos)..."
 
 # Aguardar nodes ficarem Ready
 for i in {1..10}; do
-    NOT_READY=$(kubectl get nodes --no-headers | grep -c "NotReady" || echo "0")
+    NOT_READY=$(kubectl get nodes --no-headers | grep -c "NotReady" | xargs || echo "0")
     
     if [ "$NOT_READY" -eq 0 ]; then
         echo -e "${GREEN}✓ Todos os nodes estão Ready${NC}"
@@ -184,6 +221,12 @@ for i in {1..10}; do
 done
 
 echo ""
+
+echo "Reiniciando container runtime e kubelet para reavaliar CNI..."
+run_privileged systemctl restart containerd
+run_privileged systemctl restart kubelet
+sleep 5
+
 echo "Status dos nodes:"
 kubectl get nodes
 
@@ -194,8 +237,8 @@ echo "======================================"
 echo ""
 
 # Validação final
-ALL_RUNNING=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | grep -c "Running" || echo "0")
-NOT_READY=$(kubectl get nodes --no-headers | grep -c "NotReady" || echo "0")
+ALL_RUNNING=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | grep -c "Running" | xargs || echo "0")
+NOT_READY=$(kubectl get nodes --no-headers | grep -c "NotReady" | xargs || echo "0")
 
 if [ "$ALL_RUNNING" -ge "$TOTAL_NODES" ] && [ "$NOT_READY" -eq 0 ]; then
     echo -e "${GREEN}🎉 SUCESSO! Flannel está funcionando corretamente${NC}"

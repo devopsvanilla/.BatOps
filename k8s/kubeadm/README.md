@@ -12,20 +12,40 @@
 Get a fully functional Kubernetes cluster up and running in under 15 minutes:
 
 ```bash
-# 1. Prepare the system
+# 1) REQUIRED - Prepare the system
 sudo bash ./install-requirements.sh
 
-# 2. Initialize the control plane
+# 2) REQUIRED - Initialize the control plane
 sudo bash ./init-master.sh
 
-# 3. Configure kubectl for your user
+# 3) REQUIRED (for non-root kubectl usage) - Configure kubectl for your user
 bash ./setup-kubectl.sh
 
-# 4. Install network plugin (Flannel)
+# 4) REQUIRED - Install network plugin (Flannel + CNI checks)
 bash ./install-flannel.sh
 ```
 
-That's it! Your cluster is ready to deploy pods.
+After this sequence, confirm the node is `Ready`:
+
+```bash
+kubectl get nodes
+```
+
+Then your cluster is ready to deploy pods.
+
+---
+
+## ✅ Correct Execution Order (Required vs Optional)
+
+Run scripts in this exact order:
+
+1. **`install-requirements.sh`** → **Required**
+2. **`init-master.sh`** → **Required**
+3. **`setup-kubectl.sh`** → **Required** for day-to-day use as non-root user
+4. **`install-flannel.sh`** → **Required** (without CNI/plugin, node stays `NotReady`)
+5. **`add-worker.sh`** → Optional (only when adding worker nodes)
+
+> If you skip `install-flannel.sh`, kubelet will report `cni plugin not initialized` and node status will remain `NotReady`.
 
 ---
 
@@ -157,12 +177,12 @@ kubectl get deployments
 
 ## 📖 Common Tasks
 
-### Install Network Plugin
+### Install Network Plugin (**Required**)
 ```bash
-# Automated installation with validation
+# Automated installation with validation + CNI prerequisites
 bash ./install-flannel.sh
 
-# Or manual installation
+# Or manual installation (advanced)
 kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
 ```
 
