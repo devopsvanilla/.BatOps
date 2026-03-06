@@ -93,6 +93,14 @@ if [[ -z "${API_URL}" ]]; then
   fail "Não foi possível obter a URL da API do contexto atual."
 fi
 
+API_CA_DATA=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' 2>/dev/null || true)
+CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "kubernetes")
+
+# Metadados para kubeconfig exibido em memória
+KCFG_CLUSTER_NAME="${CURRENT_CONTEXT}"
+KCFG_USER_NAME="${SA_NAMESPACE}-${SA_NAME}-token-user"
+KCFG_CONTEXT_NAME="${KCFG_CLUSTER_NAME}-${KCFG_USER_NAME}"
+
 # Tenta obter token do usuário atual no kubeconfig (quando auth por token é usada).
 API_TOKEN=$(kubectl config view --minify -o jsonpath='{.users[0].user.token}' 2>/dev/null || true)
 
@@ -163,7 +171,57 @@ echo "======================================"
 echo "Kubernetes API Credentials"
 echo "======================================"
 echo "URL da API: ${API_URL}"
-echo "Token da API: ${API_TOKEN}"
+echo ""
+echo "Token da API (bloco separado):"
+echo "-----BEGIN API_TOKEN-----"
+echo "${API_TOKEN}"
+echo "-----END API_TOKEN-----"
+
+echo ""
+echo "Kubeconfig (bloco separado, sem gerar arquivo):"
+echo "-----BEGIN KUBECONFIG-----"
+if [[ -n "${API_CA_DATA}" ]]; then
+cat <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: ${API_CA_DATA}
+    server: ${API_URL}
+  name: ${KCFG_CLUSTER_NAME}
+contexts:
+- context:
+    cluster: ${KCFG_CLUSTER_NAME}
+    user: ${KCFG_USER_NAME}
+  name: ${KCFG_CONTEXT_NAME}
+current-context: ${KCFG_CONTEXT_NAME}
+users:
+- name: ${KCFG_USER_NAME}
+  user:
+    token: ${API_TOKEN}
+EOF
+else
+cat <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    server: ${API_URL}
+  name: ${KCFG_CLUSTER_NAME}
+contexts:
+- context:
+    cluster: ${KCFG_CLUSTER_NAME}
+    user: ${KCFG_USER_NAME}
+  name: ${KCFG_CONTEXT_NAME}
+current-context: ${KCFG_CONTEXT_NAME}
+users:
+- name: ${KCFG_USER_NAME}
+  user:
+    token: ${API_TOKEN}
+EOF
+fi
+echo "-----END KUBECONFIG-----"
 echo ""
 echo "⚠️  Segurança: trate este token como segredo."
 echo ""
