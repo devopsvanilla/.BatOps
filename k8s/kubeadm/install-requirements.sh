@@ -185,11 +185,17 @@ apt-get install -y containerd
 mkdir -p /etc/containerd
 containerd config default | tee /etc/containerd/config.toml
 
-# Habilitar SystemdCgroup
+# Habilitar SystemdCgroup para evitar alertas de CRI runtime
 sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 
-# Atualizar versão da imagem pause para compatibilidade com Kubernetes 1.35
-sed -i 's/pause:3\.[0-9]\+/pause:3.10/' /etc/containerd/config.toml
+# Configurar imagem pause correta (3.10.1) para evitar alerta de sandbox image
+# Busca e substitui a sandbox_image na seção CRI plugin
+sed -i 's|sandbox_image = ".*pause.*"|sandbox_image = "registry.k8s.io/pause:3.10.1"|g' /etc/containerd/config.toml
+
+# Se a linha não existir, adicionar na seção [plugins."io.containerd.grpc.v1.cri"]
+if ! grep -q "sandbox_image" /etc/containerd/config.toml; then
+    sed -i '/\[plugins\."io\.containerd\.grpc\.v1\.cri"\]/a\  sandbox_image = "registry.k8s.io/pause:3.10.1"' /etc/containerd/config.toml
+fi
 
 systemctl restart containerd
 systemctl enable containerd
@@ -240,16 +246,21 @@ echo "✓ Sistema preparado com sucesso!"
 echo "======================================"
 echo ""
 echo "Próximos passos:"
-echo "  - Para inicializar o control plane (master):"
-echo "    kubeadm init --pod-network-cidr=10.244.0.0/16"
 echo ""
-echo "  - Para configurar kubectl:"
-echo "    mkdir -p \$HOME/.kube"
-echo "    sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-echo "    sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"
+echo "  1) Pré-carregar as imagens Docker (recomendado para evitar alertas):"
+echo "     kubeadm config images pull"
 echo ""
-echo "  - Para instalar plugin de rede (exemplo com Flannel):"
-echo "    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+echo "  2) Inicializar o control plane (master):"
+echo "     kubeadm init --pod-network-cidr=10.244.0.0/16"
 echo ""
-echo "  - Para adicionar workers ao cluster, execute o comando 'kubeadm join' fornecido após o init"
+echo "  3) Configurar kubectl:"
+echo "     mkdir -p \$HOME/.kube"
+echo "     sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
+echo "     sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"
+echo ""
+echo "  4) Instalar plugin de rede (Flannel - compatível com 10.244.0.0/16):"
+echo "     kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+echo ""
+echo "  5) Adicionar workers ao cluster (execute no(s) node(s) worker):"
+echo "     Use o comando 'kubeadm join' fornecido após o init"
 echo ""
