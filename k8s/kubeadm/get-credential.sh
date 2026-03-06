@@ -151,6 +151,13 @@ EOF
   fi
 fi
 
+info "Testando acesso à API com o token gerado..."
+if kubectl --token="${API_TOKEN}" --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
+  ok "Acesso validado com sucesso usando o token da API"
+else
+  fail "Token gerado, mas sem acesso válido à API. Verifique RBAC, contexto atual e conectividade."
+fi
+
 echo ""
 echo "======================================"
 echo "Kubernetes API Credentials"
