@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 /docker/zap/zap-results/*
 
 docker/openldap+phpLDAPadmin/data/*
+kvm/convert-ovn2qcow2/ovf-images
+kvm/convert-ovn2qcow2/qcow2-images
