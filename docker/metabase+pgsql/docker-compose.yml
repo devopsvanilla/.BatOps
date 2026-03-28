@@ -1,0 +1,51 @@
+services:
+  metabase:
+    image: ${METABASE_IMAGE:-metabase/metabase:latest}
+    container_name: ${METABASE_CONTAINER_NAME:-metabase}
+    hostname: ${METABASE_HOSTNAME:-metabase}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${METABASE_PORT:-3000}:3000"
+    environment:
+      MB_DB_TYPE: ${MB_DB_TYPE:-postgres}
+      MB_DB_DBNAME: ${POSTGRES_DB:-metabaseappdb}
+      MB_DB_PORT: ${POSTGRES_PORT:-5432}
+      MB_DB_USER: ${POSTGRES_USER:-metabase}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-change-me}
+      MB_DB_HOST: ${POSTGRES_HOSTNAME:-postgres}
+    networks:
+      - metanet1
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16}
+    container_name: ${POSTGRES_CONTAINER_NAME:-postgres}
+    hostname: ${POSTGRES_HOSTNAME:-postgres}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-metabase}
+      POSTGRES_DB: ${POSTGRES_DB:-metabaseappdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${POSTGRES_PUBLISHED_PORT:-5432}:5432"
+    networks:
+      - metanet1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  metanet1:
+    name: ${DOCKER_NETWORK_NAME:-metanet1}
+    driver: bridge
