@@ -75,7 +75,70 @@ Se a validação retornar **OK**, inicie a conversão.
 
 ---
 
-## 📊 5. Interpretando o Relatório de Validação
+
+## 🗺️ 5. Fluxo Operacional do Script `convert-ovf-qcow2.sh`
+
+```mermaid
+flowchart TD
+     A[Início do Script] --> B[Verifica dependências: xmllint, qemu-img, virt-v2v, virt-inspector]
+     B --> C[Cria diretórios: ./output, ./work]
+     C --> D[Busca arquivos .ovf em ./ovf-images]
+     D --> E[Para cada .ovf encontrado]
+     E --> F[Cria área de trabalho temporária em ./work/<vm>]
+     F --> G[Copia .ovf e .vmdk para ./work/<vm>]
+     G --> H[Extrai metadados (RAM, CPU, firmware) com xmllint]
+     H --> I[Normaliza discos: converte VMDK para monolithicFlat com qemu-img]
+     I --> J[Gera arquivo temp.vmx (descritor VMX)]
+     J --> K[Executa virt-v2v: converte e injeta drivers, gera .qcow2 em ./output/<vm>]
+     K --> L[Se erro: executa virt-inspector e salva log]
+     K --> M[LIMPA ./work/<vm>]
+     M --> N[Registra logs em conversion.log]
+     N --> O[Fim do processo para a VM]
+```
+
+### Sequência operacional detalhada
+
+1. **Verificação de Dependências**  
+    O script checa se os programas `xmllint`, `qemu-img`, `virt-v2v` e `virt-inspector` estão instalados. Se faltar algum, aborta com erro.
+
+2. **Preparação de Diretórios**  
+    Garante a existência dos diretórios de saída (`./output`), trabalho temporário (`./work`) e log (`conversion.log`).
+
+3. **Busca de Arquivos OVF**  
+    Procura recursivamente por arquivos `.ovf` dentro de `./ovf-images`.
+
+4. **Processamento de Cada VM**  
+    Para cada arquivo `.ovf` encontrado:
+    - Cria uma subpasta temporária em `./work/<vm>`.
+    - Copia o `.ovf` e todos os `.vmdk` da pasta de origem para a área de trabalho temporária.
+
+5. **Extração de Metadados**  
+    Utiliza `xmllint` para extrair informações de RAM, CPU e firmware do arquivo OVF.
+
+6. **Normalização dos Discos**  
+    Converte cada VMDK para o formato monolithicFlat usando `qemu-img`, facilitando o processamento posterior.
+
+7. **Geração do Descritor VMX**  
+    Cria um arquivo `temp.vmx` com as configurações de hardware e discos, servindo de ponte para o `virt-v2v`.
+
+8. **Conversão e Injeção de Drivers**  
+    Executa `virt-v2v` para converter a VM para QCOW2, injetando drivers VirtIO e salvando o resultado em `./output/<vm>`.
+
+9. **Diagnóstico de Erros**  
+    Se a conversão falhar, executa `virt-inspector` para diagnóstico e salva logs detalhados.
+
+10. **Limpeza de Temporários**  
+     Remove a pasta de trabalho temporária da VM em `./work/<vm>`.
+
+11. **Registro de Logs**  
+     Todas as etapas e erros são registrados em `conversion.log`.
+
+12. **Finalização**  
+     Ao processar todas as VMs, exibe mensagem de conclusão.
+
+---
+
+## 📊 6. Interpretando o Relatório de Validação
 
 | Status | Significado | Ação Necessária |
 | :--- | :--- | :--- |
