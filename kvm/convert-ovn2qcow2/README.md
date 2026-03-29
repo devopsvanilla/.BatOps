@@ -80,20 +80,20 @@ Se a validação retornar **OK**, inicie a conversão.
 
 ```mermaid
 flowchart TD
-     A[Início do Script] --> B[Verifica dependências: xmllint, qemu-img, virt-v2v, virt-inspector]
-     B --> C[Cria diretórios: ./output, ./work]
-     C --> D[Busca arquivos .ovf em ./ovf-images]
-     D --> E[Para cada .ovf encontrado]
-     E --> F[Cria área de trabalho temporária em ./work/<vm>]
-     F --> G[Copia .ovf e .vmdk para ./work/<vm>]
-     G --> H[Extrai metadados (RAM, CPU, firmware) com xmllint]
-     H --> I[Normaliza discos: converte VMDK para monolithicFlat com qemu-img]
-     I --> J[Gera arquivo temp.vmx (descritor VMX)]
-     J --> K[Executa virt-v2v: converte e injeta drivers, gera .qcow2 em ./output/<vm>]
-     K --> L[Se erro: executa virt-inspector e salva log]
-     K --> M[LIMPA ./work/<vm>]
-     M --> N[Registra logs em conversion.log]
-     N --> O[Fim do processo para a VM]
+    A[Inicio do Script] --> B[Verifica dependencias]
+    B --> C[Cria diretorios output e work]
+    C --> D[Busca arquivos ovf em ovf-images]
+    D --> E[Para cada ovf encontrado]
+    E --> F[Cria area temporaria em work_vm]
+    F --> G[Copia ovf e vmdk para work_vm]
+    G --> H[Extrai metadados com xmllint]
+    H --> I[Converte VMDK para monolithicFlat com qemu-img]
+    I --> J[Gera arquivo temp_vmx]
+    J --> K[Executa virt-v2v e gera qcow2 em output_vm]
+    K --> L[Se erro, executa virt-inspector e salva log]
+    K --> M[Limpa work_vm]
+    M --> N[Registra logs em conversion_log]
+    N --> O[Fim do processo para a VM]
 ```
 
 ### Sequência operacional detalhada
