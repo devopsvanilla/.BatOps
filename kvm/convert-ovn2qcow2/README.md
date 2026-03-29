@@ -1,4 +1,4 @@
-# 🛠️ BConversor de imagens do VMware (ovf) para KVM (qcow2)
+# 🛠️ Conversor de imagens do VMware (ovf) para KVM (qcow2)
 
 Este conjunto de ferramentas foi desenvolvido para automatizar e validar a migração de máquinas virtuais de ambientes **VMware (ESXi/vSphere)** para **KVM/Proxmox**, com suporte específico para execução em **Ubuntu** (Nativo ou WSL2).
 
