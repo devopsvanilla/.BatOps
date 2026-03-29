@@ -1,0 +1,658 @@
+# en_US resources
+signature="sIgNaTuRe"
+###
+###
+AndAlarmExpression.label                 = "AND"
+AndAlarmExpression.summary               = "Alarm expression that describes conjoined alarm expressions"
+###
+OrAlarmExpression.label                  = "OR"
+OrAlarmExpression.summary                = "Alarm expression that describes disjoined alarm expressions"
+###
+StateAlarmExpression.label               = "Entity state"
+StateAlarmExpression.summary             = "Alarm expression defined on the connection state of the host, power state of a host, or virtual machine"
+StateAlarmExpression.valueSummary        = "State is equal to {1,C}"
+StateAlarmExpression.yellowSummary       = "Yellow state {operator} {yellow.state}"
+StateAlarmExpression.redSummary          = "Red state {operator} {red.state}"
+###
+MetricAlarmExpression.label              = "Entity metric"
+MetricAlarmExpression.summary            = "Alarm expression defined on the metric data of an entity"
+MetricAlarmExpression.valueSummary       = "Metric {1,C} is equal to {2,I,m}"
+MetricAlarmExpression.yellowSummary      = "Yellow metric {operator} {yellow.value,m}"
+MetricAlarmExpression.redSummary         = "Red metric {operator} {red.value,m}"
+MetricAlarmExpression.nonPercent.valueSummary = "Metric {1,C} is equal to {2,I,l}"
+MetricAlarmExpression.nonPercent.yellowSummary = "Yellow Metric {operator} {yellow.value,l}"
+MetricAlarmExpression.nonPercent.redSummary = "Red Metric {operator} {red.value,l}"
+###
+HostConnectionStateAlarm.label           = "Host connection and power state"
+HostConnectionStateAlarm.summary         = "Default alarm to monitor host connection and power state"
+HostCPUUsageAlarm.label                  = "Host CPU usage"
+HostCPUUsageAlarm.summary                = "Default alarm to monitor host CPU usage"
+HostMemoryUsageAlarm.label               = "Host memory usage"
+HostMemoryUsageAlarm.summary             = "Default alarm to monitor host memory usage"
+HostEsxCosSwapAlarm.label                = "Host service console swap rates"
+HostEsxCosSwapAlarm.summary              = "Default alarm to monitor host service console memory swap rates"
+VmCPUUsageAlarm.label                    = "Virtual machine CPU usage"
+VmCPUUsageAlarm.summary                  = "Default alarm to monitor virtual machine CPU usage"
+VmMemoryUsageAlarm.label                 = "Virtual machine memory usage"
+VmMemoryUsageAlarm.summary               = "Default alarm to monitor virtual machine memory usage"
+DatastoreDiskUsageAlarm.label            = "Datastore usage on disk"
+DatastoreDiskUsageAlarm.summary          = "Default alarm to monitor datastore disk usage"
+###
+VmCPUReadyAlarm.label                    = "Virtual machine CPU ready"
+VmCPUReadyAlarm.summary                  = "Default alarm to monitor virtual machine CPU ready time"
+VmDiskLatencyAlarm.label                 = "Virtual machine total disk latency"
+VmDiskLatencyAlarm.summary               = "Default alarm to monitor virtual machine total disk latency"
+VmDiskAbortsAlarm.label                  = "Virtual machine disk commands canceled"
+VmDiskAbortsAlarm.summary                = "Default alarm to monitor number of virtual machine disk commands canceled"
+VmDiskResetAlarm.label                   = "Virtual machine disk reset"
+VmDiskResetAlarm.summary                 = "Default alarm to monitor number of virtual machine bus resets"
+###
+LicenseNonComplianceAlarm.label          = "License inventory monitoring"
+LicenseNonComplianceAlarm.summary        = "Default alarm to monitor if license inventory is not compliant"
+LicenseUserThresholdExceededAlarm.label     = "License user threshold monitoring"
+LicenseUserThresholdExceededAlarm.summary   = "Default alarm to monitor if a user-defined license threshold is exceeded"
+LicenseCapacityExceededAlarm.label     = "License capacity monitoring"
+LicenseCapacityExceededAlarm.summary   = "Default alarm to monitor if a license capacity is exceeded"
+HostLicenseEditionNotAllowed.label     = "The host license edition is not compatible with the vCenter Server license edition"
+HostLicenseEditionNotAllowed.summary   = "Default alarm to monitor if host license edition is not allowed"
+LicenseExpiredVc.label                 = "Expired vCenter Server license"
+LicenseExpiredVc.summary               = "Default alarm to monitor for expired vCenter Server license or evaluation period."
+LicenseExpiredHost.label               = "Expired host license"
+LicenseExpiredHost.summary             = "Default alarm to monitor for expired host license or evaluation period."
+LicenseExpiredVsan.label               = "Expired vSAN license"
+LicenseExpiredVsan.summary             = "Default alarm to monitor for expired vSAN license or evaluation period."
+SubscriptionLicenseExpiredVc.label     = "Expired vCenter Server time-limited license"
+SubscriptionLicenseExpiredVc.summary   = "Default alarm to monitor for expired vCenter Server time-limited license."
+SubscriptionLicenseExpiredHost.label   = "Expired host time-limited license"
+SubscriptionLicenseExpiredHost.summary = "Default alarm to monitor for expired host time-limited license."
+SubscriptionLicenseExpiredVsan.label   = "Expired vSAN time-limited license"
+SubscriptionLicenseExpiredVsan.summary = "Default alarm to monitor for expired vSAN time-limited license."
+VsanHostSsdOverUsageAlarm.label   = "Host flash capacity exceeds the licensed limit for vSAN"
+VsanHostSsdOverUsageAlarm.summary = "Default alarm to monitor if the capacity of the flash disks on the host exceeds the limit of the vSAN license"
+VsanClusterLicenseExpiryAlarm.label   = "Expired vSAN license"
+VsanClusterLicenseExpiryAlarm.summary = "Default alarm for expired vSAN license or evaluation period."
+VsanHostDiskErrorAlarm.label      = "Errors occurred on the disk(s) of a vSAN host"
+VsanHostDiskErrorAlarm.summary    = "Default alarm that monitors whether there are errors on the host disk(s) in the vSAN cluster."
+VmTimedoutStartingSecondaryAlarm.label      = "Timed out starting Secondary VM"
+VmTimedoutStartingSecondaryAlarm.summary    = "Default alarm to monitor time-outs when starting a Secondary VM"
+VmNoCompatibleHostForSecondaryAlarm.label   = "No compatible host for Secondary VM"
+VmNoCompatibleHostForSecondaryAlarm.summary = "Default alarm to monitor if no compatible hosts are available to place Secondary VM"
+VmFaultToleranceStateChangedAlarm.label     = "Virtual machine Fault Tolerance state changed"
+VmFaultToleranceStateChangedAlarm.summary   = "Default alarm to monitor changes in the Fault Tolerance state of a virtual machine"
+VmFaultToleranceLatencyStatusAlarm.label    = "Virtual Machine Fault Tolerance vLockStep interval Status Changed"
+VmFaultToleranceLatencyStatusAlarm.summary  = "Default Alarm to monitor changes in the Fault Tolerance Secondary vLockStep interval"
+ProcessorHealthAlarm.label = "Host processor status"
+ProcessorHealthAlarm.summary = "Default alarm to monitor processors.  See the host's Hardware Status tab for more details."
+MemoryHealthAlarm.label = "Host memory status"
+MemoryHealthAlarm.summary = "Default alarm to monitor memory.  See the host's Hardware Status tab for more details."
+FanHealthAlarm.label = "Host hardware fan status"
+FanHealthAlarm.summary = "Default alarm to monitor fans.  See the host's Hardware Status tab for more details."
+VoltageHealthAlarm.label = "Host hardware voltage"
+VoltageHealthAlarm.summary = "Default alarm to monitor voltage.  See the host's Hardware Status tab for more details."
+TemperatureHealthAlarm.label = "Host hardware temperature status"
+TemperatureHealthAlarm.summary = "Default alarm to monitor temperature.  See the host's Hardware Status tab for more details."
+PowerHealthAlarm.label = "Host hardware power status"
+PowerHealthAlarm.summary = "Default alarm to monitor power.  See the host's Hardware Status tab for more details."
+SystemBoardHealthAlarm.label = "Host hardware system board status"
+SystemBoardHealthAlarm.summary = "Default alarm to monitor system boards.  See the host's Hardware Status tab for more details."
+BatteryHealthAlarm.label = "Host battery status"
+BatteryHealthAlarm.summary = "Default alarm to monitor batteries.  See the host's Hardware Status tab for more details."
+OtherHealthAlarm.label = "Status of other host hardware objects"
+OtherHealthAlarm.summary = "Default alarm to monitor objects.  See the host's Hardware Status tab for more details."
+StorageHealthAlarm.label ="Host storage status"
+StorageHealthAlarm.summary = "Default alarm to monitor storage.  See the host's Hardware Status tab for more details."
+SELHealthAlarm.label ="Host IPMI System Event Log status"
+SELHealthAlarm.summary = "Monitors the fullness of the IPMI System Event Log.  See the host's Hardware Status tab for more details."
+BMCHealthAlarm.label ="Host Baseboard Management Controller status"
+BMCHealthAlarm.summary ="Monitors the status of the Baseboard Management Controller. See the host's Hardware Status tab for more details."
+HardwareSensorStateChange.label = "Host hardware sensor state"
+HardwareSensorStateChange.summary = "Default alarm to monitor sensor state change.  See the host's Hardware Status tab for more details."
+# Event-based alarms
+HostErrorAlarm.label ="Host error"
+HostErrorAlarm.summary = "Default alarm to monitor host error and warning events"
+VmErrorAlarm.label ="Virtual machine error"
+VmErrorAlarm.summary = "Default alarm to monitor virtual machine error and warning events"
+HostConnectivityAlarm.label = "Host connection failure"
+HostConnectivityAlarm.summary = "Default alarm to monitor host connection failure"
+IormNonVIWorkloadAlarm.label = "Unmanaged workload detected on SIOC-enabled datastore"
+IormNonVIWorkloadAlarm.summary = "Default alarm that is triggered if an unmanaged I/O workload is detected on a SIOC-enabled datastore"
+ThinProvisionedLunAlarm.label = "Thin-provisioned volume capacity threshold exceeded"
+ThinProvisionedLunAlarm.summary = "Default alarm that is triggered when the thin provisioning threshold on the storage array is exceeded for volume(s) backing the datastore"
+LunCapabilityAlarm.label = "Datastore capability alarm"
+LunCapabilityAlarm.summary = "Default alarm that is triggered when the capability status of volumes backing the datastore changes"
+VasaProviderDisconnectedAlarm.label = "VASA provider disconnected"
+VasaProviderDisconnectedAlarm.summary = "Default alarm that is triggered when a VASA provider is in a disconnected state"
+VasaProviderCertificateExpiryAlarm.label = "VASA Provider certificate expiration alarm"
+VasaProviderCertificateExpiryAlarm.summary = "Default alarm that is triggered when a VASA Provider certificate is about to expire"
+VcCertificateUpdateFailedAlarm.label = "Warnings detected after vCenter Server TLS certificate replacement"
+VcCertificateUpdateFailedAlarm.summary = "TLS certificate replaced successfully, but there are warnings detected. Please address the warnings by following the remediation instructions provided in the corresponding event description"
+WCPCertificateUpdateFailedAlarm.label = "Failed to update the certificates for WCP https://kb.vmware.com/s/article/90465"
+WCPCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the WCP service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+CPVMCertificateUpdateFailedAlarm.label = "Failed to auto-rotate the certificates for CPVM."
+CPVMCertificateUpdateFailedAlarm.summary = "Failed to auto-rotate the certificate for CPVM. Certificate auto-rotation will be retried every 12 hours. To manually rotate the certificates, please follow the steps listed in KB article: https://www.vmware.com/go/rotate-tanzu-supervisor-certificates"
+SphereletCertificateUpdateFailedAlarm.label = "Failed to auto-rotate the certificates for Spherelet"
+SphereletCertificateUpdateFailedAlarm.summary = "Failed to auto-rotate the certificates for Spherelet. Certificate auto-rotation will be re-tried. To manually rotate the certificates, please follow the steps listed in KB article: https://www.vmware.com/go/rotate-tanzu-supervisor-certificates"
+VLCMCertificateUpdateFailedAlarm.label = "Failed to update the certificates for VLCM https://kb.vmware.com/s/article/90465"
+VLCMCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the VLCM service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+UpdatemgrCertificateUpdateFailedAlarm.label = "Failed to update the certificates for Update manager https://kb.vmware.com/s/article/90465"
+UpdatemgrCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the update manager service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+VsanHealthCertificateUpdateFailedAlarm.label = "Failed to update the certificates for VSAN HEALTH https://kb.vmware.com/s/article/90465"
+VsanHealthCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the Vsan health service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+AutoDeployCertificateUpdateFailedAlarm.label = "Failed to update the certificates for Auto Deploy https://kb.vmware.com/s/article/90465"
+AutodeployCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the Auto Deploy service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+PODCertificateUpdateFailedAlarm.label = "Failed to update the certificates for POD https://kb.vmware.com/s/article/90465"
+PODCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the POD service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+SPSCertificateUpdateFailedAlarm.label = "Failed to update the certificates for SPS https://kb.vmware.com/s/article/90465"
+SPSCertificateUpdateFailedAlarm.summary = "The alarm that is triggered to indicate that the SPS service failed to load the new certificates. Please address the warning by following the remediation instructions provided in the corresponding event description"
+ClusterOperationCancelledDueToCertRefreshAlarm.label = "VUM task on cluster is cancelled. Refer https://kb.vmware.com/s/article/90842"
+ClusterOperationCancelledDueToCertRefreshAlarm.summary = "The alarm that is triggered when an in-flight VUM task on cluster is cancelled due to VC TLS certificate replacement"
+HostOperationCancelledDueToCertRefreshAlarm.label = "VUM task on host is cancelled. Refer https://kb.vmware.com/s/article/90842"
+HostOperationCancelledDueToCertRefreshAlarm.summary = "The alarm that is triggered when an in-flight VUM task on host is cancelled due to VC TLS certificate replacement"
+OperationCancelledDueToCertRefreshAlarm.label = "VUM task is cancelled. Refer https://kb.vmware.com/s/article/90842"
+OperationCancelledDueToCertRefreshAlarm.summary = "The alarm that is triggered when an in-flight VUM task on datacenter or folder is cancelled due to VC TLS certificate replacement"
+VmStorageComplianceAlarm.label = "VM storage compliance alarm"
+VmStorageComplianceAlarm.summary = "Default alarm that is triggered when the virtual disk goes out of compliance with the object-based storage"
+DatastoreStorageComplianceAlarm.label = "Datastore compliance alarm"
+DatastoreStorageComplianceAlarm.summary = "Default alarm that is triggered when the virtual disk on the datastore goes out of compliance with the object-based storage"
+VasaProviderRefreshCACertsAndCRLsFailureAlarm.label = "Refreshing CA certificates and CRLs for a VASA provider failed"
+VasaProviderRefreshCACertsAndCRLsFailureAlarm.summary = "Default alarm that monitors whether the refreshing of CA certificates and CRLs for some of the VASA providers has failed."
+VasaProviderObjectAlarm.label = "Object type storage alarm"
+VasaProviderObjectAlarm.summary = "Default alarm that is triggered when a VASA provider raises an Object type alarm on an entity backing the datastore"
+EsxiVasaClientCertificateProvisionFailureAlarm.label = "ESXi VASA client certificate provision has failed"
+EsxiVasaClientCertificateProvisionFailureAlarm.summary = "Default alarm that monitors whether the provision of ESXi VASA client certificate has failed"
+EsxiVasaClientCertificateRegisterFailureAlarm.label = "ESXi VASA client certificate register to some/all VPs has failed"
+EsxiVasaClientCertificateRegisterFailureAlarm.summary = "Default alarm that monitors whether register of ESXi VASA client certificate register to some/all VPs has failed"
+RegisterVcClientCertOnRenewalFailureAlarm.label = "Registering renewed VC Client Certificate failed for some/all VASA providers"
+RegisterVcClientCertOnRenewalFailureAlarm.summary = "Default alarm that monitors whether the register of renewed VC Client Certificate failed for any VASA provider"
+VcClientAndVpCertRefreshOnVmcaRootCertRotationFailureAlarm.label = "On VMCA Root Certificate rotation, register of VC Client Certificate and/or refresh of VASA VP certificate failed for some/all VASA 5.0 or greater VASA providers"
+VcClientAndVpCertRefreshOnVmcaRootCertRotationFailureAlarm.summary = "Default alarm that monitors whether register of VC Client Certificate and/or refresh of VP certificate on VMCA Root rotation failed for any VASA 5.0 or greater VASA provider"
+# Deprecated
+NetworkConnectivityAlarm.label ="Cannot connect to network"
+NetworkConnectivityAlarm.summary = "Default alarm to monitor network connectivity on a virtual switch"
+VCHealthStateChangedAlarm.label = "Health status monitoring"
+VCHealthStateChangedAlarm.summary = "Default alarm to monitor changes in overall health status. See vCenter Service Health in the Administration application for more details."
+SiocNotSupportedHostAlarm.label = "Pre-4.1 host connected to SIOC-enabled datastore"
+SiocNotSupportedHostAlarm.summary = "Default alarm that is triggered if a pre-4.1 host is connected to a SIOC-enabled datastore"
+
+NetworkConnectivityLostAlarm.label = "Network connectivity lost"
+NetworkConnectivityLostAlarm.summary = "Default alarm to monitor network connectivity on a virtual switch"
+NetworkRedundancyLostAlarm.label = "Network uplink redundancy lost"
+NetworkRedundancyLostAlarm.summary = "Default alarm to monitor loss of network uplink redundancy on a virtual switch"
+NetworkRedundancyDegradedAlarm.label = "Network uplink redundancy degraded"
+NetworkRedundancyDegradedAlarm.summary = "Default alarm to monitor network uplink redundancy degradation on a virtual switch"
+E1000TSO6NotSupportedAlarm.label = "IPv6 TSO not supported"
+E1000TSO6NotSupportedAlarm.summary = "Default alarm indicating that the guest operating system of a virtual machine sends IPv6 TSO packets that will be dropped"
+MigrateBindToVMKAlarm.label = "VMKernel NIC not configured correctly"
+MigrateBindToVMKAlarm.summary = "Default alarm for incorrectly configured VMkernel NIC"
+
+StorageConnectivityAlarm.label ="Cannot connect to storage"
+StorageConnectivityAlarm.summary = "Default alarm to monitor host connectivity to storage device"
+MigrationErrorAlarm.label = "Migration error"
+MigrationErrorAlarm.summary = "Default alarm to monitor if a virtual machine cannot migrate, relocate, or is orphaned"
+ExitStandbyErrorAlarm.label = "Exit standby error"
+ExitStandbyErrorAlarm.summary = "Default alarm to monitor if a host cannot exit standby mode"
+
+# vSphere HA alarms
+HAinsufficientFailoverResources.label = "Insufficient vSphere HA failover resources"
+HAinsufficientFailoverResources.summary = "Default alarm to alert when there are insufficient cluster resources for vSphere HA to guarantee failover"
+HAfailoverInProgress.label = "vSphere HA failover in progress"
+HAfailoverInProgress.summary = "Default alarm to alert when vSphere HA is in the process of failing over virtual machines"
+HAcannotFindMaster.label = "Cannot find vSphere HA master agent"
+HAcannotFindMaster.summary = "Default alarm to alert when vCenter Server has been unable to connect to a vSphere HA master agent for a prolonged period"
+HAhostStatus.label = "vSphere HA host status"
+HAhostStatus.summary = "Default alarm to monitor health of a host as reported by vSphere HA"
+HAfailoverFailed.label = "vSphere HA virtual machine failover failed"
+HAfailoverFailed.summary = "Default alarm to alert when vSphere HA failed to failover a virtual machine"
+HAvmMonitoringAction.label = "vSphere HA virtual machine monitoring action"
+HAvmMonitoringAction.summary = "Default alarm to alert when vSphere HA reset a virtual machine"
+HAvmMonitoringError.label = "vSphere HA virtual machine monitoring error"
+HAvmMonitoringError.summary = "Default alarm to alert when vSphere HA failed to reset a virtual machine"
+VmcpTerminateVmAborted.label = "vSphere HA VM Component Protection could not power off a virtual machine"
+VmcpTerminateVmAborted.summary = "Default alarm that is triggered when vSphere HA VM Component Protection cannot power off a virtual machine with an inaccessible datastore"
+
+# Deprecated vSphere HA alarms (as of 5.0)
+VmHighAvailabilityError.label = "Virtual machine high availability error"
+VmHighAvailabilityError.summary = "Default alarm to monitor high availability errors on a virtual machine"
+HighAvailabilityError.label = "Cluster high availability error"
+HighAvailabilityError.summary = "Default alarm to monitor high availability errors on a cluster"
+HighAvailabilityAction.label = "Cluster high availability action in progress"
+HighAvailabilityAction.summary = "Default alarm that is triggered when a high availability failover is in progress"
+
+# Backup Restore alarms
+BackupStatusVc.label = "Backup job status"
+BackupStatusVc.summary = "Default alarm to monitor backup job status."
+
+LicenseError.label = "License error"
+LicenseError.summary = "Default alarm to monitor license errors"
+HealthStatusChangedAlarm.label = "Health status changed alarm"
+HealthStatusChangedAlarm.summary = "Default alarm to monitor changes to service and extension health status"
+VmComponentProtectionRestartErrorAlarm.label = "Virtual machine component protection restart error"
+VmComponentProtectionRestartErrorAlarm.summary = "Default alarm that is triggered when vSphere HA VM Component Protection fails to restart a virtual machine"
+###
+EventAlarmExpression.label               = "Event"
+EventAlarmExpression.summary             = "Event alarm expression"
+EventAlarmExpression.statusSummary       = "Status = {status}"
+###
+CurrentValue.label                       = "Current values for metric/state"
+EventDetail.label                        = "Event details"
+
+### StoragePod Related Alarms
+StoragePodSDRSRecommendation.label       = "Storage DRS recommendation"
+StoragePodSDRSRecommendation.summary     = "Alarm that monitors a Storage DRS recommendation"
+
+StoragePodSDRSNotSupportedHost.label     = "Storage DRS is not supported on a host"
+StoragePodSDRSNotSupportedHost.summary   = "Alarm that monitors and alerts when Storage DRS is not supported on a host"
+
+StoragePodOutOfSpace.label               = "Datastore cluster is out of space"
+StoragePodOutOfSpace.summary             = "Alarm that monitors when a datastore cluster is out of space"
+
+DatastoreInMultipleDatacenters.label     = "Datastore is in multiple datacenters"
+DatastoreInMultipleDatacenters.summary   = "Datastore in a datastore cluster is visible in more than one datacenter"
+
+ConsistencyGroupViolation.label          = "SRM Consistency Group Violation"
+ConsistencyGroupViolation.summary        = "Datastore cluster has datastores that belong to different SRM Consistency Groups"
+
+### Vds healthcheck Alarms
+VdsHCVlanTrunkedAlarm.label = "vSphere Distributed Switch VLAN trunked status"
+VdsHCVlanTrunkedAlarm.summary = "Default alarm to monitor changes in vSphere Distributed Switch VLAN trunked status"
+
+VdsHCMTUMatchAlarm.label = "vSphere Distributed Switch MTU matched status"
+VdsHCMTUMatchAlarm.summary = "Default alarm to monitor changes in vSphere Distributed Switch MTU matched status"
+
+VdsHCMTUSupportedAlarm.label = "vSphere Distributed Switch MTU supported status"
+VdsHCMTUSupportedAlarm.summary = "Default alarm to monitor changes in vSphere Distributed Switch MTU supported status"
+
+VdsHCTeamingMatchAlarm.label = "vSphere Distributed Switch teaming matched status"
+VdsHCTeamingMatchAlarm.summary = "Default alarm to monitor changes in vSphere Distributed Switch teaming matched status"
+
+VmAdapterResvervationStatus.label = "Virtual Machine network adapter reservation status"
+VmAdapterResvervationStatus.summary = "Default alarm to monitor changes in the reservation status of a virtual machine network adapter"
+
+VmDiskConsolidationNeededAlarm.label = "Virtual machine Consolidation Needed status"
+VmDiskConsolidationNeededAlarm.summary = "Default alarm that is triggered when virtual machine Consolidation Needed status is set"
+
+### vSphere Flash Alarms
+VFlashResourceHealthAlarm.label = "Host virtual flash resource status"
+VFlashResourceHealthAlarm.summary = "Default alarm to monitor the VMware Flash Read Cache resource status on the host"
+
+VFlashResourceUsageAlarm.label = "Host virtual flash resource usage"
+VFlashResourceUsageAlarm.summary = "Default alarm to monitor the VMware Flash Read Cache resource usage on the host"
+
+### HOST VSAN VP registration alarm
+HostVendorProviderRegistrationAlarm.label = "Registration/unregistration of a VASA vendor provider on a vSAN host fails"
+HostVendorProviderRegistrationAlarm.summary = "Default alarm that monitors whether the registration or unregistration of a VASA vendor provider on a vSAN host fails."
+
+### HOST IoFilter VP registration alarm
+IoFilterHostVendorProviderRegistrationAlarm.label = "Registration/unregistration of third-party IO filter storage providers fails on a host"
+IoFilterHostVendorProviderRegistrationAlarm.summary = "Default alarm that monitors whether vCenter Server fails to register or unregister third-party IO filter storage providers on a host."
+
+### IoFilter filter management operation alarm
+IoFilterManagementOperationAlarm.label = "vSphere APIs for IO Filtering (VAIO) Filter Management Operations"
+IoFilterManagementOperationAlarm.summary = "Default alarm that is triggered when vSphere APIs for IO Filtering (VAIO) operations (installing/uninstalling/upgrading filters) fail for some hosts in the cluster"
+
+### Component Health Alarms
+ServiceControlAgentHealthAlarm.label = "Service Control Agent Health Alarm"
+ServiceControlAgentHealthAlarm.summary = "Alarm that is triggered when the Service Control Agent is not reachable."
+IdentityHealthAlarm.label = "Identity Health Alarm"
+IdentityHealthAlarm.summary = "Identity service alarm to monitor health status"
+VsphereClientHealthAlarm.label = "vSphere Client Health Alarm"
+VsphereClientHealthAlarm.summary = "vSphere Client service alarm to monitor health status"
+VsphereUiHealthAlarm.label = "vSphere UI Health Alarm"
+VsphereUiHealthAlarm.summary = "vSphere UI service alarm to monitor health status"
+EAMHealthAlarm.label = "ESX Agent Manager Health Alarm"
+EAMHealthAlarm.summary = "ESX Agent Manager service alarm to monitor health status"
+MsgBusHealthAlarm.label = "Message Bus Config Health Alarm"
+MsgBusHealthAlarm.summary = "Message Bus Config service alarm to monitor health status"
+LicenseHealthAlarm.label = "Cis License Health Alarm"
+LicenseHealthAlarm.summary = "Cis License service alarm to monitor health status"
+ApplmgmtHealthAlarm.label = "Appliance Management Health Alarm"
+ApplmgmtHealthAlarm.summary = "Appliance Management service alarm to monitor health status"
+
+# Deprecated: replaced by VpxdSvcsHealthAlarm
+InventoryHealthAlarm.label = "Inventory Health Alarm"
+InventoryHealthAlarm.summary = "Inventory service alarm to monitor health status"
+
+VpxdSvcsHealthAlarm.label = "VMware vCenter-Services Health Alarm"
+VpxdSvcsHealthAlarm.summary = "VMware vCenter-Services alarm to monitor health status"
+HvcHealthAlarm.label = "Hybrid vCenter Service Health Alarm"
+HvcHealthAlarm.summary = "Default alarm that monitors the health status of Hybrid vCenter Service"
+VCServerHealthAlarm.label = "vCenter Server Health Alarm"
+VCServerHealthAlarm.summary = "vCenter Server service alarm to monitor health status"
+DSHealthAlarm.label = "Data Service Health Alarm"
+DSHealthAlarm.summary = "Data Service service alarm to monitor health status"
+RBDHealthAlarm.label = "RBD Health Alarm"
+RBDHealthAlarm.summary = "RBD service alarm to monitor health status"
+VSMHealthAlarm.label = "vService Manager Health Alarm"
+VSMHealthAlarm.summary = "vService Manager service alarm to monitor health status"
+PerfchartsHealthAlarm.label = "Performance Charts Service Health Alarm"
+PerfchartsHealthAlarm.summary = "Performance Charts Service alarm to monitor health status"
+ContentLibraryServiceHealthAlarm.label = "Content Library Service Health Alarm"
+ContentLibraryServiceHealthAlarm.summary = "Default alarm that monitors the health status of the VMware Content Library Service."
+
+# Deprecated
+TsHealthAlarm.label = "Transfer Service Health Alarm"
+TsHealthAlarm.summary = "Default alarm that monitors the health status of the VMware Transfer Service."
+
+NetdumperHealthAlarm.label = "VMware vSphere ESXi Dump Collector Health Alarm"
+NetdumperHealthAlarm.summary = "Default alarm that monitors the health status of the VMware vSphere ESXi Dump Collector Service."
+VapiEndpointHealthAlarm.label = "VMware vAPI Endpoint Service Health Alarm"
+VapiEndpointHealthAlarm.summary = "Default alarm that monitors the health status of the VMware vAPI Endpoint Service."
+
+# Deprecated
+VwsHealthAlarm.label = "VMware System and Hardware Health Manager Service Health Alarm"
+VwsHealthAlarm.summary = "Default alarm that monitors the health status of the VMware System and Hardware Health Manager Service."
+
+SpsHealthAlarm.label = "VMware vSphere Profile-Driven Storage Service Health Alarm"
+SpsHealthAlarm.summary = "Default alarm that monitors the health status of the VMware vSphere Profile-Driven Storage Service."
+
+# Deprecated
+VmwareSyslogHealthAlarm.label = "VMware Common Logging Service Health Alarm"
+VmwareSyslogHealthAlarm.summary = "Default alarm that monitors the health status of the VMware Common Logging Service."
+
+VmwareVpostgresHealthAlarm.label = "PostgreSQL Service Health Alarm"
+VmwareVpostgresHealthAlarm.summary = "Default alarm that monitors the health status of the PostgreSQL Service."
+VmwarePgArchiverHealthAlarm.label = "PostgreSQL Archiver Service Health Alarm"
+VmwarePgArchiverHealthAlarm.summary = "Default alarm that monitors the health status of PostgreSQL Archiver Service."
+VmwareRhttpproxyHealthAlarm.label = "VMware HTTP Reverse Proxy Service Health Alarm."
+VmwareRhttpproxyHealthAlarm.summary = "Default alarm that monitors the health status of HTTP Reverse Proxy Service."
+StatsmonitorHealthAlarm.label = "vCenter Stats Monitor Service Health Alarm."
+StatsmonitorHealthAlarm.summary = "Default alarm that monitors the health status of vCenter Stats Monitor Service."
+VchaHealthAlarm.label = "vCenter HA Service Health Alarm."
+VchaHealthAlarm.summary = "Default alarm that monitors the health status of vCenter HA Service."
+PscHealthAlarm.label = "PSC Service Health Alarm."
+PscHealthAlarm.summary = "Default alarm that monitors the health status of PSC Service."
+ImageBuilderHealthAlarm.label = "Image Builder Service Health Alarm"
+ImageBuilderHealthAlarm.summary = "Default alarm that monitors the health status of Image Builder Service."
+UpdateMgrHealthAlarm.label = "Update Manager Service Health Alarm"
+UpdateMgrHealthAlarm.summary = "Default alarm that monitors the health status of Update Manager Service."
+VmonApiHealthAlarm.label = "vMon API Service Health Alarm"
+VmonApiHealthAlarm.summary = "Default alarm that monitors the health status of vMon API Service."
+ComponentMgrHealthAlarm.label = "Component Manager Service Health Alarm"
+ComponentMgrHealthAlarm.summary = "Default alarm that monitors the health status of Component Manager Service."
+VsphereAuthProxyHealthAlarm.label = "VMware vSphere Authentication Proxy Service Health Alarm"
+VsphereAuthProxyHealthAlarm.summary = "Default alarm that monitors the health status of VMware vSphere Authentication Proxy Service."
+VsanHealthAlarm.label = "vSAN Health Service Alarm"
+VsanHealthAlarm.summary = "Default alarm that monitors the health status of vSAN Health Services."
+
+HostCertsUpdateFailedAlarm.label = "ESXi Host Certificates Update Failure Status"
+HostCertsUpdateFailedAlarm.summary = "Alarm to indicate that the certificates update on an ESXi host failed"
+HostCertStatusAlarm.label = "ESXi Host Certificate Status"
+HostCertStatusAlarm.summary = "Alarm to indicate certificate status of an ESXi host"
+HostCertVerificationFailedAlarm.label = "ESXi Host Certificate Verification Failure Status"
+HostCertVerificationFailedAlarm.summary = "Alarm to indicate that the ESXi host certificate verification failed"
+HostCertManagementModeChangedAlarm.label = "When ESXi Certificate Mode is set to custom it is mandatory to add the custom CA certificates to vCenter trusted root store before updating the host certificates"
+HostCertManagementModeChangedAlarm.summary = "Alarm to monitor changes in the certificate management mode of vCenter Server"
+HostCertManagementModeThumbprintAlarm.label = "ESXi Certificate Mode 'thumbprint' is deprecated"
+HostCertManagementModeThumbprintAlarm.summary = "ESXi Certificate Mode is set to deprecated value, 'thumbprint'. Use a supported mode ('vmca' or 'custom')."
+
+MachineSSLCertificateStatusAlarm.label = "MACHINE_SSL_CERT certificate in VECS is about to expire https://knowledge.broadcom.com/external/article?articleNumber=318973"
+MachineSSLCertificateStatusAlarm.summary = "This alarm indicates that Machine SSL certificate in VECS store is getting close to its expiration date."
+
+MachineSSLCertificateExpiredAlarm.label = "MACHINE_SSL_CERT certificate in VECS has expired https://knowledge.broadcom.com/external/article?articleNumber=318973"
+MachineSSLCertificateExpiredAlarm.summary = "This alarm indicates that Machine SSL certificate in VECS store has expired."
+
+TrustedRootCertificateStatusAlarm.label = "Certificate(s) in VECS TRUSTED_ROOTS store is about to expire https://knowledge.broadcom.com/external/article?articleNumber=318973"
+TrustedRootCertificateStatusAlarm.summary = "This alarm indicates that some certificates in TRUSTED_ROOTS store of VECS is getting close to its expiration date."
+
+TrustedRootCertificateExpiredAlarm.label = "Certificate(s) in VECS TRUSTED_ROOTS store has expired https://knowledge.broadcom.com/external/article?articleNumber=318973"
+TrustedRootCertificateExpiredAlarm.summary = "This alarm indicates that some certificates in TRUSTED_ROOTS store of VECS has expired."
+
+SolutionUserCertificateStatusAlarm.label = "Solution user certificate(s) in VECS is about to expire https://knowledge.broadcom.com/external/article?articleNumber=318973"
+SolutionUserCertificateStatusAlarm.summary = "This alarm indicates that solution user certificate(s) in VECS is getting close to its expiration date."
+
+SolutionUserCertificateExpiredAlarm.label = "Solution user certificate(s) in VECS has expired https://knowledge.broadcom.com/external/article?articleNumber=318973"
+SolutionUserCertificateExpiredAlarm.summary = "This alarm indicates that solution user certificate(s) in VECS has expired."
+
+DataEnciphermentCertificateStatusAlarm.label = "Data-encipherment certificate in VECS is about to expire https://knowledge.broadcom.com/external/article?articleNumber=318973"
+DataEnciphermentCertificateStatusAlarm.summary = "This alarm indicates that data-encipherment certificate in VECS is getting close to its expiration date."
+
+DataEnciphermentCertificateExpiredAlarm.label = "Data-encipherment certificate in VECS has expired https://knowledge.broadcom.com/external/article?articleNumber=318973"
+DataEnciphermentCertificateExpiredAlarm.summary = "This alarm indicates that data-encipherment certificate in VECS has expired."
+
+SmsCertificateStatusAlarm.label = "SMS certificate in VECS is about to expire https://knowledge.broadcom.com/external/article?articleNumber=318973"
+SmsCertificateStatusAlarm.summary = "This alarm indicates that SMS certificate in VECS is getting close to its expiration date."
+
+SmsCertificateExpiredAlarm.label = "SMS certificate in VECS has expired https://knowledge.broadcom.com/external/article?articleNumber=318973"
+SmsCertificateExpiredAlarm.summary = "This alarm indicates that SMS certificate in VECS has expired."
+
+KMSClientCertificateStatusAlarm.label = "KMS Client Certificate Status"
+KMSClientCertificateStatusAlarm.summary = "This alarm indicates that the KMS client certificate is getting close to its expiration date."
+KMSServerCertificateStatusAlarm.label = "KMS Server Certificate Status"
+KMSServerCertificateStatusAlarm.summary = "This alarm indicates that the KMS server certificate is getting close to its expiration date."
+
+VmDirStateChangedAlarm.label = "vCenter Server Replication State Change Alarm"
+VmDirStateChangedAlarm.summary = "This alarm indicates that the vCenter server replication state has changed"
+VmdirReplicationStatusAlarm.label = "vCenter Server Replication Status Change Alarm"
+VmdirReplicationStatusAlarm.summary = "This alarm indicates that the vCenter server replication status has changed"
+
+VCHAHealthAlarm.label = "vCenter HA Cluster Health Alarm"
+VCHAHealthAlarm.summary = "Default alarm that monitors the health of vCenter HA"
+PSCHAHealthAlarm.label = "PSC HA Health Alarm"
+PSCHAHealthAlarm.summary = "Default alarm that monitors the health of PSC HA"
+FailoverFailedAlarm.label = "Failover Failed Alarm"
+FailoverFailedAlarm.summary = "Alarm to indicate that failover has failed"
+VmdirHealthAlarm.label = "VMware Directory Service Health Alarm"
+VmdirHealthAlarm.summary = "Default alarm that monitors the health of VMware Directory Service"
+
+VchaRduAlarm.label = "vCenter HA deploy failed during vCenter upgrade"
+VchaRduAlarm.summary = "This alarm indicates that the vCenter HA deployment failed during vCenter upgrade"
+
+DBHealthAlarm.label = "Database Health Alarm"
+DBHealthAlarm.summary = "Default alarm that monitors the database health status."
+
+HostIpConflictAlarm.label = "Host IP Address Conflict Alarm"
+HostIpConflictAlarm.summary = "Default alarm to indicate that the host has taken an IP address that conflicts with another host."
+
+TPMAttestationAlarm.label = "Host TPM attestation alarm"
+TPMAttestationAlarm.summary = "Default alarm that indicates host TPM attestation failure."
+
+VMRunningOnTPMAttestationFailedHostAlarm.label = "Virtual machine running on TPM attestation failed host alarm"
+VMRunningOnTPMAttestationFailedHostAlarm.summary = "This alarm is triggered when virtual machines are running on a host which has failed TPM attestation. Migrate these virtual machines to other hosts."
+
+### First Class Disk alarms.
+VStorageObjectInfraNamespacePolicyAlarm.label = "Improved virtual disk infrastructure namespaces storage policy alarm"
+VStorageObjectInfraNamespacePolicyAlarm.summary = "Default alarm to monitor improved virtual disk infrastructure namespace storage policy status on the host."
+
+VStorageObjectInfraCatalogAlarm.label = "Improved virtual disk infrastructure's catalog health alarm"
+VStorageObjectInfraCatalogAlarm.summary = "Default alarm to monitor improved virtual disk infrastructure's catalog health status on the host."
+
+### VMCrypt alarms
+VmCryptoStateLockedAlarm.label = "Virtual Machine Locked Alarm"
+VmCryptoStateLockedAlarm.summary = "Alarm to indicate that the virtual machine is locked."
+
+### Host Crypto State alarms
+HostRequiresEncryptionModeEnabledAlarm.label = "Host Requires Encryption Mode Enabled Alarm"
+HostRequiresEncryptionModeEnabledAlarm.summary = "Alarm to indicate that the host requires encryption mode enabled."
+
+### Burst Filter alarms
+EventBurstAlarm.label           = "Event Burst Alarm"
+EventBurstAlarm.summary         = "Alarm to indicate that currently there is at least one event burst in the system."
+
+### WCP Service alarms
+WcpSvcAlarm.label = "WCP Service Health Alarm"
+WcpSvcAlarm.summary = "Default alarm that monitors the health status of WCP Service."
+
+### Cluster store alarms
+ClusterStoreDegradedAlarm.label = "Cluster metadata store degraded alarm"
+ClusterStoreDegradedAlarm.summary = "Alarm that indicates that cluster metadata store degraded on the host."
+
+###Alarms email tempalte
+### TriggeredAlarm
+TriggeredAlarm.Status.gray.label                                   = "Unset"
+TriggeredAlarm.Status.gray.summary                                 = "Does not change the entity status"
+TriggeredAlarm.Status.green.label                                  = "Normal"
+TriggeredAlarm.Status.green.summary                                = "Indicates normal operation"
+TriggeredAlarm.Status.yellow.label                                 = "Warning"
+TriggeredAlarm.Status.yellow.summary                               = "Indicates an error"
+TriggeredAlarm.Status.red.label                                    = "Critical"
+TriggeredAlarm.Status.red.summary                                  = "Indicates an  critical error"
+###
+###
+Email.statefulAlarm.subject                         = "[{newStatus}] Alarm {alarmName} on {targetType} {targetName}"
+Email.statefulAlarm.body                            =  "This email is to notify you that an alarm has been triggered in your vCenter:<br><b>[{newStatus}] Alarm {alarmName} on {targetType} {targetName}<br></b>because <b>{targetType} {triggeringSummary}.</b><br><table><tr><td>Alarm name</td><td>{alarmName}</td></tr><tr><td>Description</td><td>{alarmDescription}</td></tr><tr><td>Target</td><td>{targetType} {targetName}</td></tr><tr><td>Status</td><td>{newStatus} (previous status: {oldStatus})</td></tr><tr><td>Triggered time</td><td>{triggeredTime}</td></tr></table>"
+###
+###
+Email.statefulEventAlarm.subject                         = "[{newStatus}] Alarm {alarmName} on {targetType} {targetName}"
+Email.statefulEventAlarm.body                            =  "This email is to notify you that an alarm has been triggered in your vCenter:<br><b>[{newStatus}] Alarm {alarmName} on {targetType} {targetName}<br></b>because <b>{eventDescription}.</b><br><table><tr><td>Alarm name</td><td>{alarmName}</td></tr><tr><td>Description</td><td>{alarmDescription}</td></tr><tr><td>Target</td><td>{targetType} {targetName}</td></tr><tr><td>Status</td><td>{newStatus} (previous status: {oldStatus})</td></tr><tr><td>Triggered time</td><td>{triggeredTime}</td></tr></table>"
+###
+
+###
+Email.statelessEventAlarm.subject                         = "Alarm {alarmName} on {targetType} {targetName}"
+Email.statelessEventAlarm.body                            =  "This email is to notify you that an alarm has been triggered in your vCenter:<br><b>Alarm {alarmName} on {targetType} {targetName}<br></b>because <b>{eventDescription}.</b><br><table><tr><td>Alarm name</td><td>{alarmName}</td></tr><tr><td>Description</td><td>{alarmDescription}</td></tr><tr><td>Target</td><td>{targetType} {targetName}</td></tr><tr><td>Triggered time</td><td>{triggeredTime}</td></tr></table>"
+###
+
+Vm.label                  = "VM"
+Host.label                = "Host"
+ComputeResource.label     = "Resource-pool"
+Datacenter.label          = "Datacenter"
+Datastore.label           = "Datastore"
+Network.label             = "Network"
+Folder.label              = "Folder"
+DVS.label                 = "vSphere Distributed Switch"
+DVP.label                 = "vSphere Distributed Portgroup"
+Entity.label              = "Entity"
+
+### KMS Unreachable alarm
+KMSUnreachableAlarm.label = "Key Management Server Health Status Alarm"
+KMSUnreachableAlarm.summary = "Alarm to indicate that key management server is not reachable"
+
+### VMC External Storage Core Storage APIs Alarm
+VMCExternalStorageCoreStorageAPIsAlarm.label = "VMC External Storage Core Storage APIs Alarm"
+VMCExternalStorageCoreStorageAPIsAlarm.summary = "Alarm to notify the runtime failure of the Core Storage APIs for VMC External Storage"
+###
+
+### Diskchain using mixed keys alarm
+DiskchainMixedKeysAlarm.label = "Diskchain Using Mixed Keys Alarm"
+DiskchainMixedKeysAlarm.summary = "Alarm to notify that a diskchain is encrypted with mixed keys"
+###
+
+### Langley Alarms
+LangleyHostNotConfiguredAlarm.label   = "Trusted Infrastructure Host Not Configured Alarm"
+LangleyHostNotConfiguredAlarm.summary = "Alarm to notify that an ESX Host, member of Trust Authority Cluster or Trusted Cluster, is not configured."
+LangleyHostDecommissionAlarm.label   = "Trusted Infrastructure Host Decommission Alarm"
+LangleyHostDecommissionAlarm.summary = "Alarm to notify that an ESX Host, moved out of a Trust Authority Cluster or Trusted Cluster, must be decommissioned."
+TaHostAttestStatusAlarm.label = "Trusted Host Attestation Failed Alarm"
+TaHostAttestStatusAlarm.summary = "Default alarm which indicates that a Trusted Host has failed attestation with the configured Trust Authority attestation service(s)."
+TaStsCertificatesChangeAlarm.label   = "STS Certificates Change Alarm"
+TaStsCertificatesChangeAlarm.summary = "STS Certificates have changed. Trust authority cluster needs to be reconfigured. Please execute step 'Import the Trusted Host Information to the Trust Authority Cluster' from 'vSphere Trust Authority manual'."
+###
+
+
+### DPUTRUST alarms start
+EsxtokendDpuTrustStatusAlarm.label   = "Esxtokend dpu-trust failed alarm"
+EsxtokendDpuTrustStatusAlarm.summary = "DPU trust failed"
+### DPUTRUST alarms end
+### Host crypto disabled alarm
+HostCryptoDisabledAlarm.label = "Host Crypto Disabled Alarm"
+HostCryptoDisabledAlarm.summary = "Alarm to notify that host is crypto disabled."
+
+### STS Signing Certificates Expiry Warning Alarm
+STSCertExpiryWarningAlarm.label = "STS Signing Certificates are about to expire"
+STSCertExpiryWarningAlarm.summary = "Renew STS Signing Certificates, follow https://kb.vmware.com/s/article/79248"
+
+### Identity Source LDAP Certificate Expiry Warning Alarm
+LDAPCertExpiryWarningAlarm.label = "Identity Source LDAP Certificate is about to expire"
+LDAPCertExpiryWarningAlarm.summary = "Renew Identity Source LDAP Certificate"
+
+### WS1 User/Group Sync Token Expiry Warning Alarm
+WS1SyncTokenExpiryWarningAlarm.label = "Identity Provider Users and Groups token is about to expire"
+WS1SyncTokenExpiryWarningAlarm.summary = "Renew Identity Provider Users and Groups token by navigating to the Identity Provider configuration page"
+
+### WS1 External IDP SSL Trust Expiry Warning Alarm
+WS1SSLTrustExpiryWarningAlarm.label = "WS1 External IDP SSL Trust Certificates are about to expire"
+WS1SSLTrustExpiryWarningAlarm.summary = "Renew External IDP SSL Trust Certificates by navigating to the Identity Provider configuration page"
+
+### Host Time Sync Alarm
+HostTimeSyncAlarm.label = "Host has lost time synchronization"
+HostTimeSyncAlarm.summary = "Review the host Time Service Configuration and current operational status report."
+
+### Key Provider Not Backed Up Alarm
+KeyProviderNotBackedUpAlarm.label = "Key Provider Not Backed Up"
+KeyProviderNotBackedUpAlarm.summary = "Alarm to indicate that one or more key providers require backup."
+
+### Host Config Encryption Recovery Key Alarm
+HostTpmConfigEncryptionAlarm.label = "TPM Encryption Recovery Key Backup Alarm"
+HostTpmConfigEncryptionAlarm.summary = "Default alarm which indicates that host configuration is TPM encrypted. Recovery key backup may be performed in order to restore host configuration on TPM failure. https://knowledge.broadcom.com/external/article/323401"
+
+### Memory mode alarms
+HostMemoryModeHighActiveDRAMAlarm.label = "Host Memory Mode High Active DRAM Usage"
+HostMemoryModeHighActiveDRAMAlarm.summary = "The alarm is triggered when the active memory of all virtual machines on the host exceeds the required DRAM occupancy when the host is configured in Memory Mode. Please consider migrating some virtual machines to other hosts."
+
+VmHighPMemBandwidthAlarm.label = "Virtual Machine High PMem Bandwidth Usage"
+VmHighPMemBandwidthAlarm.summary = "The alarm is triggered when the 'Host Memory Mode High Active DRAM' condition is satisfied and this virtual machine's PMem bandwidth is greater than the required DRAM Bandwidth. Please consider migrating this virtual machine to another host."
+
+### Tiering Memory alarms
+TieredHostHighActiveDRAMAlarm.label = "Tiered Host High Active DRAM Memory Usage"
+TieredHostHighActiveDRAMAlarm.summary = "The alarm is triggered when the active memory of all virtual machines on the host exceeds the required DRAM occupancy when the host is configured as tiered host. Please consider migrating some virtual machines to other hosts."
+
+TieredVmHighTier1BandwidthAlarm.label = "Virtual Machine Tier 1 High Bandwidth Usage"
+TieredVmHighTier1BandwidthAlarm.summary = "The alarm is triggered after 'Tiered Host High Active DRAM Memory Usage' alarm is raised and this virtual machine's tier 1 bandwidth is higher than expected. Please consider migrating this virtual machine to another host."
+
+### Capacity based datastore usage alarm
+CapacityBasedDatastoreUsageAlarm.label = "Datastore usage on disk based on available capacity"
+CapacityBasedDatastoreUsageAlarm.summary = "Default alarm to monitor datastore disk usage based on available capacity applicable for datastore"
+
+###
+VmVnicUptv2Inactive.label = "The UPT(Uniform Passthrough) is not activated on network adapter"
+VmVnicUptv2Inactive.summary = "Alarm to indicate that UPT(Uniform Passthrough) fails to activate on network adapter"
+
+### Autonomous Cluster Disconnected Alarm
+AutonomousClusterHealthAlarm.label = "Autonomous cluster disconnected"
+AutonomousClusterHealthAlarm.summary = "Autonomous cluster has been disconnected"
+
+### vCLS deploymentMode ABSENT with DRS-enabled Alarm
+VclsDrsEnabledClusterDeploymentModeAbsentAlarm.label = "vSphere Cluster Services are disabled by Retreat Mode. vSphere DRS is not functioning and vSphere HA will not perform optimally"
+VclsDrsEnabledClusterDeploymentModeAbsentAlarm.summary = "Alarm to indicate that DRS is enabled, but vCLS mode is set to ABSENT."
+
+### vCLS deploymentMode ABSENT with HA-enabled and DRS-disabled Alarm
+VclsHaEnabledDrsDisabledClusterDeploymentModeAbsentAlarm.label = "vSphere Cluster Services are disabled by Retreat Mode. vSphere HA will not perform optimally"
+VclsHaEnabledDrsDisabledClusterDeploymentModeAbsentAlarm.summary = "Alarm to indicate that HA is enabled, DRS is disabled, and vCLS mode is set to ABSENT."
+
+### authz manager Alarm
+VcAuthzDataNotSyncedAlarm.label = "Authorization data sync failure."
+VcAuthzDataNotSyncedAlarm.summary = "Authorization data is not being synced, thus any latest changes are currently not taken into account."
+
+### vpxd memory usage Alarm
+VpxdMemoryUsageLimitHitAlarm.label = "Warning: VPXD memory usage overload"
+VpxdMemoryUsageLimitHitAlarm.summary = "VPXD memory usage has passed the configured soft limit."
+
+### envoy connection overload Alarm
+EdgeEnvoyClientConnectionsOverload.label = "Increased client connections load on vCenter edge envoy"
+EdgeEnvoyClientConnectionsOverload.summary = "Alarm to indicate the client connections load on vCenter edge envoy."
+
+### csi datastore inaccesible alarm
+CSISharedDatastoreNotAccessibleAlarm.label              = "Datastore no longer accessible to all hosts in the cluster compute resource"
+CSISharedDatastoreNotAccessibleAlarm.summary            = "This alarm is triggered when a datastore that is previously accessible to all hosts in the cluster compute resource is no longer accessible to those hosts."
+
+### DPU failed alarm
+DpuFailedAlarm.label = "DPU experienced a failure or DPU removed"
+DpuFailedAlarm.summary = "DPU with dpuId {dpuId} experienced a failure or it was removed."
+
+### DPU failover alarm
+DpuFailoverAlarm.label = "DPU failover happened on offloading enabled vds"
+DpuFailoverAlarm.summary = "DPU failover from {fromDpu} to {toDpu} on vds {vds} has been started."
+
+
+## DVSRuntimeInfo alarm
+HostMemberVdsStatusAlarm.label =   "The VDS status becomes down on some hosts"
+HostMemberVdsStatusAlarm.summary = "Alarm to indicate that vds status is down on some hosts"
+
+### Extension alarm
+ExtensionWithUnsupportedThumbprintModeAlarm.label = "Extensions registered with thumbprint hash algorithm not supported by vCenter Server"
+ExtensionWithUnsupportedThumbprintModeAlarm.summary = "Alarm to indicate that extensions are registered with thumbprint hash algorithm not supported by vCenter Server."
+
+### WCP (VM Service) registervm failed alarm
+WCPRegisterVMFailedAlarm.label = "Failed to register the virtual machine with VM Service on Supervisor"
+WCPRegisterVMFailedAlarm.summary = "An attempt to register this virtual machine with VM Service on Supervisor failed."
+
+## Foundation load balancer VM health state alarm
+FoundationLoadBalancerVmHealthStateAlarm.label =   "The foundation load balancer VM becomes unhealthy"
+FoundationLoadBalancerVmHealthStateAlarm.summary = "Alarm to indicate that the foundation load balancer VM is unhealthy"
+
+## Foundation load balancer VM workload alarm
+FoundationLoadBalancerWorkloadAlarm.label =   "The foundation load balancer VM failed to realize some workloads"
+FoundationLoadBalancerWorkloadAlarm.summary = "Alarm to indicate that the foundation load balancer VM failed to realize some workloads"
+
+## Foundation load balancer agent crash alarm
+FoundationLoadBalancerAgentCrashAlarm.label =   "The foundation load balancer agent crashed"
+FoundationLoadBalancerAgentCrashAlarm.summary = "Alarm to indicate that the foundation load balancer agent in the VM crashed"
