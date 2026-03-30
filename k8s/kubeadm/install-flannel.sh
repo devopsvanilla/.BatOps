@@ -151,7 +151,7 @@ echo "======================================"
 TEMP_MANIFEST=$(mktemp)
 if curl -sSL "$FLANNEL_URL" -o "$TEMP_MANIFEST"; then
     echo -e "${GREEN}✓ Manifesto baixado com sucesso${NC}"
-    
+
     # Mostrar versão se disponível
     VERSION=$(grep -oP 'image:.*flannel.*:v\K[0-9.]+' "$TEMP_MANIFEST" | head -1 || echo "latest")
     echo "  Versão detectada: v$VERSION"
@@ -176,7 +176,7 @@ if kubectl get ns kube-flannel &>/dev/null; then
         rm -f "$TEMP_MANIFEST"
         exit 0
     fi
-    
+
     echo "Removendo instalação anterior..."
     kubectl delete -f "$FLANNEL_URL" --ignore-not-found=true 2>/dev/null || true
     sleep 5
@@ -208,7 +208,7 @@ echo ""
 
 # Aguardar namespace ser criado
 echo -n "Aguardando namespace kube-flannel..."
-for i in {1..30}; do
+for _ in {1..30}; do
     if kubectl get ns kube-flannel &>/dev/null; then
         echo -e " ${GREEN}OK${NC}"
         break
@@ -233,16 +233,16 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     # Pegar status dos pods (strip newlines with xargs)
     READY_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | grep -c "Running" | xargs || echo "0")
     TOTAL_PODS=$(kubectl get pods -n kube-flannel --no-headers 2>/dev/null | wc -l | xargs || echo "0")
-    
+
     # Mostrar progresso
     echo -ne "\rPods Flannel: $READY_PODS/$TOTAL_PODS prontos (esperando $TOTAL_NODES)..."
-    
+
     # Verificar se todos os pods estão rodando
     if [ "$READY_PODS" -ge "$TOTAL_NODES" ] && [ "$READY_PODS" -eq "$TOTAL_PODS" ]; then
         echo -e " ${GREEN}COMPLETO${NC}"
         break
     fi
-    
+
     sleep 3
     WAIT_COUNT=$((WAIT_COUNT + 3))
 done
@@ -272,14 +272,14 @@ echo ""
 echo "Aguardando nodes ficarem Ready (até 30 segundos)..."
 
 # Aguardar nodes ficarem Ready
-for i in {1..10}; do
+for _ in {1..10}; do
     NOT_READY=$(kubectl get nodes --no-headers | grep -c "NotReady" | xargs || echo "0")
-    
+
     if [ "$NOT_READY" -eq 0 ]; then
         echo -e "${GREEN}✓ Todos os nodes estão Ready${NC}"
         break
     fi
-    
+
     echo -n "."
     sleep 3
 done

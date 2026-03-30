@@ -65,7 +65,7 @@ if ! grep -q 'starship init bash' ~/.bashrc; then
 fi
 
 # Recarregar bashrc
-echo -e "${YELLOW}🔄 Recarregando bashrc...${RESET}"
+# shellcheck source=/dev/null
 source ~/.bashrc
 
 echo -e "${GREEN}✅ Instalação concluída com sucesso!${RESET}"

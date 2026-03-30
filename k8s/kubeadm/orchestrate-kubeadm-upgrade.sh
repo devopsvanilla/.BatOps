@@ -149,7 +149,8 @@ build_node_command() {
         local remote_cmd
         remote_cmd="cd $(shell_escape "$SCRIPT_DIR") && $node_cmd"
 
-        local ssh_cmd="ssh -p $(shell_escape "$ssh_port") "
+        local ssh_cmd
+        ssh_cmd="ssh -p $(shell_escape "$ssh_port") "
         if [ -n "$SSH_KEY" ]; then
             ssh_cmd+="-i $(shell_escape "$SSH_KEY") "
         fi
@@ -304,7 +305,7 @@ EOF
     for cp in "${CONTROL_PLANES[@]}"; do
         local mark=""
         [ "$cp" = "$first_cp" ] && mark=" *(first control plane)*"
-        echo "- \\`$cp\\` - ${NODE_VERSION[$cp]:-unknown}$mark" >> "$plan_file"
+        echo "- \`$cp\` - ${NODE_VERSION[$cp]:-unknown}$mark" >> "$plan_file"
     done
 
     cat >> "$plan_file" <<EOF
@@ -317,7 +318,7 @@ EOF
     else
         local w
         for w in "${WORKERS[@]}"; do
-            echo "- \\`$w\\` - ${NODE_VERSION[$w]:-unknown}" >> "$plan_file"
+            echo "- \`$w\` - ${NODE_VERSION[$w]:-unknown}" >> "$plan_file"
         done
     fi
 
@@ -333,7 +334,7 @@ EOF
 
 ## Execution Order
 
-1. First control plane: \\`$first_cp\\`
+1. First control plane: \`$first_cp\`
 2. Remaining control planes (one by one)
 3. Workers (one by one, drain + uncordon)
 
@@ -341,11 +342,11 @@ EOF
 
 > Run the following on each respective node.
 
-### 1) First control plane (\\`$first_cp\\`)
+### 1) First control plane (\`$first_cp\`)
 
-\\`\\`\\`bash
+\`\`\`bash
 $(build_node_command "$first_cp" "control-plane-first")
-\\`\\`\\`
+\`\`\`
 EOF
 
     if [ "${#CONTROL_PLANES[@]}" -gt 1 ]; then
@@ -358,11 +359,11 @@ EOF
             if [ "$cp2" != "$first_cp" ]; then
                 cat >> "$plan_file" <<EOF
 
-Node: \\`$cp2\\`
+Node: \`$cp2\`
 
-\\`\\`\\`bash
+\`\`\`bash
 $(build_node_command "$cp2" "control-plane")
-\\`\\`\\`
+\`\`\`
 EOF
             fi
         done
@@ -378,11 +379,11 @@ EOF
         for wrk in "${WORKERS[@]}"; do
             cat >> "$plan_file" <<EOF
 
-Node: \\`$wrk\\`
+Node: \`$wrk\`
 
-\\`\\`\\`bash
+\`\`\`bash
 $(build_node_command "$wrk" "worker")
-\\`\\`\\`
+\`\`\`
 EOF
         done
     fi
@@ -391,16 +392,16 @@ EOF
 
 ## Validation (After each node)
 
-\\`\\`\\`bash
+\`\`\`bash
 kubectl get nodes -o wide
 kubectl get pods -A
-\\`\\`\\`
+\`\`\`
 
 ## Final Validation
 
 - [ ] All nodes report expected version
-- [ ] All nodes are \\`Ready\\`
-- [ ] Core components in \\`kube-system\\` are healthy
+- [ ] All nodes are \`Ready\`
+- [ ] Core components in \`kube-system\` are healthy
 - [ ] Business workloads are healthy
 EOF
 

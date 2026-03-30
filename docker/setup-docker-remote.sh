@@ -55,7 +55,8 @@ validate_remote_volume_permissions() {
     local context_name="$1"
     log "Validando permissões de volume no host remoto (contexto $context_name)..."
     ensure_remote_busybox "$context_name"
-    local test_volume="remote-perm-test-$(date +%s)"
+    local test_volume
+    test_volume="remote-perm-test-$(date +%s)"
     docker --context "$context_name" volume create "$test_volume" >/dev/null
     if docker --context "$context_name" run --rm -v "$test_volume:/mnt" "$BUSYBOX_IMAGE" \
         sh -c "mkdir -p /mnt/probe && chown 10001:0 /mnt/probe" >/dev/null 2>&1; then
@@ -72,7 +73,7 @@ validate_remote_volume_permissions() {
 clean_old_env_vars() {
     local bashrc="$HOME/.bashrc"
     local zshrc="$HOME/.zshrc"
-    
+
     # Remover variáveis de ambiente antigas dos arquivos de configuração
     for rc in "$bashrc" "$zshrc"; do
         if [ -f "$rc" ]; then
@@ -85,7 +86,7 @@ clean_old_env_vars() {
             fi
         fi
     done
-    
+
     # Limpar variáveis da sessão atual
     if [ -n "$DOCKER_HOST" ] || [ -n "$DOCKER_TLS_VERIFY" ] || [ -n "$DOCKER_CERT_PATH" ]; then
         warn "Limpando variáveis de ambiente Docker da sessão atual..."
@@ -99,17 +100,17 @@ clean_old_env_vars() {
 # Função para verificar requisitos
 check_requirements() {
     log "Verificando requisitos do sistema..."
-    
+
     local missing_packages=()
     local install_docker=false
-    
+
     # Verificar pacotes necessários
     for pkg in openssl curl; do
         if ! command -v "$pkg" &> /dev/null; then
             missing_packages+=("$pkg")
         fi
     done
-    
+
     # Verificar se Docker CLI está instalado
     if ! command -v docker &> /dev/null; then
         warn "Docker CLI não está instalado."
@@ -122,15 +123,15 @@ check_requirements() {
             exit 1
         fi
     fi
-    
+
     # Instalar pacotes faltantes
     if [ ${#missing_packages[@]} -gt 0 ] || [ "$install_docker" = true ]; then
         log "Instalando pacotes necessários..."
-        
+
         if command -v apt-get &> /dev/null; then
             sudo apt-get update
             [ ${#missing_packages[@]} -gt 0 ] && sudo apt-get install -y "${missing_packages[@]}"
-            
+
             if [ "$install_docker" = true ]; then
                 # Instalar apenas Docker CLI (sem daemon)
                 sudo apt-get install -y ca-certificates gnupg lsb-release
@@ -151,7 +152,7 @@ check_requirements() {
             exit 1
         fi
     fi
-    
+
     log "Todos os requisitos foram atendidos."
 }
 
@@ -185,30 +186,30 @@ create_remote_context() {
     local context_name=$1
     local host_ip=$2
     local certs_dir=$3
-    
+
     log "Criando Docker Context: $context_name..."
-    
+
     if context_exists "$context_name"; then
         warn "Context '$context_name' já existe. Removendo o antigo..."
         docker context rm -f "$context_name" &>/dev/null
     fi
-    
+
     docker context create "$context_name" \
         --docker "host=tcp://${host_ip}:2376,ca=${certs_dir}/ca.pem,cert=${certs_dir}/cert.pem,key=${certs_dir}/key.pem" \
         --description "Docker remoto em ${host_ip}"
-    
+
     log "Context '$context_name' criado com sucesso!"
 }
 
 # Função para trocar para um context
 switch_context() {
     local context_name=$1
-    
+
     if ! context_exists "$context_name"; then
         error "Context '$context_name' não existe."
         return 1
     fi
-    
+
     docker context use "$context_name"
     log "Trocado para context: $context_name"
 }
@@ -234,19 +235,19 @@ read_existing_config() {
 choose_docker_mode() {
     local has_local=false
     local has_remote=false
-    
+
     if check_local_docker; then
         has_local=true
         info "Docker local detectado"
     fi
-    
+
     if check_existing_remote_config; then
         has_remote=true
         local remote_host
         remote_host=$(read_existing_config)
         info "Configuração remota existente detectada: $remote_host"
     fi
-    
+
     if [ "$has_local" = true ] && [ "$has_remote" = true ]; then
         echo ""
         prompt "Qual Docker você deseja usar?"
@@ -255,7 +256,7 @@ choose_docker_mode() {
         echo "  3) Configurar novo Docker Remoto"
         echo -n "Escolha (1/2/3): "
         read -r choice
-        
+
         case $choice in
             1)
                 use_local_docker
@@ -290,7 +291,7 @@ choose_docker_mode() {
         echo "  2) Configurar novo servidor"
         echo -n "Escolha (1/2): "
         read -r choice
-        
+
         case $choice in
             1)
                 use_remote_docker "$remote_host"
@@ -312,9 +313,9 @@ choose_docker_mode() {
 # Função para usar Docker local
 use_local_docker() {
     log "Configurando para usar Docker local..."
-    
+
     switch_context "default"
-    
+
     log "✓ Docker local ativado!"
     info "Você já pode usar 'docker ps' para testar."
 }
@@ -324,25 +325,25 @@ use_remote_docker() {
     local remote_host=$1
     local context_name="${REMOTE_CONTEXT_PREFIX}-${remote_host}"
     local DOCKER_CERTS_DIR="$DOCKER_BASE_DIR/$remote_host/docker-client-certs"
-    
+
     log "Configurando para usar Docker remoto: $remote_host..."
-    
+
     # Verificar se certificados existem
     if [ ! -d "$DOCKER_CERTS_DIR" ] || [ ! -f "$DOCKER_CERTS_DIR/ca.pem" ]; then
         error "Certificados não encontrados em $DOCKER_CERTS_DIR"
         error "Execute a configuração completa primeiro."
         exit 1
     fi
-    
+
     # Verificar se context existe, senão criar
     if ! context_exists "$context_name"; then
         create_remote_context "$context_name" "$remote_host" "$DOCKER_CERTS_DIR"
     fi
-    
+
     # Trocar para o context remoto
     switch_context "$context_name"
     validate_remote_volume_permissions "$context_name"
-    
+
     log "✓ Docker remoto ativado: $remote_host"
     info "Você já pode usar 'docker ps' para testar."
 }
@@ -351,34 +352,34 @@ use_remote_docker() {
 setup_new_remote() {
     echo ""
     log "Configurando novo servidor Docker remoto..."
-    
+
     # Solicitar IP do servidor
     echo -n "Digite o IP do servidor Docker remoto: "
     read -r DOCKER_HOST_IP
-    
+
     if [ -z "$DOCKER_HOST_IP" ]; then
         error "IP não pode estar vazio"
         exit 1
     fi
-    
+
     # Validar formato de IP (básico)
     if ! [[ "$DOCKER_HOST_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         error "Formato de IP inválido"
         exit 1
     fi
-    
+
     # Solicitar usuário SSH
     echo -n "Digite o usuário SSH do servidor [$USER]: "
     read -r SSH_USER
     SSH_USER=${SSH_USER:-$USER}
-    
+
     # Solicitar senha SSH (opcional)
     echo ""
     info "Se você possui uma chave SSH configurada, apenas pressione ENTER para pular a senha."
     echo -n "Digite a senha SSH (ou ENTER para usar chave SSH): "
     read -rs SSH_PASSWORD
     echo ""
-    
+
     # Testar conectividade
     log "Testando conectividade com $DOCKER_HOST_IP..."
     if ! ping -c 1 -W 2 "$DOCKER_HOST_IP" &>/dev/null; then
@@ -386,14 +387,14 @@ setup_new_remote() {
     else
         log "Servidor acessível."
     fi
-    
+
     # Criar diretório local para certificados
     local DOCKER_CERTS_DIR="$DOCKER_BASE_DIR/$DOCKER_HOST_IP/docker-client-certs"
     mkdir -p "$DOCKER_CERTS_DIR"
-    
+
     # Copiar certificados do servidor
     log "Copiando certificados do servidor remoto..."
-    
+
     if [ -n "$SSH_PASSWORD" ]; then
         # Usar sshpass se senha foi fornecida
         if ! command -v sshpass &> /dev/null; then
@@ -407,7 +408,7 @@ setup_new_remote() {
                 exit 1
             fi
         fi
-        
+
         if sshpass -p "$SSH_PASSWORD" scp -r "${SSH_USER}@${DOCKER_HOST_IP}:~/docker-client-certs/"* "$DOCKER_CERTS_DIR/" 2>/dev/null; then
             log "Certificados copiados com sucesso."
         else
@@ -433,13 +434,13 @@ setup_new_remote() {
             exit 1
         fi
     fi
-    
+
     # Ajustar permissões dos certificados
     chmod 0400 "$DOCKER_CERTS_DIR/key.pem"
     chmod 0444 "$DOCKER_CERTS_DIR/ca.pem" "$DOCKER_CERTS_DIR/cert.pem"
-    
+
     log "Permissões dos certificados ajustadas."
-    
+
     # Salvar configuração
     mkdir -p "$DOCKER_CONFIG_DIR"
     cat > "$DOCKER_CONFIG_DIR/remote-docker-host.conf" <<EOF
@@ -449,11 +450,11 @@ REMOTE_DOCKER_PORT=2376
 REMOTE_DOCKER_USER=$SSH_USER
 REMOTE_DOCKER_CERTS=$DOCKER_CERTS_DIR
 EOF
-    
+
     # Criar Docker Context
     local context_name="${REMOTE_CONTEXT_PREFIX}-${DOCKER_HOST_IP}"
     create_remote_context "$context_name" "$DOCKER_HOST_IP" "$DOCKER_CERTS_DIR"
-    
+
     # Testar conexão trocando temporariamente de context
     log "Testando conexão com Docker remoto..."
     if switch_context "$context_name" && docker version &>/dev/null; then
@@ -468,7 +469,7 @@ EOF
         docker context use default &>/dev/null || true
         exit 1
     fi
-    
+
     echo ""
     log "Configuração concluída com sucesso!"
     info "Context Docker criado: $context_name"

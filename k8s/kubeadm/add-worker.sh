@@ -16,7 +16,7 @@ echo "======================================"
 echo ""
 
 # Verifica se está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "❌ Este script deve ser executado como root ou com sudo"
     echo "   Execute: sudo bash ./add-worker.sh"
     exit 1
@@ -54,7 +54,6 @@ if [ -z "$JOIN_COMMAND" ]; then
     exit 1
 fi
 
-TOKEN=$(echo "$JOIN_COMMAND" | awk '{print $5}')
 MASTER_IP=$(echo "$JOIN_COMMAND" | awk '{print $3}' | cut -d: -f1)
 
 echo "✓ Token gerado com sucesso"
@@ -63,7 +62,6 @@ echo ""
 
 # Extrai informações
 echo "[2/3] Validando informações do cluster..."
-HASH=$(kubeadm token create --print-join-command 2>/dev/null | grep -oP 'sha256:\K[a-f0-9]+')
 echo "✓ Cluster validado"
 echo "  Master: $MASTER_IP:6443"
 echo ""

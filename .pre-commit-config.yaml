@@ -45,9 +45,12 @@ repos:
         stages: [commit-msg]
         args: ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert']
 
-  # ─── Lint de Markdown ───
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
+  # ─── Lint de Markdown (Usando versão do sistema) ───
+  - repo: local
     hooks:
       - id: markdownlint
+        name: markdownlint
+        entry: markdownlint
+        language: system
+        types: [markdown]
         args: ['--fix']

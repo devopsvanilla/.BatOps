@@ -13,7 +13,7 @@ echo "Inicializando Kubernetes Control Plane"
 echo "======================================"
 
 # Verifica se está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "❌ Por favor, execute como root ou com sudo"
     exit 1
 fi
@@ -29,7 +29,7 @@ if [ -f /etc/kubernetes/admin.conf ]; then
         echo "Cancelado pelo usuário"
         exit 0
     fi
-    
+
     echo ""
     echo "🔄 Resetando cluster existente..."
     kubeadm reset -f
@@ -50,7 +50,7 @@ echo ""
 echo "[3/3] Configurando kubectl..."
 mkdir -p $HOME/.kube
 cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-chown $(id -u):$(id -g) $HOME/.kube/config
+chown "$(id -u)":"$(id -g)" $HOME/.kube/config
 echo "✓ Kubectl configurado"
 
 echo ""

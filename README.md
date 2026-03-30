@@ -39,7 +39,7 @@
 | Solução | Descrição |
 |---|---|
 | [kubeadm](k8s/kubeadm/) | Instalação e configuração de cluster com kubeadm |
-| [nginx-nodeport-deployment](nginx-nodeport-deployment/) | Deploy de Nginx com NodePort no K8s ([docs](nginx-nodeport-deployment/README.md)) |
+| [nginx-nodeport-deployment](k8s/nginx-nodeport-deployment/) | Deploy de Nginx com NodePort no K8s ([docs](k8s/nginx-nodeport-deployment/README.md)) |
 
 #### Guias Kubernetes
 
@@ -55,8 +55,8 @@
 
 | Solução | Descrição |
 |---|---|
-| [create-proxmox-vm.sh](create-proxmox-vm.sh) | Criação de VMs no Proxmox ([docs](create-proxmox-vm.md)) |
-| [create-haos-vm.sh](haos/create-haos-vm.sh) | Criação de VM para Home Assistant OS |
+| [create-proxmox-vm.sh](proxmox/create-proxmox-vm.sh) | Criação de VMs no Proxmox ([docs](proxmox/README.md)) |
+| [create-haos-vm.sh](proxmox/create-haos-vm.sh) | Criação de VM para Home Assistant OS |
 | [convert-ovn2qcow2](kvm/convert-ovn2qcow2/) | Conversão de imagens OVN para QCOW2 |
 
 ---
@@ -65,12 +65,12 @@
 
 | Solução | Descrição |
 |---|---|
-| [list-ports-and-firewall.sh](list-ports-and-firewall.sh) | Listagem de portas e regras de firewall ([docs](README-list-ports-firewall.md)) |
-| [list-ports-simple.sh](list-ports-simple.sh) | Listagem simplificada de portas |
-| [audit-site-simple.sh](audit-site-simple.sh) | Auditoria simples de sites |
-| [get-linux-version.sh](get-linux-version.sh) | Identificação da versão do Linux |
-| [get-proxmox-cloudinit-diagnostics.sh](get-proxmox-cloudinit-diagnostics.sh) | Diagnóstico de Cloud-Init no Proxmox |
-| [get-ssh-diagnostics.sh](get-ssh-diagnostics.sh) | Diagnóstico de configuração SSH |
+| [list-ports-and-firewall.sh](network-diagnostics/list-ports-and-firewall.sh) | Listagem de portas e regras de firewall ([docs](network-diagnostics/README.md)) |
+| [list-ports-simple.sh](network-diagnostics/list-ports-simple.sh) | Listagem simplificada de portas |
+| [audit-site-simple.sh](network-diagnostics/audit-site-simple.sh) | Auditoria simples de sites |
+| [get-linux-version.sh](linux-utils/get-linux-version.sh) | Identificação da versão do Linux |
+| [get-proxmox-cloudinit-diagnostics.sh](proxmox/get-proxmox-cloudinit-diagnostics.sh) | Diagnóstico de Cloud-Init no Proxmox |
+| [get-ssh-diagnostics.sh](network-diagnostics/get-ssh-diagnostics.sh) | Diagnóstico de configuração SSH |
 
 ---
 
@@ -78,11 +78,11 @@
 
 | Solução | Descrição |
 |---|---|
-| [morpheus-phpmysql](morpheus-phpmysql/) | Instalação do phpMyAdmin para Morpheus ([docs](morpheus-phpmysql/install-morpheus-phpsqladmin.md)) |
-| [set-morpheus-logback.sh](set-morpheus-logback.sh) | Configuração de logback do Morpheus |
-| [setup-morpheus-nfs.sh](setup-morpheus-nfs.sh) | Configuração de NFS para Morpheus ([docs](setup-morpheus-nfs.md)) |
-| [delete-morpheus-logs.sh](delete-morpheus-logs.sh) | Limpeza de logs do Morpheus |
-| [list-morpheus-aws-permissions.sh](list-morpheus-aws-permissions.sh) | Listagem de permissões AWS do Morpheus |
+| [phpmysql](docker/phpmysql/) | Instalação do phpMyAdmin para Morpheus ([docs](docker/phpmysql/README.md)) |
+| [set-morpheus-logback.sh](morpheus/set-morpheus-logback.sh) | Configuração de logback do Morpheus |
+| [setup-morpheus-nfs.sh](morpheus/setup-morpheus-nfs.sh) | Configuração de NFS para Morpheus ([docs](morpheus/SETUP-NFS.md)) |
+| [delete-morpheus-logs.sh](morpheus/delete-morpheus-logs.sh) | Limpeza de logs do Morpheus |
+| [list-morpheus-aws-permissions.sh](morpheus/list-morpheus-aws-permissions.sh) | Listagem de permissões AWS do Morpheus |
 
 ---
 
@@ -104,8 +104,8 @@
 | [code-server/update-code.sh](code-server/update-code.sh) | Atualização do code-server |
 | [vscode/reset-copilot.sh](vscode/reset-copilot.sh) | Reset do GitHub Copilot no VSCode |
 | [git/cd-git-root.sh](git/cd-git-root.sh) | Navegação para a raiz do repositório Git |
-| [git-resetall.sh](git-resetall.sh) | Reset completo de repositório Git |
-| [gravar-terminal.sh](gravar-terminal.sh) | Gravação de sessão de terminal |
+| [git-resetall.sh](git/git-resetall.sh) | Reset completo de repositório Git |
+| [gravar-terminal.sh](linux-utils/gravar-terminal.sh) | Gravação de sessão de terminal |
 
 ---
 
@@ -132,8 +132,8 @@
 
 | Solução | Descrição |
 |---|---|
-| [Compact-WSL.ps1](Compact-WSL.ps1) | Compactação de disco WSL |
-| [Reset-GitHubCopilotVSCode.ps1](Reset-GitHubCopilotVSCode.ps1) | Reset do GitHub Copilot no VSCode (PowerShell) |
+| [Compact-WSL.ps1](windows/Compact-WSL.ps1) | Compactação de disco WSL |
+| [Reset-GitHubCopilotVSCode.ps1](windows/Reset-GitHubCopilotVSCode.ps1) | Reset do GitHub Copilot no VSCode (PowerShell) |
 
 ---
 
@@ -162,8 +162,8 @@ cd batops
 
 ```bash
 # Exemplo: Executar o diagnóstico de portas e firewall
-chmod +x list-ports-and-firewall.sh
-./list-ports-and-firewall.sh
+chmod +x network-diagnostics/list-ports-and-firewall.sh
+./network-diagnostics/list-ports-and-firewall.sh
 ```
 
 > **Nota:** Alguns scripts podem requerer permissões elevadas (`sudo`). Consulte a documentação de cada solução.

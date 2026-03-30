@@ -15,6 +15,7 @@ Lista de todas as dependências, bibliotecas, ferramentas e soluções de tercei
 | Flannel | Apache 2.0 | Plugin de rede CNI para Kubernetes | [github.com/flannel-io/flannel](https://github.com/flannel-io/flannel) |
 | Proxmox VE | AGPL v3 | Plataforma de virtualização para criação de VMs | [proxmox.com](https://www.proxmox.com/) |
 | QEMU/KVM | GPL v2 | Hypervisor para virtualização | [qemu.org](https://www.qemu.org/) |
+| qemu-utils | GPL v2 | Utilitários de disco (qemu-img) para KVM/Proxmox | [qemu.org](https://www.qemu.org/) |
 
 ## Stacks Docker Compose
 
@@ -42,6 +43,9 @@ Lista de todas as dependências, bibliotecas, ferramentas e soluções de tercei
 | Starship | ISC | Prompt personalizado para terminal | [starship.rs](https://starship.rs/) |
 | code-server | MIT | VS Code no navegador | [github.com/coder/code-server](https://github.com/coder/code-server) |
 | VMware OVF Tool | Comercial (VMware) | Conversão de imagens OVF/VMDK | [vmware.com](https://www.vmware.com/) |
+| asciinema | GPL v3 | Gravação e compartilhamento de sessões de terminal | [asciinema.org](https://asciinema.org/) |
+| rpcbind | BSD | Mapeador de portas RPC para serviços NFS | [linux-nfs.org](http://linux-nfs.org/) |
+| nfs-kernel-server | GPL v2 | Servidor NFS nativo do Kernel Linux | [linux-nfs.org](http://linux-nfs.org/) |
 
 ## CI/CD e Automação
 

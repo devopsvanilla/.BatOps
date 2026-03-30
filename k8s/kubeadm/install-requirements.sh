@@ -12,7 +12,7 @@ echo "Preparando Ubuntu 24.04 para Kubernetes"
 echo "======================================"
 
 # Verifica se está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "Por favor, execute como root ou com sudo"
     exit 1
 fi
@@ -57,22 +57,22 @@ if [ "$KUBEADM_INSTALLED" = true ] || [ "$KUBECTL_INSTALLED" = true ] || [ "$KUB
     echo "  3) Cancelar e sair"
     echo ""
     read -p "Escolha uma opção [1/2/3]: " choice
-    
+
     case $choice in
         1)
             echo ""
             echo "🔄 Removendo instalações existentes..."
-            
+
             # Fazer reset do cluster Kubernetes se existir
             if [ -f /etc/kubernetes/admin.conf ]; then
                 echo "Executando kubeadm reset..."
                 kubeadm reset -f 2>/dev/null || true
             fi
-            
+
             # Parar serviços se estiverem rodando
             systemctl stop kubelet 2>/dev/null || true
             systemctl stop containerd 2>/dev/null || true
-            
+
             # Matar processos remanescentes
             echo "Encerrando processos do Kubernetes..."
             pkill -9 kube-apiserver 2>/dev/null || true
@@ -81,25 +81,25 @@ if [ "$KUBEADM_INSTALLED" = true ] || [ "$KUBECTL_INSTALLED" = true ] || [ "$KUB
             pkill -9 kubelet 2>/dev/null || true
             pkill -9 kube-proxy 2>/dev/null || true
             pkill -9 etcd 2>/dev/null || true
-            
+
             # Aguardar liberação de portas
             sleep 3
-            
+
             # Desmontar volumes montados
             echo "Desmontando volumes..."
-            umount $(df -HT | grep '/var/lib/kubelet' | awk '{print $7}') 2>/dev/null || true
-            
+            umount "$(df -HT | grep '/var/lib/kubelet' | awk '{print $7}')" 2>/dev/null || true
+
             # Remover interfaces de rede do Kubernetes
             echo "Removendo interfaces de rede..."
             ip link delete cni0 2>/dev/null || true
             ip link delete flannel.1 2>/dev/null || true
             ip link delete docker0 2>/dev/null || true
-            
+
             # Remover pacotes
             apt-get remove -y kubeadm kubectl kubelet containerd 2>/dev/null || true
             apt-get purge -y kubeadm kubectl kubelet containerd 2>/dev/null || true
             apt-get autoremove -y
-            
+
             # Limpar configurações
             rm -rf /etc/kubernetes
             rm -rf /var/lib/kubelet
@@ -110,13 +110,13 @@ if [ "$KUBEADM_INSTALLED" = true ] || [ "$KUBECTL_INSTALLED" = true ] || [ "$KUB
             rm -rf $HOME/.kube
             rm -rf /etc/apt/sources.list.d/kubernetes.list
             rm -rf /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-            
+
             # Limpar regras iptables
             iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X 2>/dev/null || true
-            
+
             # Remover hold de pacotes
             apt-mark unhold kubelet kubeadm kubectl 2>/dev/null || true
-            
+
             echo "✓ Remoção concluída. Prosseguindo com instalação limpa..."
             ;;
         2)

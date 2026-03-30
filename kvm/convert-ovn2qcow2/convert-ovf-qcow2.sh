@@ -35,27 +35,31 @@ get_val() {
 # --- Processamento da VM ---
 process_vm() {
     local ovf_path="$1"
-    local vm_name=$(basename "$ovf_path" .ovf)
+    local vm_name
+    vm_name=$(basename "$ovf_path" .ovf)
     local vm_output="$OUTPUT_DIR/$vm_name"
     local vm_work="$WORK_DIR/$vm_name"
 
     log "${GREEN}🚀 Iniciando Processamento Completo: $vm_name${NC}"
-    
+
     # 1. Preparar área de trabalho isolada
     mkdir -p "$vm_output"
     rm -rf "$vm_work" && mkdir -p "$vm_work"
-    
+
     cp "$ovf_path" "$vm_work/"
     # Copiar todos os VMDKs da pasta de origem
     cp "$(dirname "$ovf_path")"/*.vmdk "$vm_work/" 2>/dev/null || true
 
     pushd "$vm_work" > /dev/null
-    local ovf_local=$(basename "$ovf_path")
+    local ovf_local
+    ovf_local=$(basename "$ovf_path")
 
     # 2. Extrair Hardware do OVF
     log "🔍 Extraindo metadados do XML..."
-    local ram=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=4]/*[local-name()='VirtualQuantity']" "$ovf_local")
-    local cpu=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=3]/*[local-name()='VirtualQuantity']" "$ovf_local")
+    local ram
+    ram=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=4]/*[local-name()='VirtualQuantity']" "$ovf_local")
+    local cpu
+    cpu=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=3]/*[local-name()='VirtualQuantity']" "$ovf_local")
     local firmware="bios"
     [[ $(grep -iE "efi|uefi" "$ovf_local") ]] && firmware="efi"
 
@@ -65,7 +69,7 @@ process_vm() {
     # 3. Mapear e Normalizar Discos (Suporta múltiplos discos)
     log "📦 Normalizando discos (VMDK -> Flat)..."
     mapfile -t vmdk_list < <(xmllint --xpath "//*[local-name()='File']/@*[local-name()='href']" "$ovf_local" | grep -oP 'href="\K[^"]+')
-    
+
     declare -a flat_disks=()
     for i in "${!vmdk_list[@]}"; do
         local src="${vmdk_list[$i]}"
@@ -84,7 +88,7 @@ process_vm() {
         echo "numvcpus = \"$cpu\""
         echo "firmware = \"$firmware\""
         echo "guestOS = \"windows9-64\""
-        
+
         for i in "${!flat_disks[@]}"; do
             echo "scsi0:$i.present = \"TRUE\""
             echo "scsi0:$i.fileName = \"${flat_disks[$i]}\""
@@ -96,7 +100,7 @@ process_vm() {
 
     # 5. Executar virt-v2v (A Conversão Real)
     log "🔄 Executando virt-v2v (Injeção de drivers e conversão QCOW2)..."
-    
+
     # Configurar ambiente para WSL2/Direct Backend
     export LIBGUESTFS_BACKEND=direct
     if [ -d "/usr/lib/x86_64-linux-gnu/guestfs" ]; then

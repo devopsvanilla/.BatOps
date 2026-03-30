@@ -57,19 +57,59 @@ security-sca: ## Scan de vulnerabilidades com Trivy
 		echo "❌ Trivy: vulnerabilidades encontradas"
 
 # ─── Setup ───
-setup: ## Configura ambiente de desenvolvimento
-	@echo "⚙️  Configurando ambiente..."
-	@echo "1. Instalando pre-commit hooks..."
+setup: ## Instala todas as dependências necessárias (requer sudo)
+	@echo "⚙️  Iniciando setup agressivo do ambiente..."
+
+	@echo "1. Instalando pre-commit..."
+	@if ! command -v pre-commit >/dev/null 2>&1; then \
+		sudo apt update && sudo apt install -y pre-commit || pip install --user pre-commit; \
+	fi
 	@pre-commit install
 	@pre-commit install --hook-type commit-msg
-	@echo "2. Verificando dependências..."
-	@command -v shellcheck >/dev/null 2>&1 && echo "   ✅ shellcheck" || echo "   ❌ shellcheck (instale: apt install shellcheck)"
-	@command -v hadolint >/dev/null 2>&1 && echo "   ✅ hadolint" || echo "   ❌ hadolint (instale: https://github.com/hadolint/hadolint)"
-	@command -v gitleaks >/dev/null 2>&1 && echo "   ✅ gitleaks" || echo "   ❌ gitleaks (instale: https://github.com/gitleaks/gitleaks)"
-	@command -v trivy >/dev/null 2>&1 && echo "   ✅ trivy" || echo "   ❌ trivy (instale: https://github.com/aquasecurity/trivy)"
-	@command -v markdownlint >/dev/null 2>&1 && echo "   ✅ markdownlint" || echo "   ❌ markdownlint (instale: npm install -g markdownlint-cli)"
+
+	@echo "2. Instalando linters e ferramentas de segurança..."
+
+	@# ShellCheck
+	@if ! command -v shellcheck >/dev/null 2>&1; then \
+		echo "   📦 Instalando shellcheck..."; \
+		sudo apt update && sudo apt install -y shellcheck; \
+	fi
+
+	@# Hadolint
+	@if ! command -v hadolint >/dev/null 2>&1; then \
+		echo "   🐳 Instalando hadolint..."; \
+		sudo wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64; \
+		sudo chmod +x /usr/local/bin/hadolint; \
+	fi
+
+	@# Gitleaks
+	@if ! command -v gitleaks >/dev/null 2>&1; then \
+		echo "   🔐 Instalando gitleaks..."; \
+		wget https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz; \
+		tar -xzf gitleaks_8.18.2_linux_x64.tar.gz gitleaks; \
+		sudo mv gitleaks /usr/local/bin/; \
+		rm gitleaks_8.18.2_linux_x64.tar.gz; \
+	fi
+
+	@# Trivy
+	@if ! command -v trivy >/dev/null 2>&1; then \
+		echo "   🔍 Instalando trivy..."; \
+		sudo apt-get install wget apt-transport-https gnupg lsb-release -y; \
+		sudo rm -f /etc/apt/sources.list.d/trivy.list; \
+		wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null; \
+		echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $$(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list; \
+		sudo apt-get update; \
+		sudo apt-get install trivy -y; \
+	fi
+
+	@# markdownlint
+	@if ! command -v markdownlint >/dev/null 2>&1; then \
+		echo "   📝 Instalando markdownlint..."; \
+		sudo env "PATH=$$PATH" $$(which npm) install -g markdownlint-cli; \
+	fi
+
 	@echo ""
-	@echo "✅ Setup concluído!"
+	@echo "✅ Setup agressivo concluído com sucesso!"
 
 # ─── Testes ───
 test: ## Executa testes (validação básica dos scripts)
