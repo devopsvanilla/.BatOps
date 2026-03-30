@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- Configurações de Ambiente ---
 INPUT_DIR="./ovf-images"

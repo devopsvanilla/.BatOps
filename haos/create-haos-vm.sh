@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 set -e
 
 echo "=== Assistente de criação de VM Home Assistant OS (qcow2) no Proxmox ==="

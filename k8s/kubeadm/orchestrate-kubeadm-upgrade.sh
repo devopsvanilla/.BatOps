@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Orquestrador seguro para upgrade de clusters Kubernetes com kubeadm
 # - Descobre control planes e workers

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 # setup-docker-remote.sh: Configura cliente para acessar Docker remoto via TLS usando Docker Contexts
 # EXECUTE ESTE SCRIPT NO COMPUTADOR CLIENTE (que deseja usar Docker remoto)
 # Uso: ./setup-docker-remote.sh

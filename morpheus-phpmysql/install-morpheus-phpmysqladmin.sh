@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Cores para saída colorida
 GREEN="\033[0;32m"

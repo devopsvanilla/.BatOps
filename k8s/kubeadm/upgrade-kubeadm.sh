@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script guiado para upgrade seguro de clusters Kubernetes com kubeadm
 # Suporta execução em control planes e workers

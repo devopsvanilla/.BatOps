@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Diretório temporário padrão para salvar os resultados
 default_data_dir="/tmp/test-internet-speed"

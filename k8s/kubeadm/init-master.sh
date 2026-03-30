@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para inicializar o Kubernetes Master (Control Plane)
 # com as melhores práticas e evitando alertas conhecidos

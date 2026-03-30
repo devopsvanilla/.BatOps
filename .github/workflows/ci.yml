@@ -1,0 +1,96 @@
+name: CI — Lint, Segurança e SCA
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Detecção de Segredos ───
+  secrets-scan:
+    name: 🔐 Detecção de Segredos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── Lint de Scripts Shell ───
+  shellcheck:
+    name: 🐚 ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Executar ShellCheck
+        run: |
+          find . -name '*.sh' -not -path './.git/*' -not -path './node_modules/*' \
+            -exec shellcheck --severity=warning {} +
+
+  # ─── Lint de Dockerfiles ───
+  hadolint:
+    name: 🐳 Hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Executar Hadolint
+        run: |
+          DOCKERFILES=$(find . -name 'Dockerfile' -not -path './.git/*')
+          if [ -n "$DOCKERFILES" ]; then
+            for f in $DOCKERFILES; do
+              echo "::group::Linting $f"
+              docker run --rm -i hadolint/hadolint < "$f" || true
+              echo "::endgroup::"
+            done
+          else
+            echo "Nenhum Dockerfile encontrado"
+          fi
+
+  # ─── Lint de Markdown ───
+  markdownlint:
+    name: 📝 Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Executar markdownlint
+        uses: articulate/actions-markdownlint@v1
+        with:
+          config: .markdownlint.json
+          files: '**/*.md'
+          ignore: 'node_modules'
+        continue-on-error: true
+
+  # ─── SCA — Trivy ───
+  trivy:
+    name: 🔍 Trivy SCA
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy — Scan de Vulnerabilidades no Repositório
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+          format: 'table'

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 ################################################################################
 # Script para gerenciar níveis de log do Morpheus Data Enterprise

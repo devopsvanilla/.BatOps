@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Desabilita pipefail para permitir que o script continue após o ZAP retornar exit code não-zero

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 # install-docker-remote.sh: Instala e configura Docker no Ubuntu para uso como host remoto com TLS
 # EXECUTE ESTE SCRIPT NO SERVIDOR REMOTO (Host Docker)
 # Uso: sudo ./install-docker-remote.sh

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 echo "=== DIAGNÓSTICO CLOUD-INIT VM COMPLETO ==="
 echo "Data: $(date)"
 echo "Hostname: $(hostname)"

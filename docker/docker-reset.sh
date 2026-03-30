@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 # Script com duas opções:
 # 1) Limpeza de recursos não utilizados (preserva recursos usados por containers UP)
 # 2) Reset total do Docker

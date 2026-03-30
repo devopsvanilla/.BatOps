@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Verificar se o domínio foi fornecido
 if [ -z "$1" ]; then

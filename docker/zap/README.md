@@ -2,7 +2,7 @@
 
 Esta página documenta a execução containerizada do **zap-scanner**, automação feita em Bash e Docker que executa um scan de baseline (passivo) com o OWASP ZAP em uma URL alvo, gerando um relatório HTML e PDF em `zap-results/`.
 
-![ZAP Scan Report](../../_images/check-zap-cve.jpeg)
+![ZAP Scan Report](../../assets/images/check-zap-cve.jpeg)
 
 ## 🛡️ Por que usar esta abordagem?
 

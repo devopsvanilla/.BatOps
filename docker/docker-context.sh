@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para gerenciar contextos Docker
 # Permite listar e selecionar o contexto Docker padrão com UI amigável

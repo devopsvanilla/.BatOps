@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para instalar e validar Flannel CNI Plugin
 # - Baixa e aplica o manifesto oficial

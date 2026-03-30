@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Nome do arquivo de saída
 CAST_FILE="terminal_$(date +%Y%m%d_%H%M%S).cast"

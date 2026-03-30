@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 echo "=== DIAGNÓSTICO SSH SENHA ==="
 echo "1. Configuração SSH principal:"
 sudo grep -n -E "PasswordAuthentication|PubkeyAuthentication|ssh_pwauth" /etc/ssh/sshd_config

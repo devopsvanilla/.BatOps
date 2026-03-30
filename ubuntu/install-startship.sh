@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script de instalação do Starship Prompt no Ubuntu
 # Autor: Copilot 🤖

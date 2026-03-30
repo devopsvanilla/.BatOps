@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 #
 # Script para configurar Ubuntu com Logitech MX Keys
 # Layout: US com suporte a Português do Brasil e ç com AltGr+c

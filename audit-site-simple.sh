@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Remove prefixo http:// ou https:// da entrada
 DOMINIO=$(echo "$1" | sed -E 's#https?://##')

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 # cd-git-root.sh: Vai para a raiz do repositório git corrente
 
 # Detecta a raiz do repositório git

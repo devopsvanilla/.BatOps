@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script interativo para configurar compartilhamento SMB no Ubuntu
 # Autor: devopsvanilla

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para preparar Ubuntu 24.04 LTS para instalação do Kubernetes via kubeadm
 # Autor: DevOps Vanilla

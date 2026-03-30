@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 echo "🔐 Qual perfil da AWS você quer testar?"
 read -p "Perfil: " PERFIL

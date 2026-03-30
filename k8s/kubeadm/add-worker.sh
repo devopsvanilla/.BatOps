@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para adicionar um novo worker node ao cluster Kubernetes
 # - Gera um novo token a cada execução

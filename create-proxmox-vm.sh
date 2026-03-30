@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 
 # Script para criar VM no Proxmox com Ubuntu Noble Cloud Image
 # Uso: ./create-vm.sh <nome_vm> <ip_static>

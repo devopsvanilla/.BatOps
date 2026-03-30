@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: Revisar e adicionar set -euo pipefail — Issue #1
 # get-linux-version.sh
 # Script "battle proof" para detectar versão do Linux
 
