@@ -1,6 +1,11 @@
 # 🦇 BatOps 🚀
 
+[![CI — Lint, Segurança e SCA](https://github.com/devopsvanilla/.batops/actions/workflows/ci.yml/badge.svg)](https://github.com/devopsvanilla/.batops/actions/workflows/ci.yml)
+[![Release](https://github.com/devopsvanilla/.batops/actions/workflows/release.yml/badge.svg)](https://github.com/devopsvanilla/.batops/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/devopsvanilla/.batops)](LICENSE)
+
 **O Cinturão de Utilidades do Guardião DevOps**
+
 
 > Enquanto um cinturão de ferramentas DevOps representa um conjunto técnico de soluções, o cinturão de utilidades simboliza a postura estratégica e multifuncional do verdadeiro guardião da cultura DevOps — alguém que não apenas executa, mas protege, promove e adapta práticas que sustentam a colaboração, a automação e a entrega contínua.
 
