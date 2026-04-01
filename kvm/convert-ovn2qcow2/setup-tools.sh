@@ -5,7 +5,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
-NC='\033[0m' 
+NC='\033[0m'
 
 set -e
 
@@ -13,7 +13,7 @@ echo -e "${GREEN}🛠️  Instalador de Dependências BatOps (KVM/virt-v2v)${NC}
 echo "-------------------------------------------------------"
 
 # 1. Verificação de Root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}❌ Erro: Este script precisa de privilégios de root.${NC}"
   echo "Execute: sudo ./setup-tools.sh"
   exit 1
@@ -43,6 +43,9 @@ PACKAGES=(
     cpu-checker
     libvirt-daemon-system
     libvirt-clients
+    rhsrvany
+    libguestfs-winsupport
+    nbdkit
 )
 
 apt install -y "${PACKAGES[@]}"
@@ -53,7 +56,7 @@ if [ "$IS_WSL" = true ]; then
     apt install -y linux-image-virtual
     # Garante que o kernel em /boot é legível para ferramentas de disco
     chmod 0644 /boot/vmlinuz-* || true
-    
+
     # Cria o Fixed Appliance para evitar erros de boot no WSL2
     echo "🔨 Gerando Appliance fixo para Libguestfs..."
     mkdir -p /usr/lib/x86_64-linux-gnu/guestfs

@@ -12,6 +12,23 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+FORCE_EOL=false
+
+# --- Parsing de Argumentos ---
+for arg in "$@"; do
+    case $arg in
+        --force-wineol)
+            FORCE_EOL=true
+            ;;
+        --help)
+            echo "Uso: $0 [--force-wineol]"
+            echo "Opções:"
+            echo "  --force-wineol    Permite a conversão de imagens detectadas como Windows EOL (XP, 7, 8.1, Server 2012, etc)"
+            exit 0
+            ;;
+    esac
+done
+
 set -euo pipefail
 
 # --- Verificações Iniciais ---
@@ -54,12 +71,41 @@ process_vm() {
     local ovf_local
     ovf_local=$(basename "$ovf_path")
 
-    # 2. Extrair Hardware do OVF
+    # 2. Extrair Hardware e SO do OVF
     log "🔍 Extraindo metadados do XML..."
     local ram
     ram=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=4]/*[local-name()='VirtualQuantity']" "$ovf_local")
     local cpu
     cpu=$(get_val "//*[local-name()='Item'][*[local-name()='ResourceType']=3]/*[local-name()='VirtualQuantity']" "$ovf_local")
+
+    local os_desc
+    os_desc=$(get_val "//*[local-name()='OperatingSystemSection']/*[local-name()='Description']" "$ovf_local")
+    local os_type
+    os_type=$(xmllint --xpath "string(//*[local-name()='OperatingSystemSection']/@*[local-name()='osType'])" "$ovf_local" 2>/dev/null || echo "")
+
+    log "🖥️  SO Detectado: ${YELLOW}${os_desc:-Desconhecido} ($os_type)${NC}"
+
+    # Verificação de Windows EOL (End of Life)
+    # Regex para capturar: XP, 7, 8.1, Server 2012 e builds específicas de Win10 EOL
+    local eol_regex="([Xx][Pp]|[Ww]indows 7|[Ww]indows 8\.1|[Ss]erver 2012|1809|1903|1909|2004|20[Hh]2|21[Hh]1|21[Hh]2|22[Hh]2|[Ll][Tt][Ss][Bb])"
+
+    if [[ "$os_desc" =~ $eol_regex ]] || [[ "$os_type" =~ $eol_regex ]]; then
+        if [ "$FORCE_EOL" = false ]; then
+            log "${YELLOW}⚠️  Aviso: Sistema EOL detectado (${os_desc:-$os_type}). Use --force-wineol para processar.${NC}"
+            log "   Pulando conversão de $vm_name..."
+            popd > /dev/null
+            return 0
+        fi
+        log "${YELLOW}⚡ Processando Sistema EOL: ${os_desc} (Modo Forçado Ativo)${NC}"
+    fi
+
+    # Mapeamento do guestOS para o VMX
+    local vmx_os="windows9-64" # Default para Win10 moderno
+    [[ "$os_type" =~ [Xx][Pp] ]] && vmx_os="winxpGuest"
+    [[ "$os_type" =~ "win7" ]] && vmx_os="windows7-64"
+    [[ "$os_type" =~ "win8" ]] && vmx_os="windows8-64"
+    [[ "$os_type" =~ "2012" ]] && vmx_os="windows8Server64Guest"
+
     local firmware="bios"
     [[ $(grep -iE "efi|uefi" "$ovf_local") ]] && firmware="efi"
 
@@ -79,6 +125,12 @@ process_vm() {
         flat_disks+=("$dst")
     done
 
+    # 3.1 Verificações de Integridade e Saúde
+    if [ ! -d "/usr/share/virtio-win" ] || [ -z "$(ls -A /usr/share/virtio-win 2>/dev/null)" ]; then
+        log "${YELLOW}⚠️  AVISO: Pasta /usr/share/virtio-win/ está vazia ou ausente.${NC}"
+        log "   O virt-v2v pode falhar ao injetar drivers ou causar BSOD no Windows XP."
+    fi
+
     # 4. Criar Descritor VMX (Ponte de Metadados)
     log "📝 Gerando ponte VMX (Firmware: $firmware, RAM: ${ram}MB)..."
     {
@@ -87,7 +139,7 @@ process_vm() {
         echo "memsize = \"$ram\""
         echo "numvcpus = \"$cpu\""
         echo "firmware = \"$firmware\""
-        echo "guestOS = \"windows9-64\""
+        echo "guestOS = \"$vmx_os\""
 
         for i in "${!flat_disks[@]}"; do
             echo "scsi0:$i.present = \"TRUE\""
