@@ -205,7 +205,7 @@ process_vm() {
     local out_abs
     out_abs=$(realpath "../../$vm_output")
 
-    if ! virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" --network none --virtio-win "$current_virtio" 2>v2v_error.log; then
+    if ! VIRTIO_WIN="$current_virtio" virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" --network none 2>v2v_error.log; then
         log "${RED}❌ Erro Crítico na Conversão.${NC}"
         echo "----------------- [ LOG DE ERRO VIRT-V2V ] -----------------" >&2
         cat v2v_error.log >&2

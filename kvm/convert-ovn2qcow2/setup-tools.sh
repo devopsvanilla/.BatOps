@@ -43,6 +43,7 @@ PACKAGES=(
     cpu-checker
     libvirt-daemon-system
     libvirt-clients
+    virt-v2v
     rhsrvany
     ntfs-3g
     nbdkit
