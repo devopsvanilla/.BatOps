@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0 (2026-04-02)
+
+### Features
+
+* :sparkles: **KVM Migration**: Implementação do sistema híbrido de drivers VirtIO (Stable/Legacy).
+* :sparkles: **Windows EOL**: Prompt interativo para seleção de drivers em sistemas legados (WinXP/7/2012).
+* :sparkles: **UX/UI**: Geração automática de relatórios `README.txt` com comandos de importação Libvirt.
+* :sparkles: **Format**: Automação de conversão para QCOW2 real com renomeação de arquivos e ajuste de XML.
+* :sparkles: **Compatibility**: Suporte total ao Ubuntu 24.04 (Noble) e virt-v2v 2.4.
+
+### Bug Fixes
+
+* :bug: **Dependencies**: Substituição do pacote obsoleto `libguestfs-winsupport` por `ntfs-3g`.
+* :bug: **Virt-v2v**: Substituição da flag legada `--virtio-win` pela variável de ambiente `VIRTIO_WIN`.
+* :bug: **Shell**: Correção de avisos ShellCheck e padronização de funções (SC2218).
+
 ## 1.0.0 (2026-03-30)
 
 
