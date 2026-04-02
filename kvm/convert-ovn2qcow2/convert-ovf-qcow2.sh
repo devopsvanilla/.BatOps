@@ -31,23 +31,57 @@ done
 
 set -euo pipefail
 
-# --- Verificações Iniciais ---
-mkdir -p "$OUTPUT_DIR" "$WORK_DIR"
-
+# --- Funções Utilitárias ---
 log() { echo -e "$(date '+%F %T') | $1" | tee -a "$LOG_FILE" >&2; }
 fail() { log "${RED}❌ ERRO: $1${NC}"; exit 1; }
 
-# Checar dependências instaladas pelo setup-tools
-for cmd in xmllint qemu-img virt-v2v virt-inspector; do
-    command -v $cmd >/dev/null 2>&1 || fail "Comando '$cmd' não encontrado. Rode o ./setup-tools.sh primeiro."
-done
-
-# --- Funções de Extração ---
 get_val() {
     local xpath="$1"
     local file="$2"
     xmllint --xpath "string($xpath)" "$file" 2>/dev/null || echo ""
 }
+
+# --- Scan inicial para detecção de Windows EOL ---
+WINEOL_FOUND=false
+EOL_REGEX="([Xx][Pp]|[Ww]indows 7|[Ww]indows 8\.1|[Ss]erver 2012|1809|1903|1909|2004|20[Hh]2|21[Hh]1|21[Hh]2|22[Hh]2|[Ll][Tt][Ss][Bb])"
+
+log "${YELLOW}🔎 Escaneando imagens para detecção de sistemas legados...${NC}"
+# Usamos find e checagem simples de XML para o prompt global
+while read -r ovf; do
+    if [ ! -f "$ovf" ]; then continue; fi
+    desc=$(xmllint --xpath "string(//*[local-name()='OperatingSystemSection']/*[local-name()='Description'])" "$ovf" 2>/dev/null || echo "")
+    type=$(xmllint --xpath "string(//*[local-name()='OperatingSystemSection']/@*[local-name()='osType'])" "$ovf" 2>/dev/null || echo "")
+    if [[ "$desc" =~ $EOL_REGEX ]] || [[ "$type" =~ $EOL_REGEX ]]; then
+        WINEOL_FOUND=true
+        break
+    fi
+done < <(find "$INPUT_DIR" -name "*.ovf" 2>/dev/null)
+
+VIRTIO_MODE="latest"
+if [ "$WINEOL_FOUND" = true ]; then
+    echo -e "\n${YELLOW}🎨 [VIRTIO] Sistemas Windows legados (EOL) detetados no lote!${NC}"
+    echo -e "👉 Escolha a versão dos Drivers VirtIO para injeção nestas máquinas:"
+    echo -e "   1) 📀 ${GREEN}Legacy${NC} (0.1.185) - [RECOMENDADO para WinEOL]"
+    echo -e "   2) 🚀 ${YELLOW}Modern${NC} (Stable) - [Pode causar instabilidade em sistemas antigos]"
+    echo -ne "Opção [1]: "
+    # Desativar set -e temporariamente para o read não quebrar se o usuário der Ctrl+D
+    set +e
+    read -r opt
+    set -e
+    case $opt in
+        2) VIRTIO_MODE="latest" ;;
+        *) VIRTIO_MODE="legacy" ;;
+    esac
+    echo -e "✅ Configuração global WinEOL: ${GREEN}$VIRTIO_MODE${NC}\n"
+fi
+
+# --- Verificações Iniciais ---
+mkdir -p "$OUTPUT_DIR" "$WORK_DIR"
+
+# Checar dependências instaladas pelo setup-tools
+for cmd in xmllint qemu-img virt-v2v virt-inspector; do
+    command -v "$cmd" >/dev/null 2>&1 || fail "Comando '$cmd' não encontrado. Rode o ./setup-tools.sh primeiro."
+done
 
 # --- Processamento da VM ---
 process_vm() {
@@ -107,7 +141,7 @@ process_vm() {
     [[ "$os_type" =~ "2012" ]] && vmx_os="windows8Server64Guest"
 
     local firmware="bios"
-    [[ $(grep -iE "efi|uefi" "$ovf_local") ]] && firmware="efi"
+    grep -qiE "efi|uefi" "$ovf_local" && firmware="efi"
 
     [ -z "$ram" ] && ram="4096"
     [ -z "$cpu" ] && cpu="2"
@@ -136,9 +170,9 @@ process_vm() {
     {
         echo "config.version = \"8\""
         echo "virtualHW.version = \"11\""
+        echo "displayName = \"$vm_name\""
         echo "memsize = \"$ram\""
         echo "numvcpus = \"$cpu\""
-        echo "firmware = \"$firmware\""
         echo "guestOS = \"$vmx_os\""
 
         for i in "${!flat_disks[@]}"; do
@@ -153,6 +187,14 @@ process_vm() {
     # 5. Executar virt-v2v (A Conversão Real)
     log "🔄 Executando virt-v2v (Injeção de drivers e conversão QCOW2)..."
 
+    # Seleção do diretório de drivers baseado no SO e na escolha global
+    local current_virtio="/usr/share/virtio-win/latest"
+    local is_eol=false
+    if [[ "$os_desc" =~ $eol_regex ]] || [[ "$os_type" =~ $eol_regex ]]; then
+        current_virtio="/usr/share/virtio-win/$VIRTIO_MODE"
+        is_eol=true
+    fi
+
     # Configurar ambiente para WSL2/Direct Backend
     export LIBGUESTFS_BACKEND=direct
     if [ -d "/usr/lib/x86_64-linux-gnu/guestfs" ]; then
@@ -163,18 +205,53 @@ process_vm() {
     local out_abs
     out_abs=$(realpath "../../$vm_output")
 
-    if ! virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" --network none 2>v2v_error.log; then
-        log "${RED}❌ Falha na inspeção do SO.${NC}"
+    if ! virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" --network none --virtio-win "$current_virtio" 2>v2v_error.log; then
+        log "${RED}❌ Erro Crítico na Conversão.${NC}"
+        echo "----------------- [ LOG DE ERRO VIRT-V2V ] -----------------" >&2
+        cat v2v_error.log >&2
+        echo "------------------------------------------------------------" >&2
         log "Tentando diagnóstico com virt-inspector..."
         virt-inspector -a "${flat_disks[0]}" > "inspector_report.txt" 2>&1 || true
-        echo "------------------------------------------------" >&2
-        cat v2v_error.log >&2
-        echo "------------------------------------------------" >&2
         popd > /dev/null
         return 1
     fi
 
-    # 6. Limpeza de ficheiros de trabalho (opcional, remova se quiser depurar)
+    # 6. Gerar README.txt de diagnóstico
+    log "📄 Gerando relatório de conversão..."
+    {
+        echo "================================================================"
+        echo "📦 RELATÓRIO DE CONVERSÃO BATOPS - $vm_name"
+        echo "================================================================"
+        echo "Data: $(date '+%F %T')"
+        echo "Sistema Operacional: ${os_desc:-$os_type}"
+        echo "Drivers VirtIO: $current_virtio"
+        echo "----------------------------------------------------------------"
+
+        if [ "$is_eol" = true ]; then
+            echo "⚠️  AVISO DE SISTEMA LEGADO (WinEOL)"
+            echo "Este OS está fora do suporte oficial. Os drivers injetados"
+            echo "foram selecionados via prompt global (Modo: $VIRTIO_MODE)."
+            echo ""
+            echo "📋 COMO TESTAR COMPATIBILIDADE:"
+            echo "1. Boot KVM: Se ocorrer BSOD 0x0000007B, os drivers de disco"
+            echo "   falharam. Tente reprocessar com a outra versão de drivers."
+            echo "2. Gerenciador de Dispositivos: Procure por 'Red Hat VirtIO'"
+            echo "   em Controladores SCSI e Adaptadores de Rede."
+            echo "3. Rede: Se não houver rede, verifique se o driver 'NetKVM'"
+            echo "   foi carregado corretamente."
+        else
+            echo "🚀 SISTEMA MODERNO"
+            echo "Drivers estáveis aplicados com sucesso."
+            echo ""
+            echo "📋 RECOMENDAÇÕES:"
+            echo "1. Valide a performance de I/O em discos virtio-scsi."
+            echo "2. Instale o QEMU Guest Agent se não houver sido injetado."
+        fi
+        echo "----------------------------------------------------------------"
+        echo "BatOps - Infrastructure & Automation"
+    } > "$out_abs/README.txt"
+
+    # 7. Limpeza de ficheiros de trabalho (opcional, remova se quiser depurar)
     log "🧹 Limpando ficheiros temporários..."
     popd > /dev/null
     rm -rf "$vm_work"

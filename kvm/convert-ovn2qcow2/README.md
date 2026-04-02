@@ -13,7 +13,7 @@ O diferencial desta ferramenta é a injeção automática de drivers **VirtIO** 
 * **WSL2 (Windows Subsystem for Linux)**: Requer que a Virtualização Aninhada (Nested Virtualization) esteja ativa na BIOS/UEFI e no Windows.
 
 ### Dependências Técnicas
-O script `setup-tools.sh` instalará automaticamente:
+O script `setup-tools.sh` instalará automaticamente (requer acesso à Internet na primeira execução):
 * `virt-v2v`: Motor de conversão e injeção de drivers.
 * `rhsrvany`: Binários Windows essenciais para o primeiro boot de guests Windows.
 * `ntfs-3g`: Suporte a leitura/escrita em partições NTFS (substitui `libguestfs-winsupport` no Ubuntu 24.04+).

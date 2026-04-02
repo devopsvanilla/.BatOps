@@ -46,9 +46,38 @@ PACKAGES=(
     rhsrvany
     ntfs-3g
     nbdkit
+    p7zip-full
+    curl
 )
 
 apt install -y "${PACKAGES[@]}"
+
+# 3.1 Download e Extração de Drivers VirtIO (Híbrido: Stable + Legacy)
+VIRTIO_BASE="/usr/share/virtio-win"
+VIRTIO_STABLE_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
+VIRTIO_LEGACY_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.185-2/virtio-win.iso"
+
+install_virtio() {
+    local name="$1"
+    local url="$2"
+    local target="$VIRTIO_BASE/$name"
+    local iso="/tmp/virtio-$name.iso"
+
+    if [ ! -d "$target" ] || [ -z "$(ls -A "$target" 2>/dev/null)" ]; then
+        echo -e "🌐 Baixando Drivers VirtIO ($name)..."
+        mkdir -p "$target"
+        curl -L -o "$iso" "$url"
+        echo -e "📦 Extraindo para $target..."
+        7z x "$iso" -o"$target" -y > /dev/null
+        rm -f "$iso"
+        echo -e "${GREEN}✅ Drivers VirtIO ($name) extraídos com sucesso.${NC}"
+    else
+        echo -e "${GREEN}✅ Drivers VirtIO ($name) já presentes.${NC}"
+    fi
+}
+
+install_virtio "latest" "$VIRTIO_STABLE_URL"
+install_virtio "legacy" "$VIRTIO_LEGACY_URL"
 
 # 4. Configuração de Kernel (Específico para funcionamento do Libguestfs/virt-v2v)
 if [ "$IS_WSL" = true ]; then

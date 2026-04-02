@@ -10,7 +10,8 @@ Este documento lista todas as dependências, bibliotecas e ferramentas de tercei
 | **qemu-utils** | GNU GPL v2 | N/A | [qemu.org](https://www.qemu.org/) | Utilitários para manipulação de imagens de disco (qemu-img). |
 | **libxml2 (xmllint)** | MIT | N/A | [gnome.org/libxml2](https://gitlab.gnome.org/GNOME/libxml2) | Parser de XML utilizado para ler manifestos OVF. |
 | **nbdkit** | GNU GPL v2+ | 1.30+ | [libguestfs.org](https://github.com/libguestfs/nbdkit) | Toolkit para exportação de dados de disco via Network Block Device. |
-| **VirtIO Drivers** | Apache 2.0 / MIT | Latest | [github.com/virtio-win](https://github.com/virtio-win/virtio-win-pkg-scripts) | Drivers de alta performance para I/O no KVM. |
+| **VirtIO Drivers (Stable)** | Apache 2.0 / MIT | Stable | [fedoraproject.org](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/) | Drivers de alta performance para I/O no KVM (Modernos). |
+| **VirtIO Drivers (Legacy)** | Apache 2.0 / MIT | 0.1.185 | [fedoraproject.org](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/) | Versão arquivada recomendada para Windows XP e sistemas EOL. |
 
 ## Notas de Licenciamento
 Todas as ferramentas listadas são de código aberto (FOSS). O uso comercial é permitido conforme as licenças GPL/MIT correspondentes, desde que respeitadas as cláusulas de atribuição e distribuição.
