@@ -16,7 +16,7 @@ O diferencial desta ferramenta é a injeção automática de drivers **VirtIO** 
 O script `setup-tools.sh` instalará automaticamente:
 * `virt-v2v`: Motor de conversão e injeção de drivers.
 * `rhsrvany`: Binários Windows essenciais para o primeiro boot de guests Windows.
-* `libguestfs-winsupport`: Suporte a NTFS (ACLs e atributos) em ferramentas guestfs.
+* `ntfs-3g`: Suporte a leitura/escrita em partições NTFS (substitui `libguestfs-winsupport` no Ubuntu 24.04+).
 * `nbdkit`: Ferramenta para exportação de discos via rede/local (melhora estabilidade).
 * `libguestfs-tools`: Manipulação de sistemas de arquivos internos da VM.
 * `qemu-utils`: Conversão de formatos de disco rígido virtual.

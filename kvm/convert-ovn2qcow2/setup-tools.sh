@@ -44,7 +44,7 @@ PACKAGES=(
     libvirt-daemon-system
     libvirt-clients
     rhsrvany
-    libguestfs-winsupport
+    ntfs-3g
     nbdkit
 )
 
