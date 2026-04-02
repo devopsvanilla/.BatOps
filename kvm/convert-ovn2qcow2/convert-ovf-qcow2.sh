@@ -205,7 +205,7 @@ process_vm() {
     local out_abs
     out_abs=$(realpath "../../$vm_output")
 
-    if ! VIRTIO_WIN="$current_virtio" virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" --network none 2>v2v_error.log; then
+    if ! VIRTIO_WIN="$current_virtio" virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" -of qcow2 -oa sparse --network none 2>v2v_error.log; then
         log "${RED}❌ Erro Crítico na Conversão.${NC}"
         echo "----------------- [ LOG DE ERRO VIRT-V2V ] -----------------" >&2
         cat v2v_error.log >&2
@@ -247,6 +247,11 @@ process_vm() {
             echo "1. Valide a performance de I/O em discos virtio-scsi."
             echo "2. Instale o QEMU Guest Agent se não houver sido injetado."
         fi
+        echo ""
+        echo "🛠️  IMPORTAÇÃO NO KVM (Libvirt):"
+        echo "Para subir esta VM no host KVM de destino, execute:"
+        echo "  virsh define $out_abs/$vm_name.xml"
+        echo "  virsh start $vm_name"
         echo "----------------------------------------------------------------"
         echo "BatOps - Infrastructure & Automation"
     } > "$out_abs/README.txt"

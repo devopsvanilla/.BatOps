@@ -62,7 +62,7 @@
 |---|---|
 | [create-proxmox-vm.sh](proxmox/create-proxmox-vm.sh) | Criação de VMs no Proxmox ([docs](proxmox/README.md)) |
 | [create-haos-vm.sh](proxmox/create-haos-vm.sh) | Criação de VM para Home Assistant OS |
-| [convert-ovn2qcow2](kvm/convert-ovn2qcow2/) | Conversão de imagens OVN para QCOW2 |
+| [convert-ovf2qcow2](kvm/convert-ovn2qcow2/) | Conversão de imagens OVF para QCOW2 (Suporte WinEOL e VirtIO) |
 
 ---
 

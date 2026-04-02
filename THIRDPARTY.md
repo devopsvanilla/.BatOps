@@ -16,6 +16,8 @@ Lista de todas as dependências, bibliotecas, ferramentas e soluções de tercei
 | Proxmox VE | AGPL v3 | Plataforma de virtualização para criação de VMs | [proxmox.com](https://www.proxmox.com/) |
 | QEMU/KVM | GPL v2 | Hypervisor para virtualização | [qemu.org](https://www.qemu.org/) |
 | qemu-utils | GPL v2 | Utilitários de disco (qemu-img) para KVM/Proxmox | [qemu.org](https://www.qemu.org/) |
+| virt-v2v | GPL v2+ | Conversão e injeção de drivers em VMs (Libguestfs) | [libguestfs.org](https://libguestfs.org/virt-v2v.1.html) |
+| ntfs-3g | GPL v2+ | Suporte NTFS para injeção de drivers em Windows | [tuxera.com](https://github.com/tuxera/ntfs-3g) |
 
 ## Stacks Docker Compose
 

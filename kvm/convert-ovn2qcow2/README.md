@@ -73,7 +73,6 @@ Execute o validador para garantir que os arquivos não estão corrompidos ou inc
 ```
 
 ### Passo 3: Conversão Real
-Se a validação retornar **OK**, inicie a conversão.
 Se a validação retornar **OK**, inicie a conversão. Para imagens com Windows EOL, utilize a flag de força.
 ```bash
 # Conversão padrão
@@ -145,6 +144,37 @@ flowchart TD
 
 12. **Finalização**
      Ao processar todas as VMs, exibe mensagem de conclusão.
+
+---
+
+## 📦 6. Resultados da Conversão
+
+Após o processamento, os arquivos finais estarão localizados em `./output/<vm-name>/`:
+
+- **`<vm-name>.qcow2`**: Imagem do disco rígido em formato QCOW2 (esparso/thin-provisioned).
+- **`<vm-name>.xml`**: Arquivo de definição do Libvirt para importação rápida.
+- **`README.txt`**: Relatório detalhado com drivers injetados e comandos de suporte.
+
+---
+
+## 🛠️ 7. Como Importar no KVM (Libvirt)
+
+Para registrar e iniciar a nova VM no host KVM de destino:
+
+1. **Definir a VM**:
+   ```bash
+   virsh define ./output/<vm-name>/<vm-name>.xml
+   ```
+
+2. **Iniciar a VM**:
+   ```bash
+   virsh start <vm-name>
+   ```
+
+3. **Verificar Console**:
+   ```bash
+   virt-viewer <vm-name>
+   ```
 
 ---
 
