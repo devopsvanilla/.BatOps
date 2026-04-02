@@ -216,6 +216,17 @@ process_vm() {
         return 1
     fi
 
+    # 5.1 Ajuste de extensibilidade (Re-nomear discos para .qcow2 e atualizar XML)
+    log "✨ Finalizando formatação e extensões..."
+    # Localizar os nomes de arquivo originais no XML (que o virt-v2v gera sem extensão)
+    # e renomear fisicamente além de atualizar o descritor XML
+    while read -r disk_file; do
+        if [ -f "$out_abs/$disk_file" ]; then
+            mv "$out_abs/$disk_file" "$out_abs/$disk_file.qcow2"
+            sed -i "s|'$out_abs/$disk_file'|'$out_abs/$disk_file.qcow2'|g" "$out_abs/$vm_name.xml"
+        fi
+    done < <(grep -oP "source file='\K[^']*(?=/|$out_abs/)" "$out_abs/$vm_name.xml" | xargs -n1 basename | sort -u)
+
     # 6. Gerar README.txt de diagnóstico
     log "📄 Gerando relatório de conversão..."
     {
