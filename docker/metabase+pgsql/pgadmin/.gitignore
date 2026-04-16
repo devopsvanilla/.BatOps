@@ -1,0 +1,5 @@
+# Gerado dinamicamente pelo up.sh — contém senha em texto claro
+pgpassfile
+
+# Volume persistente do pgAdmin
+data/

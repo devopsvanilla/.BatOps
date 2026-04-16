@@ -81,3 +81,4 @@ id_ed25519
 *.tgz
 *.tar.gz
 *.zip
+data/

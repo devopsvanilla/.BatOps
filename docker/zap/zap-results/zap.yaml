@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - https://portal.sondahybrid.com/
+    - https://finops.sondahybrid.com
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: https://portal.sondahybrid.com/
+    url: https://finops.sondahybrid.com
   type: spider
 - parameters:
     maxDuration: 0
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: portal.sondahybrid.com-202511252145.html
+    reportFile: finops.sondahybrid.com-202604070841.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report

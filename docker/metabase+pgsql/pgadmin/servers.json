@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Metabase PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "metabaseappdb",
+      "Username": "metabase",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

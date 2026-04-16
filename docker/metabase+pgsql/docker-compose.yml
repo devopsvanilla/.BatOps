@@ -16,8 +16,13 @@ services:
       MB_DB_DBNAME: ${POSTGRES_DB:-metabaseappdb}
       MB_DB_PORT: ${POSTGRES_PORT:-5432}
       MB_DB_USER: ${POSTGRES_USER:-metabase}
-      MB_DB_PASS: ${POSTGRES_PASSWORD:-change-me}
       MB_DB_HOST: ${POSTGRES_HOSTNAME:-postgres}
+    secrets:
+      - postgres_password
+    entrypoint:
+      - /bin/sh
+      - -c
+      - export MB_DB_PASS=$(cat /run/secrets/postgres_password) && exec /app/run_metabase.sh
     networks:
       - metanet1
     healthcheck:
@@ -33,7 +38,9 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-metabase}
       POSTGRES_DB: ${POSTGRES_DB:-metabaseappdb}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     ports:
@@ -45,6 +52,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  pgadmin:
+    image: ${PGADMIN_IMAGE:-dpage/pgadmin4:latest}
+    container_name: ${PGADMIN_CONTAINER_NAME:-pgadmin}
+    hostname: ${PGADMIN_HOSTNAME:-pgadmin}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    secrets:
+      - pgadmin_password
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpassfile:/pgpass:ro
+      - ./pgadmin/data:/var/lib/pgadmin
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${PGADMIN_PORT:-5050}:80"
+    networks:
+      - metanet1
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  pgadmin_password:
+    file: ./secrets/pgadmin_password.txt
 networks:
   metanet1:
     name: ${DOCKER_NETWORK_NAME:-metanet1}
