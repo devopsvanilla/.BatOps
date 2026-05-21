@@ -36,3 +36,36 @@ if [ "$USER_NAME" != "root" ]; then
     echo "⚠️ O usuário '$USER_NAME' foi adicionado ao grupo 'docker'."
     echo "⚠️ Você precisa reiniciar a sessão (ou rodar 'su - $USER_NAME') para usar o Docker sem sudo."
 fi
+
+# Instalação opcional do Dockly
+if ! command -v dockly &> /dev/null; then
+    echo ""
+    read -p "Deseja instalar o Dockly (dashboard CLI para Docker)? (s/N): " dockly_response || dockly_response="n"
+    if [[ "$dockly_response" =~ ^[Ss]$ ]]; then
+        echo "⏳ Instalando dependências de sistema para Node.js (libatomic)..."
+        # Tratamento de libatomic para que o Node+Dockly funcione em qualquer disto base
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y libatomic1 >/dev/null 2>&1 || true
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y libatomic >/dev/null 2>&1 || true
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y libatomic >/dev/null 2>&1 || true
+        fi
+
+        echo "⏳ Instalando nvm e Node.js..."
+        export NVM_DIR="$HOME/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        nvm install node --latest-npm
+        nvm use node
+
+        echo "⏳ Instalando Dockly..."
+        npm install -g dockly
+        echo "✅ Dockly instalado com sucesso!"
+    else
+        echo "⏭️ Instalação do Dockly ignorada."
+    fi
+else
+    echo "✅ Dockly já está instalado."
+fi
