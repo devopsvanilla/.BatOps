@@ -14,19 +14,19 @@ sysbench threads run
 
 echo -e "\n===== TESTE DE DISCO ====="
 # Preparar arquivos de teste
-sysbench fileio --file-total-size=1G prepare
+sysbench fileio --file-total-size=100mb prepare
 
 # Teste de leitura sequencial
-sysbench fileio --file-total-size=1G --file-test-mode=seqrd run
+sysbench fileio --file-total-size=100mb --file-test-mode=seqrd run
 
 # Teste de escrita sequencial
-sysbench fileio --file-total-size=1G --file-test-mode=seqwr run
+sysbench fileio --file-total-size=100mb --file-test-mode=seqwr run
 
 # Teste de leitura aleatória
-sysbench fileio --file-total-size=1G --file-test-mode=rndrd run
+sysbench fileio --file-total-size=100mb --file-test-mode=rndrd run
 
 # Teste de escrita aleatória
-sysbench fileio --file-total-size=1G --file-test-mode=rndwr run
+sysbench fileio --file-total-size=100mb --file-test-mode=rndwr run
 
 # Limpar arquivos de teste
 sysbench fileio cleanup
