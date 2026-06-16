@@ -1,0 +1,6 @@
+project_id         = "mrphs-292602"
+billing_account_id = "017300-1AD74D-000DB9"
+dataset_id         = "billing_export"
+location           = "US"
+export_type        = "DETAILED_COST"
+credentials_file   = ""  # Ex: "../../credentials/gcloud/morpheuslab-sa.json"
