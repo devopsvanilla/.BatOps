@@ -24,7 +24,7 @@ Este diretório provisiona o dataset BigQuery e a exportação de faturamento po
 
 3. Atualize `terraform.tfvars` com seus valores reais. Se preferir usar o arquivo de credenciais da service account, informe a variável `credentials_file`:
    ```hcl
-   credentials_file = "../../credentials/gcloud/morpheuslab-sa.json"
+   credentials_file = "../../credentials/gcloud/gcloud-sa.json.json"
    ```
 
 4. Inicialize o Terraform:
@@ -54,7 +54,7 @@ gcloud auth application-default login
 ou, usando o JSON diretamente no `terraform.tfvars`:
 
 ```hcl
-credentials_file = "../../credentials/gcloud/morpheuslab-sa.json"
+credentials_file = "../../credentials/gcloud/gcloud-sa.json.json"
 ```
 
 ## Verificação após aplicação
