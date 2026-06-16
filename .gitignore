@@ -82,3 +82,8 @@ id_ed25519
 *.tar.gz
 *.zip
 data/
+/docker/metabase+pgsql/pgadmin/*
+credentials/
+*.tfvars
+volumes/
+

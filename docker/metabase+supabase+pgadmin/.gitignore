@@ -1,0 +1,16 @@
+supabase/.env
+supabase/volumes/db/data/
+supabase/volumes/storage/
+
+pgadmin/data/
+pgadmin/pgpassfile
+pgadmin/servers.json
+
+metabase/data/
+metabase/plugins/
+metabase/dashboards/*.export.json
+
+.env*
+.flaskenv*
+!.env.project
+!.env.vault

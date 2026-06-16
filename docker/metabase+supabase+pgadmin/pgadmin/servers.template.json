@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Supabase Pooler (session)",
+      "Group": "Supabase",
+      "Host": "__PGADMIN_DB_HOST__",
+      "Port": __PGADMIN_DB_PORT__,
+      "MaintenanceDB": "__PGADMIN_DB_NAME__",
+      "Username": "__PGADMIN_DB_USER__",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

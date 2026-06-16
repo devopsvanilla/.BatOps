@@ -10,6 +10,9 @@ LOG_FILE="./conversion.log"
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
 FORCE_EOL=false
@@ -40,6 +43,55 @@ get_val() {
     local file="$2"
     xmllint --xpath "string($xpath)" "$file" 2>/dev/null || echo ""
 }
+
+# --- Funções de Display e UX ---
+human_size() {
+    local bytes=$1
+    if   (( bytes >= 1073741824 )); then printf "%.1f GB" "$(echo "scale=1; $bytes/1073741824" | bc)"
+    elif (( bytes >= 1048576 ))   ; then printf "%.1f MB" "$(echo "scale=1; $bytes/1048576"    | bc)"
+    else                                 printf "%d KB"   "$(( bytes / 1024 ))"
+    fi
+}
+
+divider() { echo -e "${DIM}──────────────────────────────────────────────────${NC}"; }
+header()  {
+    echo -e "\n${BOLD}${CYAN}══════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${CYAN}  $*${NC}"
+    echo -e "${BOLD}${CYAN}══════════════════════════════════════════════════${NC}\n"
+}
+
+# --- Spinner ---
+spinner_pid=""
+start_spinner() {
+    local msg=$1
+    local spin=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    ( local i=0
+      while true; do
+          printf "\r  ${CYAN}%s${NC} %s " "${spin[$i]}" "$msg"
+          i=$(( (i+1) % ${#spin[@]} ))
+          sleep 0.1
+      done ) &
+    spinner_pid=$!
+}
+stop_spinner() {
+    if [[ -n "$spinner_pid" ]]; then
+        kill "$spinner_pid" 2>/dev/null || true
+        wait "$spinner_pid" 2>/dev/null || true
+        spinner_pid=""
+        printf "\r\033[K"
+    fi
+}
+
+# --- Cleanup e Trap ---
+CURRENT_VM_WORK=""
+cleanup() {
+    stop_spinner
+    if [[ -n "$CURRENT_VM_WORK" && -d "$CURRENT_VM_WORK" ]]; then
+        log "${YELLOW}⚠️  Interrompido! Removendo diretório parcial: $CURRENT_VM_WORK${NC}"
+        rm -rf "$CURRENT_VM_WORK"
+    fi
+}
+trap cleanup EXIT INT TERM
 
 # --- Scan inicial para detecção de Windows EOL ---
 WINEOL_FOUND=false
@@ -79,7 +131,7 @@ fi
 mkdir -p "$OUTPUT_DIR" "$WORK_DIR"
 
 # Checar dependências instaladas pelo setup-tools
-for cmd in xmllint qemu-img virt-v2v virt-inspector; do
+for cmd in xmllint qemu-img virt-v2v virt-inspector bc; do
     command -v "$cmd" >/dev/null 2>&1 || fail "Comando '$cmd' não encontrado. Rode o ./setup-tools.sh primeiro."
 done
 
@@ -96,6 +148,27 @@ process_vm() {
     # 1. Preparar área de trabalho isolada
     mkdir -p "$vm_output"
     rm -rf "$vm_work" && mkdir -p "$vm_work"
+    CURRENT_VM_WORK="$vm_work"
+
+    # Verificar espaço disponível antes de iniciar
+    local vmdk_total_size=0
+    while IFS= read -r vmdk_src; do
+        local sz
+        sz=$(stat -c%s "$vmdk_src" 2>/dev/null || echo 0)
+        vmdk_total_size=$(( vmdk_total_size + sz ))
+    done < <(find "$(dirname "$ovf_path")" -maxdepth 1 -name "*.vmdk" 2>/dev/null)
+    if (( vmdk_total_size > 0 )); then
+        local work_avail output_avail
+        work_avail=$(df -B1 --output=avail "$WORK_DIR" 2>/dev/null | tail -1 | tr -d ' ')
+        output_avail=$(df -B1 --output=avail "$OUTPUT_DIR" 2>/dev/null | tail -1 | tr -d ' ')
+        log "💾 Tamanho VMDKs: $(human_size "$vmdk_total_size") | Livre work: $(human_size "$work_avail") | Livre output: $(human_size "$output_avail")"
+        if (( work_avail < vmdk_total_size )); then
+            log "${YELLOW}⚠️  AVISO: Espaço em $WORK_DIR pode ser insuficiente para os arquivos de trabalho.${NC}"
+        fi
+        if (( output_avail < vmdk_total_size )); then
+            log "${YELLOW}⚠️  AVISO: Espaço em $OUTPUT_DIR pode ser insuficiente para a imagem qcow2 final.${NC}"
+        fi
+    fi
 
     cp "$ovf_path" "$vm_work/"
     # Copiar todos os VMDKs da pasta de origem
@@ -205,7 +278,9 @@ process_vm() {
     local out_abs
     out_abs=$(realpath "../../$vm_output")
 
+    start_spinner "Executando virt-v2v — isso pode levar vários minutos..."
     if ! VIRTIO_WIN="$current_virtio" virt-v2v -i vmx "temp.vmx" -o local -os "$out_abs" -of qcow2 -oa sparse --network none 2>v2v_error.log; then
+        stop_spinner
         log "${RED}❌ Erro Crítico na Conversão.${NC}"
         echo "----------------- [ LOG DE ERRO VIRT-V2V ] -----------------" >&2
         cat v2v_error.log >&2
@@ -215,6 +290,7 @@ process_vm() {
         popd > /dev/null
         return 1
     fi
+    stop_spinner
 
     # 5.1 Ajuste de extensibilidade (Re-nomear discos para .qcow2 e atualizar XML)
     log "✨ Finalizando formatação e extensões..."
@@ -226,6 +302,23 @@ process_vm() {
             sed -i "s|'$out_abs/$disk_file'|'$out_abs/$disk_file.qcow2'|g" "$out_abs/$vm_name.xml"
         fi
     done < <(grep -oP "source file='\K[^']*(?=/|$out_abs/)" "$out_abs/$vm_name.xml" | xargs -n1 basename | sort -u)
+
+    # 5.2 Verificação de integridade das imagens qcow2 geradas
+    log "🔬 Verificando integridade das imagens qcow2..."
+    while IFS= read -r qcow2_file; do
+        local check_out file_size
+        file_size=$(stat -c%s "$qcow2_file" 2>/dev/null || echo 0)
+        log "   📁 $(basename "$qcow2_file") — $(human_size "$file_size") em disco"
+        start_spinner "Verificando $(basename "$qcow2_file")..."
+        if check_out=$(qemu-img check "$qcow2_file" 2>&1); then
+            stop_spinner
+            log "${GREEN}   ✅ Verificação OK: $(basename "$qcow2_file")${NC}"
+        else
+            stop_spinner
+            log "${YELLOW}   ⚠️  qemu-img check reportou issues (pode ser não-crítico): $(basename "$qcow2_file")${NC}"
+            echo "$check_out" >&2
+        fi
+    done < <(find "$out_abs" -maxdepth 1 -name "*.qcow2" 2>/dev/null)
 
     # 6. Gerar README.txt de diagnóstico
     log "📄 Gerando relatório de conversão..."
@@ -271,6 +364,7 @@ process_vm() {
     log "🧹 Limpando ficheiros temporários..."
     popd > /dev/null
     rm -rf "$vm_work"
+    CURRENT_VM_WORK=""
 
     log "${GREEN}✅ VM '$vm_name' concluída com sucesso!${NC}"
 }

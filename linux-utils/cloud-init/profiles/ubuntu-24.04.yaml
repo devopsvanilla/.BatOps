@@ -1,0 +1,67 @@
+profile.name: Ubuntu Server 24.04 LTS (Noble)
+profile.slug: ubuntu-24.04
+profile.os: ubuntu
+profile.version: "24.04"
+profile.description: Ubuntu cloud-init profile with secure-by-default settings for Proxmox NoCloud seed generation.
+
+virtualizer.default: proxmox
+virtualizer.proxmox.seed_format: nocloud-iso
+virtualizer.proxmox.default_interface: ens18
+virtualizer.proxmox.default_volume_label: cidata
+
+system.timezone: Etc/UTC
+system.locale: en_US.UTF-8
+system.package_update: true
+system.package_upgrade: true
+system.package_reboot_if_required: false
+system.manage_etc_hosts: true
+system.preserve_hostname: false
+
+network.default_mode: dhcp
+network.default_dns:
+  - 1.1.1.1
+  - 8.8.8.8
+
+auth.default_user: ubuntu
+auth.default_shell: /bin/bash
+auth.disable_root: true
+auth.lock_passwd_if_ssh_only: true
+auth.keep_default_user: true
+auth.ssh_password_auth: false
+auth.default_groups:
+  - sudo
+  - adm
+  - dialout
+  - cdrom
+  - floppy
+  - audio
+  - dip
+  - video
+  - plugdev
+  - netdev
+  - lxd
+
+packages.base:
+  - qemu-guest-agent
+  - cloud-init
+  - cloud-initramfs-growroot
+  - openssh-server
+  - ca-certificates
+  - curl
+  - wget
+  - vim
+  - htop
+
+services.enabled:
+  - qemu-guest-agent
+  - ssh
+
+runcmd.base:
+  - systemctl daemon-reload
+  - systemctl enable --now qemu-guest-agent
+  - systemctl restart ssh
+
+runcmd.password_auth:
+  - install -d -m 0755 /etc/ssh/sshd_config.d
+  - printf 'PasswordAuthentication yes\nKbdInteractiveAuthentication yes\n' >/etc/ssh/sshd_config.d/99-batops-cloud-init.conf
+  - systemctl restart ssh

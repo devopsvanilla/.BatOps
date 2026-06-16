@@ -1,0 +1,85 @@
+services:
+  metabase:
+    image: ${METABASE_IMAGE:-metabase/metabase:latest}
+    container_name: ${METABASE_CONTAINER_NAME:-metabase}
+    hostname: ${METABASE_HOSTNAME:-metabase}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${METABASE_PORT:-3000}:3000"
+    environment:
+      MB_DB_TYPE: ${MB_DB_TYPE:-postgres}
+      MB_DB_DBNAME: ${POSTGRES_DB:-metabaseappdb}
+      MB_DB_PORT: ${POSTGRES_PORT:-5432}
+      MB_DB_USER: ${POSTGRES_USER:-metabase}
+      MB_DB_HOST: ${POSTGRES_HOSTNAME:-postgres}
+    secrets:
+      - postgres_password
+    entrypoint:
+      - /bin/sh
+      - -c
+      - export MB_DB_PASS=$(cat /run/secrets/postgres_password) && exec /app/run_metabase.sh
+    networks:
+      - metanet1
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16}
+    container_name: ${POSTGRES_CONTAINER_NAME:-postgres}
+    hostname: ${POSTGRES_HOSTNAME:-postgres}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-metabase}
+      POSTGRES_DB: ${POSTGRES_DB:-metabaseappdb}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${POSTGRES_PUBLISHED_PORT:-5432}:5432"
+    networks:
+      - metanet1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  pgadmin:
+    image: ${PGADMIN_IMAGE:-dpage/pgadmin4:latest}
+    container_name: ${PGADMIN_CONTAINER_NAME:-pgadmin}
+    hostname: ${PGADMIN_HOSTNAME:-pgadmin}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    secrets:
+      - pgadmin_password
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpassfile:/pgpass:ro
+      - ./pgadmin/data:/var/lib/pgadmin
+    ports:
+      - "${HOST_BIND_IP:-0.0.0.0}:${PGADMIN_PORT:-5050}:80"
+    networks:
+      - metanet1
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  pgadmin_password:
+    file: ./secrets/pgadmin_password.txt
+networks:
+  metanet1:
+    name: ${DOCKER_NETWORK_NAME:-metanet1}
+    driver: bridge

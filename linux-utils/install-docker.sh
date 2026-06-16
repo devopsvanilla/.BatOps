@@ -29,12 +29,23 @@ if docker compose version &> /dev/null; then
     docker compose version
 fi
 
-# Opcional: adiciona usuário atual ao grupo docker (evita usar sudo)
+# Configuração de permissões: adiciona um usuário ao grupo docker
 USER_NAME=${SUDO_USER:-$USER}
-if [ "$USER_NAME" != "root" ]; then
-    sudo usermod -aG docker "$USER_NAME"
-    echo "⚠️ O usuário '$USER_NAME' foi adicionado ao grupo 'docker'."
-    echo "⚠️ Você precisa reiniciar a sessão (ou rodar 'su - $USER_NAME') para usar o Docker sem sudo."
+if [ "$USER_NAME" == "root" ]; then
+    echo "⚠️ O script está sendo executado como 'root'."
+    read -p "Digite o nome do usuário que deseja adicionar ao grupo 'docker' (ou deixe vazio para pular): " TARGET_USER
+else
+    TARGET_USER="$USER_NAME"
+fi
+
+if [ -n "${TARGET_USER:-}" ] && [ "$TARGET_USER" != "root" ]; then
+    if id "$TARGET_USER" &>/dev/null; then
+        sudo usermod -aG docker "$TARGET_USER"
+        echo "✅ O usuário '$TARGET_USER' foi adicionado ao grupo 'docker'."
+        echo "⚠️ Você precisa reiniciar a sessão desse usuário (ou rodar 'su - $TARGET_USER') para aplicar a permissão."
+    else
+        echo "❌ O usuário '$TARGET_USER' não foi encontrado no sistema. Nenhuma permissão extra concedida."
+    fi
 fi
 
 # Instalação opcional do Dockly
@@ -69,3 +80,7 @@ if ! command -v dockly &> /dev/null; then
 else
     echo "✅ Dockly já está instalado."
 fi
+
+echo ""
+echo "💡 DICA: Para permitir que outros usuários executem o docker sem 'sudo' no futuro, use o comando:"
+echo "   sudo usermod -aG docker <nome_do_usuario>"
