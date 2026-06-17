@@ -90,11 +90,11 @@ Substitua `${PROJECT_ID}`, `${DATASET_ID}` e `${BILLING_ACCOUNT_ID}` pelos valor
 A ativação da exportação de Billing para BigQuery precisa ser feita manualmente no Console do GCP, pois a API pública do Cloud Billing não expõe um recurso Terraform para isso.
 
 1. Acesse o Console do GCP.
-2. Vá para `Billing` > `Billing export`.
-3. Selecione a aba `BigQuery export`.
-4. Clique em `Edit settings` (Editar configurações) para `Detailed cost`.
+2. Vá para `Faturamento` > `Exportação do Faturamento`.
+3. Selecione na página 'Custo de uso detalhado'.
+4. Clique em `Ativar exportação detalhada`.
 5. Escolha o projeto e o dataset criados pelo Terraform:
-   - Projeto: `mrphs-292602`
+   - Projeto: `<SEU PROJETO>`
    - Dataset: `billing_export`
 6. Salve as configurações.
 
