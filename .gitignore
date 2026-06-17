@@ -87,3 +87,4 @@ credentials/
 *.tfvars
 volumes/
 
+output/
