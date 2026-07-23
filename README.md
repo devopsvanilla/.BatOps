@@ -39,6 +39,14 @@
 
 ---
 
+### ☁️ Cloud
+
+| Solução | Descrição |
+|---|---|
+| [create-discovery-user](clouds/aws/create-discovery-user/) | CloudFormation para criar usuário AWS de auditoria e inventário com leitura ampla, billing e restrições de acesso a dados |
+
+---
+
 ### ☸️ Kubernetes
 
 | Solução | Descrição |

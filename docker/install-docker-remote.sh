@@ -82,7 +82,8 @@ ensure_busybox_available() {
 validate_volume_permissions() {
     log "Validando possibilidade de aplicar chown 10001:0 em volumes Docker..."
     ensure_busybox_available
-    local volume_name="batops-perm-test-$(date +%s)"
+    local volume_name
+    volume_name="batops-perm-test-$(date +%s)"
     docker volume create "$volume_name" >/dev/null
     if docker run --rm -v "$volume_name:/mnt" "$BUSYBOX_IMAGE" \
         sh -c "mkdir -p /mnt/probe && chown 10001:0 /mnt/probe" >/dev/null 2>&1; then
@@ -98,22 +99,22 @@ validate_volume_permissions() {
 # Função para verificar requisitos
 check_requirements() {
     log "Verificando requisitos do sistema..."
-    
+
     local missing_packages=()
-    
+
     # Verificar se é Ubuntu
     if [ ! -f /etc/lsb-release ]; then
         error "Este script é destinado ao Ubuntu."
         exit 1
     fi
-    
+
     # Verificar pacotes necessários
     for pkg in curl ca-certificates gnupg lsb-release openssl; do
         if ! dpkg -l | grep -q "^ii  $pkg "; then
             missing_packages+=("$pkg")
         fi
     done
-    
+
     if [ ${#missing_packages[@]} -gt 0 ]; then
         warn "Pacotes necessários não instalados: ${missing_packages[*]}"
         echo -n "Deseja instalar os pacotes necessários? (s/N): "
@@ -135,7 +136,7 @@ check_requirements() {
 detect_host_info() {
     HOSTNAME=$(hostname)
     HOST_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
-    
+
     log "Informações do host detectadas:"
     info "  Hostname: $HOSTNAME"
     info "  IP: $HOST_IP"
@@ -144,31 +145,31 @@ detect_host_info() {
 # Função para gerar certificados TLS
 generate_certificates() {
     log "Gerando certificados TLS auto-assinados..."
-    
+
     sudo mkdir -p "$CERT_DIR"
     cd "$CERT_DIR"
-    
+
     # Gerar chave privada da CA
     log "Criando Certificate Authority (CA)..."
     sudo openssl genrsa -aes256 -passout pass:docker-ca-pass -out ca-key.pem 4096
-    
+
     # Gerar certificado da CA
     sudo openssl req -new -x509 -days 365 -key ca-key.pem -sha256 \
         -passin pass:docker-ca-pass \
         -out ca.pem \
         -subj "/C=BR/ST=State/L=City/O=DockerCA/CN=$HOSTNAME"
-    
+
     # Gerar chave privada do servidor
     log "Criando certificado do servidor..."
     sudo openssl genrsa -out server-key.pem 4096
-    
+
     # Gerar CSR do servidor
     sudo openssl req -subj "/CN=$HOSTNAME" -sha256 -new -key server-key.pem -out server.csr
-    
+
     # Criar arquivo de extensões para incluir IP e hostname
     echo "subjectAltName = DNS:$HOSTNAME,IP:$HOST_IP,IP:127.0.0.1" | sudo tee extfile.cnf > /dev/null
     echo "extendedKeyUsage = serverAuth" | sudo tee -a extfile.cnf > /dev/null
-    
+
     # Assinar certificado do servidor
     sudo openssl x509 -req -days 365 -sha256 \
         -in server.csr \
@@ -178,17 +179,17 @@ generate_certificates() {
         -CAcreateserial \
         -out server-cert.pem \
         -extfile extfile.cnf
-    
+
     # Gerar chave privada do cliente
     log "Criando certificado do cliente..."
     sudo openssl genrsa -out key.pem 4096
-    
+
     # Gerar CSR do cliente
     sudo openssl req -subj '/CN=client' -new -key key.pem -out client.csr
-    
+
     # Criar arquivo de extensões do cliente
     echo "extendedKeyUsage = clientAuth" | sudo tee extfile-client.cnf > /dev/null
-    
+
     # Assinar certificado do cliente
     sudo openssl x509 -req -days 365 -sha256 \
         -in client.csr \
@@ -198,21 +199,21 @@ generate_certificates() {
         -CAcreateserial \
         -out cert.pem \
         -extfile extfile-client.cnf
-    
+
     # Remover arquivos temporários
     sudo rm -f client.csr server.csr extfile.cnf extfile-client.cnf
-    
+
     # Ajustar permissões
     sudo chmod -v 0400 ca-key.pem key.pem server-key.pem
     sudo chmod -v 0444 ca.pem server-cert.pem cert.pem
-    
+
     log "Certificados gerados com sucesso em $CERT_DIR"
 }
 
 # Função para copiar certificados do cliente
 copy_client_certificates() {
     log "Copiando certificados do cliente para $CLIENT_CERT_DIR..."
-    
+
     mkdir -p "$CLIENT_CERT_DIR"
     sudo cp "$CERT_DIR/ca.pem" "$CLIENT_CERT_DIR/"
     sudo cp "$CERT_DIR/cert.pem" "$CLIENT_CERT_DIR/"
@@ -220,7 +221,7 @@ copy_client_certificates() {
     sudo chown -R "$REAL_USER:$REAL_USER" "$CLIENT_CERT_DIR"
     chmod 0400 "$CLIENT_CERT_DIR/key.pem"
     chmod 0444 "$CLIENT_CERT_DIR/ca.pem" "$CLIENT_CERT_DIR/cert.pem"
-    
+
     log "Certificados do cliente salvos em: $CLIENT_CERT_DIR"
 }
 

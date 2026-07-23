@@ -291,4 +291,3 @@ docker context use default
 - [Docker Context Documentation](https://docs.docker.com/engine/context/working-with-contexts/)
 - [Docker over SSH](https://docs.docker.com/engine/security/protect-access/#use-ssh-to-protect-the-docker-daemon-socket)
 - [SSH Key Setup](https://www.ssh.com/academy/ssh/copy-id)
-  

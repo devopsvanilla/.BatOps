@@ -200,7 +200,7 @@ prompt_network_selection() {
     printf "  [%d] %s (driver=%s, escopo=%s)\n" "$index" "$name" "$driver" "$scope"
     ((index++))
   done
-  echo "  [0] Criar nova rede" 
+  echo "  [0] Criar nova rede"
   echo "  [ENTER] Usar rede padrão gerenciada pelo Docker Compose"
   local selection
   read -rp $'Escolha a rede desejada: ' selection

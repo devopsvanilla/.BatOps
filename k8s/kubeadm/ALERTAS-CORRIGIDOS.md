@@ -1,6 +1,6 @@
 # Kubernetes 1.35 Setup via kubeadm - Release v2.0
 
-> **Release Date**: March 6, 2026  
+> **Release Date**: March 6, 2026
 > **Compatibility**: Ubuntu 24.04 LTS | Kubernetes 1.35 | containerd
 
 ---

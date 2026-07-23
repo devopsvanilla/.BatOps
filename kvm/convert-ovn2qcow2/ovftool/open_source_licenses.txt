@@ -1723,11 +1723,11 @@ Microsoft Visual Studio : Basic Proprietary Commercial License
 open-vm-tools : GNU Lesser General Public License v2.1 or later
 
 
-Copyright Text: 
+Copyright Text:
 
 
 
-Licenses: 
+Licenses:
 
 Apache License 2.0
 ['apache/xerces-c']
@@ -2088,7 +2088,7 @@ FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT, WITH REGARD TO TH
 SOFTWARE PRODUCT, AND THE PROVISION OF OR FAILURE TO PROVIDE SUPPORT SERVICES.
 THIS LIMITED WARRANTY GIVES YOU SPECIFIC LEGAL RIGHTS. YOU MAY HAVE OTHERS, WHICH
 VARY FROM STATE/JURISDICTION TO STATE/JURISDICTION.
- 
+
 LIMITATION OF LIABILITY. To the maximum extent permitted by applicable law, in no
 event shall ACME or its suppliers be liable for any special, incidental,
 indirect, or consequential damages whatsoever (including, without limitation,

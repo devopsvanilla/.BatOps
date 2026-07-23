@@ -70,7 +70,7 @@ $MAX_JOB_CONCURRENCY = 6
         </StackPanel>
 
         <!-- Log -->
-        <TextBox Grid.Row="1" Name="LogBox" Margin="0,0,0,10" 
+        <TextBox Grid.Row="1" Name="LogBox" Margin="0,0,0,10"
                  IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
         <!-- Ações -->

@@ -158,7 +158,7 @@ Então acesse: `https://<WSL-IP>:443`
   - 8000 (Portainer Agent)
   - 9443 (HTTPS)
   - 9000 (HTTP → HTTPS redirect)
-- **Volumes**: 
+- **Volumes**:
   - Docker Socket: `/var/run/docker.sock`
   - Dados: `/data` (volume Docker)
 

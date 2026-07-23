@@ -42,12 +42,12 @@ flowchart TD
    B["Docker Engine + TLS"]
    C["COMPUTADOR CLIENTE"]
    D["Docker CLI + Contexts"]
-   
+
    A --> B
    B --> |"Porta 2376/TCP\n(TLS obrigatório)"| D
    C --> D
    D <--> |"Conexão TLS/SSL\nPorta 2376"| B
-   
+
    style A fill:#e1f5dd
    style B fill:#fff3cd
    style C fill:#d1ecf1
@@ -431,7 +431,7 @@ Se escolher configurar novo servidor:
 
 ```bash
 Digite o IP do servidor Docker remoto: 192.168.1.100
-Digite o usuário SSH do servidor [devopsvanilla]: 
+Digite o usuário SSH do servidor [devopsvanilla]:
 Digite a senha SSH (ou ENTER para usar chave SSH): [senha oculta]
 ```
 
@@ -1243,7 +1243,7 @@ docker context use default
 
 ---
 
-**Última atualização**: Dezembro 2024  
-**Versão**: 3.0 - Documentação completa regenerada  
-**Autor**: DevOps Vanilla  
+**Última atualização**: Dezembro 2024
+**Versão**: 3.0 - Documentação completa regenerada
+**Autor**: DevOps Vanilla
 **Repositório**: [github.com/devopsvanilla/.BatOps](https://github.com/devopsvanilla/.BatOps)

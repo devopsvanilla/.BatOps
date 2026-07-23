@@ -224,16 +224,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Add DNS entry
         run: |
           echo "10.0.1.100 staging.internal.company" | sudo tee -a /etc/hosts
-          
+
       - name: Run ZAP Scanner
         run: |
           cd docker/zap
           ZAP_IMAGE=zaproxy/zap-stable ./run-zap-scanner.sh https://staging.internal.company
-          
+
       - name: Upload results
         uses: actions/upload-artifact@v3
         with:
@@ -248,7 +248,7 @@ jobs:
    # Ambientes de Homologação
    192.168.1.100 finops-hom.sondahybrid.com
    192.168.1.101 api-hom.sondahybrid.com
-   
+
    # Ambientes de Desenvolvimento
    10.0.1.50 finops-dev.sondahybrid.com
    ```
@@ -270,16 +270,16 @@ jobs:
    ```bash
    # Conecte à VPN corporativa primeiro
    sudo openvpn --config company-vpn.ovpn
-   
+
    # Depois execute o scan
    ./run-zap-scanner.sh https://internal-app.company.local
    ```
 
 ## Resumo
 
-✅ Configure `/etc/hosts` no servidor executor  
-✅ Verifique conectividade com `ping` e `curl`  
-✅ Execute o script (detecta automaticamente as entradas)  
-✅ Revise os resultados em `zap-results/`  
+✅ Configure `/etc/hosts` no servidor executor
+✅ Verifique conectividade com `ping` e `curl`
+✅ Execute o script (detecta automaticamente as entradas)
+✅ Revise os resultados em `zap-results/`
 
 Para mais informações sobre resolução de problemas, consulte [TROUBLESHOOTING.md](../TROUBLESHOOTING.md).

@@ -43,11 +43,11 @@ graph TB
     A --> C[pgAdmin :8080]
     B --> D[PostgreSQL :5432]
     C --> D
-    
+
     E[Volume n8n_data] --> B
     F[Volume postgres_data] --> D
     G[Volume pgadmin_data] --> C
-    
+
     H[Docker Network: n8n-network] --> B
     H --> C
     H --> D

@@ -10,9 +10,9 @@ Solução completa para implantar Portainer em Docker (WSL) acessível do Window
 cd /home/devopsvanilla/.BatOps/docker/portainer
 bash setup-portainer.sh
 ```
-✅ Gera certificados  
-✅ Cria diretórios  
-✅ Valida dependências  
+✅ Gera certificados
+✅ Cria diretórios
+✅ Valida dependências
 
 ### Passo 2: Configurar DNS no Windows
 Execute **como Administrador** no PowerShell:

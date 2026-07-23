@@ -88,3 +88,7 @@ credentials/
 volumes/
 
 output/
+
+/db/mysql/mysql-portable-client/mysql-dist/mysql-portable/*
+/db/mysql/mysql-portable-client/mysql-build-portable/*
+/db/mysql/mysql-portable-client/mysql-8.0.36/*

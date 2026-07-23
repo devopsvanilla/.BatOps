@@ -376,7 +376,7 @@ AlarmEmailFailedEvent.longDescription = "\
        </cause>\
     </EventLongDescription>\
     "
-    
+
 AlarmReconfiguredEvent.longDescription = "\
     <EventLongDescription id="vim.event.AlarmReconfiguredEvent">\
        <description>\
@@ -387,7 +387,7 @@ AlarmReconfiguredEvent.longDescription = "\
        </cause>\
     </EventLongDescription>\
     "
-        
+
 AlarmScriptFailedEvent.longDescription = "\
     <EventLongDescription id="vim.event.AlarmScriptFailedEvent">\
        <description>\
@@ -400,7 +400,7 @@ AlarmScriptFailedEvent.longDescription = "\
     </EventLongDescription>\
     "
 
-    
+
 AlarmSnmpFailedEvent.longDescription = "\
     <EventLongDescription id="vim.event.AlarmSnmpFailedEvent">\
        <description>\
@@ -412,8 +412,8 @@ AlarmSnmpFailedEvent.longDescription = "\
        </cause>\
     </EventLongDescription>\
     "
-   
-   
+
+
 ScheduledTaskEmailFailedEvent.longDescription = "\
     <EventLongDescription id="vim.event.ScheduledTaskEmailFailedEvent">\
        <description>\

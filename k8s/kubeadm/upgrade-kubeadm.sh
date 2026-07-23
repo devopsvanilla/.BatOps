@@ -84,7 +84,7 @@ confirm() {
 
 normalize_version() {
     local raw="$1"
-    echo "$raw" | sed 's/^v//' 
+    echo "$raw" | sed 's/^v//'
 }
 
 version_to_minor() {

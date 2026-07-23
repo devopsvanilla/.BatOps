@@ -264,11 +264,11 @@ O arquivo contém:
 
 ### 5. Garantias do Template
 
-✅ Seguir exatamente o padrão estabelecido  
-✅ Ser compatível com sistemas de IA  
-✅ Manter qualidade e completude  
-✅ Respeitar as especificações agents.md  
-✅ Incluir tempo de leitura estimado automaticamente  
+✅ Seguir exatamente o padrão estabelecido
+✅ Ser compatível com sistemas de IA
+✅ Manter qualidade e completude
+✅ Respeitar as especificações agents.md
+✅ Incluir tempo de leitura estimado automaticamente
 
 **O template está pronto para ser usado por qualquer agent/assistant!** 🎉
 

@@ -10,9 +10,9 @@
     elementFormDefault="qualified">
 
 <!--  The following are runtime attribute definitions -->
-  <xs:attribute name="Key" type="xs:boolean"/> 
+  <xs:attribute name="Key" type="xs:boolean"/>
 
-  <xs:attribute name="Version" type="xs:string"/> 
+  <xs:attribute name="Version" type="xs:string"/>
 
 
 <!--  The following section defines the extended WS-CIM datatypes  -->
@@ -226,4 +226,3 @@
   <xs:element name="DefaultValue" type="xs:anySimpleType" />
 
 </xs:schema>
-

@@ -16,32 +16,32 @@ NC='\033[0m' # No Color
 # Função para verificar e instalar dependências
 check_and_install_dependencies() {
   local missing_deps=()
-  
+
   # Verifica Docker
   if ! command -v docker >/dev/null 2>&1; then
     missing_deps+=("docker.io")
   fi
-  
+
   # Verifica wkhtmltopdf
   if ! command -v wkhtmltopdf >/dev/null 2>&1; then
     missing_deps+=("wkhtmltopdf")
   fi
-  
+
   # Se houver dependências faltando, tenta instalar
   if [ ${#missing_deps[@]} -gt 0 ]; then
     echo -e "${ORANGE}⚠️  Dependências faltando: ${missing_deps[*]}${NC}"
     echo -e "${YELLOW}Deseja instalar as dependências necessárias? [S/n]: ${NC}"
     read -r response
-    
+
     if [[ "$response" =~ ^[Ss]$ ]] || [[ -z "$response" ]]; then
       echo -e "${CYAN}🔧 Instalando dependências...${NC}"
-      
+
       # Atualiza lista de pacotes
       if ! sudo apt-get update >/dev/null 2>&1; then
         echo -e "${RED}❌ Erro ao atualizar lista de pacotes. Execute manualmente: sudo apt-get update${NC}"
         exit 1
       fi
-      
+
       # Instala dependências
       for dep in "${missing_deps[@]}"; do
         echo -e "${CYAN}   Instalando $dep...${NC}"
@@ -58,13 +58,13 @@ check_and_install_dependencies() {
           fi
         fi
       done
-      
+
       # Verifica se Docker foi instalado e está rodando
       if [[ " ${missing_deps[*]} " =~ docker.io ]]; then
         echo -e "${CYAN}🔧 Iniciando serviço Docker...${NC}"
         sudo systemctl start docker 2>/dev/null || true
         sudo systemctl enable docker 2>/dev/null || true
-        
+
         # Adiciona usuário ao grupo docker
         if ! groups | grep -q docker; then
           echo -e "${CYAN}🔧 Adicionando usuário ao grupo docker...${NC}"
@@ -73,11 +73,11 @@ check_and_install_dependencies() {
           echo -e "${ORANGE}   Ou execute: newgrp docker${NC}"
         fi
       fi
-      
+
       echo -e "${GREEN}✅ Todas as dependências foram instaladas!${NC}\n"
     else
       echo -e "${ORANGE}⚠️  Instalação cancelada. O script pode não funcionar corretamente.${NC}"
-      
+
       # Lista dependências que precisam ser instaladas manualmente
       if [[ " ${missing_deps[*]} " =~ docker.io ]]; then
         echo -e "${ORANGE}   Docker é obrigatório. Instale com: sudo apt-get install docker.io${NC}"
@@ -85,14 +85,14 @@ check_and_install_dependencies() {
       fi
     fi
   fi
-  
+
   # Verifica se Docker está rodando (se instalado)
   if command -v docker >/dev/null 2>&1; then
     if ! docker info >/dev/null 2>&1; then
       echo -e "${ORANGE}⚠️  Docker está instalado mas não está rodando.${NC}"
       echo -e "${YELLOW}Deseja iniciar o serviço Docker? [S/n]: ${NC}"
       read -r response
-      
+
       if [[ "$response" =~ ^[Ss]$ ]] || [[ -z "$response" ]]; then
         sudo systemctl start docker
         echo -e "${GREEN}✅ Docker iniciado com sucesso${NC}\n"
@@ -146,20 +146,23 @@ get_host_entries() {
   local domain="$1"
   local entries=""
   local found=false
-  
+
   # Procura entradas no /etc/hosts que correspondem ao domínio
   if [ -f /etc/hosts ]; then
     while IFS= read -r line; do
       # Ignora comentários e linhas vazias
       [[ "$line" =~ ^\s*# ]] && continue
       [[ -z "$line" ]] && continue
-      
+
       # Verifica se a linha contém o domínio
       if echo "$line" | grep -qw "$domain"; then
         # Extrai IP e hostname
-        local ip=$(echo "$line" | awk '{print $1}')
-        local hostname=$(echo "$line" | awk '{print $2}')
-        
+        local ip
+        local hostname
+
+        ip=$(echo "$line" | awk '{print $1}')
+        hostname=$(echo "$line" | awk '{print $2}')
+
         if [ -n "$ip" ] && [ -n "$hostname" ]; then
           entries="${entries} --add-host=${hostname}:${ip}"
           # Envia mensagem informativa para stderr (não capturada pela atribuição)
@@ -169,14 +172,14 @@ get_host_entries() {
       fi
     done < /etc/hosts
   fi
-  
+
   # Se não encontrou entradas, informa ao usuário (stderr)
   if [ "$found" = false ]; then
     echo -e "${YELLOW}⚠️  Nenhuma entrada encontrada em /etc/hosts para: ${domain}${NC}" >&2
     echo -e "${YELLOW}   Se o domínio não está no DNS público, adicione:${NC}" >&2
     echo -e "${YELLOW}   echo \"<IP> ${domain}\" | sudo tee -a /etc/hosts${NC}" >&2
   fi
-  
+
   # Retorna apenas o valor (stdout)
   echo "$entries"
 }
@@ -208,29 +211,30 @@ EOF
   fi
 
   # Extrai entradas do /etc/hosts para o domínio
-  local host_entries=$(get_host_entries "$FQDN")
-  
+  local host_entries
+  host_entries=$(get_host_entries "$FQDN")
+
   # Garante permissões corretas no diretório de resultados
   # O container roda como usuário 'zap' (UID 1000), precisa de permissão de escrita
   chmod 777 "$RESULTS_DIR" 2>/dev/null || true
-  
+
   # Garante que arquivos já existentes também tenham permissões corretas
   find "$RESULTS_DIR" -type f -exec chmod 666 {} \; 2>/dev/null || true
   find "$RESULTS_DIR" -type d -exec chmod 777 {} \; 2>/dev/null || true
 
   echo -e "${CYAN}🔍 Executando scan de segurança em: $URL${NC}"
-  
+
   # Determina modo de rede
   local network_mode="${NETWORK_MODE:-internet}"
-  
+
   if [ "$network_mode" = "local" ]; then
     echo -e "${CYAN}🌐 Modo: Local/Dummy Access (usando rede do host)${NC}"
   else
     echo -e "${CYAN}🌐 Modo: Internet Access${NC}"
   fi
-  
+
   set +e
-  
+
   # Constrói comando Docker baseado no modo de rede
   if [ "$network_mode" = "local" ]; then
     # Modo local: usa network host, não precisa --add-host
@@ -260,7 +264,7 @@ EOF
         -r "$(basename "$HTML_REPORT")" 2>&1 | tee "$ZAP_OUTPUT_LOG"
     fi
   fi
-  
+
   local rc=$?
   set -e
   return $rc
@@ -324,7 +328,7 @@ if [[ -z "${NETWORK_MODE:-}" ]]; then
     echo -e "${YELLOW}2) Local/Dummy Access (URL local, usa /etc/hosts e rede do host)${NC}"
     echo -e -n "${YELLOW}Digite o número da opção [1-2]: ${NC}"
     read NET_OPT
-    
+
     case "$NET_OPT" in
       1)
         NETWORK_MODE="internet"
@@ -391,7 +395,7 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 if [ -f "$ZAP_OUTPUT_LOG" ]; then
   # Extrai a última linha que contém o resumo
   SUMMARY_LINE=$(grep -E "FAIL-NEW:.*WARN-NEW:.*PASS:" "$ZAP_OUTPUT_LOG" 2>/dev/null | tail -1)
-  
+
   if [ -n "$SUMMARY_LINE" ]; then
     # Extrai cada valor usando regex
     FAIL_COUNT=$(echo "$SUMMARY_LINE" | grep -oP 'FAIL-NEW:\s*\K\d+' || echo "0")
@@ -403,30 +407,30 @@ if [ -f "$ZAP_OUTPUT_LOG" ]; then
     WARN_COUNT=$(grep -oP 'WARN-NEW: \K\d+' "$HTML_REPORT" 2>/dev/null | tail -1 || echo "0")
     FAIL_COUNT=$(grep -oP 'FAIL-NEW: \K\d+' "$HTML_REPORT" 2>/dev/null | tail -1 || echo "0")
   fi
-  
+
   # Calcula total de testes
   TOTAL_TESTS=$((PASS_COUNT + WARN_COUNT + FAIL_COUNT))
-  
+
   echo -e "${CYAN}🎯 Total de testes executados:${NC} ${BLUE}$TOTAL_TESTS${NC}"
   echo -e "${GREEN}✅ Testes aprovados (PASS):${NC}    ${GREEN}$PASS_COUNT${NC}"
   echo -e "${ORANGE}⚠️  Alertas encontrados (WARN):${NC}  ${ORANGE}$WARN_COUNT${NC}"
   echo -e "${RED}❌ Falhas detectadas (FAIL):${NC}   ${RED}$FAIL_COUNT${NC}"
   echo ""
-  
+
   # Barra de progresso visual
   if [ "$TOTAL_TESTS" -gt 0 ]; then
     PASS_PERCENT=$((PASS_COUNT * 100 / TOTAL_TESTS))
     WARN_PERCENT=$((WARN_COUNT * 100 / TOTAL_TESTS))
     FAIL_PERCENT=$((FAIL_COUNT * 100 / TOTAL_TESTS))
-    
+
     echo -e "${CYAN}📊 Distribuição:${NC}"
-    
+
     # Cria barra de 50 caracteres
     BAR_LENGTH=50
     PASS_BAR=$((PASS_COUNT * BAR_LENGTH / TOTAL_TESTS))
     WARN_BAR=$((WARN_COUNT * BAR_LENGTH / TOTAL_TESTS))
     FAIL_BAR=$((FAIL_COUNT * BAR_LENGTH / TOTAL_TESTS))
-    
+
     printf "   "
     printf "${GREEN}"
     printf '█%.0s' $(seq 1 $PASS_BAR) 2>/dev/null
@@ -437,7 +441,7 @@ if [ -f "$ZAP_OUTPUT_LOG" ]; then
     printf "${NC}"
     printf '░%.0s' $(seq 1 $((BAR_LENGTH - PASS_BAR - WARN_BAR - FAIL_BAR))) 2>/dev/null
     printf "${NC}\n"
-    
+
     echo -e "   ${GREEN}■${NC} Pass: ${PASS_PERCENT}%  ${ORANGE}■${NC} Warn: ${WARN_PERCENT}%  ${RED}■${NC} Fail: ${FAIL_PERCENT}%"
   fi
 fi

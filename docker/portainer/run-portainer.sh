@@ -70,15 +70,15 @@ case "$COMMAND" in
         print_header "Iniciando Portainer"
         echo ""
         check_certificates
-        
+
         echo -e "${YELLOW}[*]${NC} Iniciando containers..."
         cd "$SCRIPT_DIR"
         $DOCKER_COMPOSE up -d
-        
+
         echo ""
         echo -e "${YELLOW}[*]${NC} Aguardando containers ficarem prontos..."
         sleep 3
-        
+
         # Verificar status
         if $DOCKER_COMPOSE ps portainer | grep -q "Up"; then
             print_status "running" "Portainer iniciado com sucesso"
@@ -87,7 +87,7 @@ case "$COMMAND" in
             $DOCKER_COMPOSE logs portainer
             exit 1
         fi
-        
+
         echo ""
         echo -e "${BLUE}Informações de Acesso:${NC}"
         echo "  URL: https://portainer.local"
@@ -100,7 +100,7 @@ case "$COMMAND" in
         echo "    3. Comece a gerenciar containers!"
         echo ""
         ;;
-    
+
     stop)
         print_header "Parando Portainer"
         echo ""
@@ -114,7 +114,7 @@ case "$COMMAND" in
         fi
         echo ""
         ;;
-    
+
     restart)
         print_header "Reiniciando Portainer"
         echo ""
@@ -122,11 +122,11 @@ case "$COMMAND" in
         cd "$SCRIPT_DIR"
         echo -e "${YELLOW}[*]${NC} Reiniciando containers..."
         $DOCKER_COMPOSE restart
-        
+
         echo ""
         echo -e "${YELLOW}[*]${NC} Aguardando containers ficarem prontos..."
         sleep 3
-        
+
         if $DOCKER_COMPOSE ps portainer | grep -q "Up"; then
             print_status "running" "Portainer reiniciado com sucesso"
             echo "  Acesse: https://portainer.local"
@@ -137,37 +137,37 @@ case "$COMMAND" in
         fi
         echo ""
         ;;
-    
+
     logs)
         print_header "Logs do Portainer"
         echo ""
         cd "$SCRIPT_DIR"
         $DOCKER_COMPOSE logs -f portainer
         ;;
-    
+
     status)
         print_header "Status do Portainer"
         echo ""
         cd "$SCRIPT_DIR"
-        
+
         echo -e "${BLUE}Containers:${NC}"
         if $DOCKER_COMPOSE ps | grep -q "portainer"; then
             $DOCKER_COMPOSE ps
         else
             print_status "error" "Nenhum container ativo"
         fi
-        
+
         echo ""
         echo -e "${BLUE}Volumes:${NC}"
         docker volume ls | grep portainer || echo "  Nenhum volume encontrado"
-        
+
         echo ""
         echo -e "${BLUE}Rede:${NC}"
         docker network ls | grep portainer || echo "  Nenhuma rede encontrada"
-        
+
         echo ""
         ;;
-    
+
     *)
         echo -e "${BLUE}Portainer Manager${NC}"
         echo ""

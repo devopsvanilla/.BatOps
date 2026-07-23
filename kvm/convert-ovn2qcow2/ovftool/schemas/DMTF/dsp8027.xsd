@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     DMTF - Distributed Management Task Force, Inc. - http://www.dmtf.org
-    
+
     Document number: DSP8027
     Date: 2009-02-12
     Version: 1.1.0
     Document status: DMTF Standard
-    
+
     Title: OVF XML Schema Specification for OVF Environment
-    
+
     Document type: Specification (W3C XML Schema)
     Document language: E
-    
+
     Contact group: tm-redundancy@dmtf.org
-    
+
     Copyright (C) 2008,2009 Distributed Management Task Force, Inc. (DMTF).  All rights reserved.
     DMTF is a not-for-profit association of industry members dedicated to promoting enterprise and
     systems management and interoperability.  Members and non-members may reproduce DMTF specifications
@@ -35,19 +35,19 @@
     implementations.  For information about patents held by third-parties which have notified the DMTF
     that, in their opinion, such patent may relate to or impact implementations of DMTF standards, visit
     http://www.dmtf.org/about/policies/disclosures.php.
-    
+
     Change log:
     1.0.0  - 2009-01-15 - DMTF Standard
     1.1.0a - 2009-08-06 - Work in progress
-    - Updated DMTF header 
+    - Updated DMTF header
     1.1.0b - 2009-09-15 - Work in progress
     - No change, version updated to match DSP8023
     1.1.0c - 2009-10-08 - Draft Standard
     - No change, version updated to match DSP8023
-    1.1.0 - 2009-02-09 - DMTF Standard  
--->  
+    1.1.0 - 2009-02-09 - DMTF Standard
+-->
 
-<xs:schema 
+<xs:schema
     targetNamespace="http://schemas.dmtf.org/ovf/environment/1"
     xmlns:ovfenv="http://schemas.dmtf.org/ovf/environment/1"
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -55,13 +55,13 @@
     attributeFormDefault="qualified"
     elementFormDefault="qualified">
 
-    <xs:import namespace="http://schemas.dmtf.org/wbem/wscim/1/common" 
+    <xs:import namespace="http://schemas.dmtf.org/wbem/wscim/1/common"
         schemaLocation="common.xsd"/>
-    
+
     <xs:element name="Environment" type="ovfenv:Environment_Type">
         <xs:annotation>
             <xs:documentation>Root element of OVF environment</xs:documentation>
-        </xs:annotation>                
+        </xs:annotation>
     </xs:element>
 
     <xs:complexType name="Environment_Type">
@@ -73,7 +73,7 @@
                 <xs:annotation>
                     <xs:documentation>Entity independent meta-data
                     sections</xs:documentation>
-                </xs:annotation>                
+                </xs:annotation>
             </xs:element>
             <xs:element name="Entity" type="ovfenv:Entity_Type" minOccurs="0"
                 maxOccurs="unbounded">
@@ -82,8 +82,8 @@
                     entity</xs:documentation>
                 </xs:annotation>
             </xs:element>
-            <xs:any namespace="##other" processContents="lax" minOccurs="0" 
-                maxOccurs="unbounded"/>                    
+            <xs:any namespace="##other" processContents="lax" minOccurs="0"
+                maxOccurs="unbounded"/>
         </xs:sequence>
         <xs:attribute name="id" type="xs:string" default="" use="optional">
             <xs:annotation>
@@ -101,8 +101,8 @@
         </xs:annotation>
         <xs:sequence>
             <xs:element ref="ovfenv:Section" minOccurs="0" maxOccurs="unbounded"/>
-            <xs:any namespace="##other" processContents="lax" minOccurs="0" 
-                maxOccurs="unbounded"/>                    
+            <xs:any namespace="##other" processContents="lax" minOccurs="0"
+                maxOccurs="unbounded"/>
         </xs:sequence>
         <xs:attribute name="id" type="xs:string" use="required">
             <xs:annotation>
@@ -154,8 +154,8 @@
                             <xs:anyAttribute namespace="##any" processContents="lax"/>
                         </xs:complexType>
                     </xs:element>
-                    <xs:any namespace="##other" processContents="lax" minOccurs="0" 
-                        maxOccurs="unbounded"/>                    
+                    <xs:any namespace="##other" processContents="lax" minOccurs="0"
+                        maxOccurs="unbounded"/>
                 </xs:sequence>
             </xs:extension>
         </xs:complexContent>
@@ -164,7 +164,7 @@
     <xs:element name="PlatformSection" type="ovfenv:PlatformSection_Type"
         substitutionGroup="ovfenv:Section">
         <xs:annotation>
-            <xs:documentation>Element substitutable for Section since Platform_Type is 
+            <xs:documentation>Element substitutable for Section since Platform_Type is
                 a derivation of Section_Type </xs:documentation>
         </xs:annotation>
     </xs:element>
@@ -201,13 +201,13 @@
                     </xs:element>
                     <xs:element name="Timezone" type="xs:int" minOccurs="0">
                         <xs:annotation>
-                            <xs:documentation>Experimental: Current timezone offset in minutes 
+                            <xs:documentation>Experimental: Current timezone offset in minutes
                                 from UTC. Time zones east of Greenwich are positive and time
                                 zones west of Greenwich are negative.</xs:documentation>
                         </xs:annotation>
                     </xs:element>
-                    <xs:any namespace="##other" processContents="lax" minOccurs="0" 
-                        maxOccurs="unbounded"/>                    
+                    <xs:any namespace="##other" processContents="lax" minOccurs="0"
+                        maxOccurs="unbounded"/>
                 </xs:sequence>
             </xs:extension>
         </xs:complexContent>

@@ -34,21 +34,21 @@ O script oferece duas operações principais:
 
 ### Opções
 
-- `-h`, `--help`  
+- `-h`, `--help`
   Exibe ajuda e sai.
 
-- `--option`, `-o N`  
+- `--option`, `-o N`
   Define a opção sem prompt interativo:
   - `1` = limpeza de não utilizados
   - `2` = reset total
 
-- `--yes`, `-y`  
+- `--yes`, `-y`
   Confirma automaticamente prompts destrutivos.
 
-- `--nuclear`  
+- `--nuclear`
   No reset total, exibe prévia de serviços `systemd` com `docker compose`/`docker-compose` e adiciona confirmação extra.
 
-- `--dry-run`  
+- `--dry-run`
   Simula ações sem executar remoções.
 
 ---
@@ -182,13 +182,13 @@ Quando usado:
 
 ## Solução de problemas
 
-- **Containers reaparecem após reset**  
+- **Containers reaparecem após reset**
   Verifique automações externas (`systemd`, cron, orchestrators) que possam recriar workloads.
 
-- **Falha por permissão**  
+- **Falha por permissão**
   Confirme acesso `sudo` e disponibilidade de `systemctl`.
 
-- **Docker não inicializa após reset**  
+- **Docker não inicializa após reset**
   Consulte logs de serviço (`journalctl`) e status do daemon (`systemctl status docker`).
 
 ---

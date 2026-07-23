@@ -21,7 +21,7 @@ find "$INPUT_DIR" -name "*.ovf" | while read -r ovf_file; do
     vmdk_name=$(xmllint --xpath "string(//*[local-name()='File']/@*[local-name()='href'])" "$ovf_file" 2>/dev/null)
     ovf_expected_bytes=$(xmllint --xpath "string(//*[local-name()='File']/@*[local-name()='size'])" "$ovf_file" 2>/dev/null || echo "0")
     virt_capacity_gb=$(xmllint --xpath "string(//*[local-name()='Disk']/@*[local-name()='capacity'])" "$ovf_file" 2>/dev/null || echo "0")
-    
+
     vmdk_path="$ovf_dir/$vmdk_name"
 
     if [ ! -f "$vmdk_path" ]; then
@@ -37,22 +37,22 @@ find "$INPUT_DIR" -name "*.ovf" | while read -r ovf_file; do
 
     # 3. Cálculo de Tamanhos
     actual_size_bytes=$(stat -c%s "$vmdk_path")
-    
+
     # Formatação para exibição
     ovf_exp_fmt=$(awk "BEGIN {printf \"%.2fMB\", $ovf_expected_bytes/1024/1024}")
     real_size_fmt=$(awk "BEGIN {printf \"%.2fMB\", $actual_size_bytes/1024/1024}")
-    
+
     # 4. Lógica de Validação
     status="${GREEN}OK${NC}"
-    
+
     # Validação A: Tamanho irrisório (O seu caso do Header de 70KB)
     if [ "$actual_size_bytes" -lt 1000000 ] && [ "$virt_capacity_gb" -gt 0 ]; then
         status="${RED}DUMMY_HEADER${NC}"
-    
+
     # Validação B: Formato Incompatível ou Corrompido
     elif [[ "$img_info" == "" ]]; then
         status="${RED}CORRUPT_IMG${NC}"
-    
+
     # Validação C: StreamOptimized (Aviso de que precisa converter para Flat antes)
     elif [[ "$vmdk_format" == *"streamOptimized"* ]]; then
         status="${YELLOW}OK (COMPRESSED)${NC}"

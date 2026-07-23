@@ -43,10 +43,10 @@ graph TB
     A[Cliente Web] --> B[phpMyAdmin :8080]
     C[Aplicações] --> D[MySQL :3306]
     B --> D
-    
+
     E[Volume mysql_data] --> D
     F[Volume mysql_config] --> D
-    
+
     G[Docker Network: mysql-network] --> B
     G --> D
 ```
@@ -326,7 +326,7 @@ docker-compose exec mysql mysql -u root -p
 # Backup do banco
 docker-compose exec mysql mysqldump -u root -p --all-databases > backup.sql
 
-# Restore do banco  
+# Restore do banco
 docker-compose exec -i mysql mysql -u root -p < backup.sql
 
 # Verificar status da stack

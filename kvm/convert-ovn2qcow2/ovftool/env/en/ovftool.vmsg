@@ -278,4 +278,3 @@ xml.missing = "Line %3 column %4: Missing '%1' element in %2."
 xml.root = "%1: Unexpected root element"
 xml.unexpected = "Line %2 column %3: Unexpected element tag '%1' found."
 xml.xerces = "Line %3 column %4: Failed to parse %1. Reason: %4."
-

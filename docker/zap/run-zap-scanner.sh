@@ -136,16 +136,16 @@ if [[ "$PROD_ENV" =~ ^[Ss]$ ]]; then
     echo -e "${YELLOW}  • E possui número de chamado/ticket?${NC}\n"
     echo -e -n "${RED}Confirma que possui autorização? [s/N]: ${NC}"
     read -r AUTH_CONFIRM
-    
+
     if [[ ! "$AUTH_CONFIRM" =~ ^[Ss]$ ]]; then
         echo -e "\n${RED}❌ Scan cancelado. Obtenha autorização antes de continuar.${NC}"
         echo -e "${ORANGE}💡 Dica: Use ambientes de staging/desenvolvimento para testes.${NC}"
         exit 3
     fi
-    
+
     echo -e -n "\n${YELLOW}Número do chamado/ticket de autorização: ${NC}"
     read -r TICKET_NUMBER
-    
+
     if [ -z "$TICKET_NUMBER" ]; then
         echo -e "${ORANGE}⚠️  Prosseguindo sem número de ticket (não recomendado)${NC}\n"
     else

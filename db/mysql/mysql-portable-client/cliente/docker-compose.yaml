@@ -1,0 +1,20 @@
+# docker-compose.yml
+services:
+  mysql-server:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+    networks:
+      - rede-teste
+
+  mysql-cliente:
+    build: ./cliente
+    networks:
+      - rede-teste
+    depends_on:
+      - mysql-server
+
+networks:
+  rede-teste:
+    driver: bridge

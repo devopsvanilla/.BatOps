@@ -1,0 +1,403 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Cria o usuario IAM devopsvanilla para auditoria e inventario com acesso de leitura ao console e AWS CLI, incluindo billing e organizations, sem acesso a dados armazenados nem capacidade de autogerenciamento de credenciais.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Identificacao e padroes recomendados
+      Parameters:
+      - RecommendedStackName
+      - UserName
+      - UserEmail
+    - Label:
+        default: Acesso inicial e operacao
+      Parameters:
+      - ConsolePassword
+      - RequirePasswordReset
+      - CreateProgrammaticAccess
+    ParameterLabels:
+      RecommendedStackName:
+        default: Nome recomendado da stack
+      UserName:
+        default: Nome do usuario IAM
+      UserEmail:
+        default: Email de referencia do usuario
+      ConsolePassword:
+        default: Senha inicial de console
+      RequirePasswordReset:
+        default: Exigir troca de senha no primeiro login
+      CreateProgrammaticAccess:
+        default: Criar access key para AWS CLI
+
+Parameters:
+  RecommendedStackName:
+    Type: String
+    Default: devopsvanilla-discovery-user
+    AllowedPattern: '[A-Za-z0-9-]+'
+    Description: >-
+      Nome recomendado para a stack no CloudFormation. Pode ser alterado, mas recomenda-se manter o padrao para governanca e rastreabilidade.
+  UserName:
+    Type: String
+    Default: devopsvanilla
+    AllowedPattern: '[A-Za-z0-9+=,.@_-]+'
+    Description: >-
+      Nome do usuario IAM a ser criado. Padrao recomendado: devopsvanilla. Pode ser alterado.
+  UserEmail:
+    Type: String
+    Default: devopsvanilla@outlook.com
+    Description: >-
+      Email de referencia para tags administrativas. Padrao recomendado: devopsvanilla@outlook.com. Pode ser alterado.
+  ConsolePassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: >-
+      Senha inicial do console AWS para o usuario. Deve obedecer a politica de senha vigente da conta.
+  RequirePasswordReset:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Description: >-
+      Campo recomendado. Define se o usuario sera obrigado a trocar a senha no primeiro login. Padrao recomendado: true. Pode ser alterado.
+  CreateProgrammaticAccess:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Description: >-
+      Campo recomendado. Define se uma access key para AWS CLI sera criada junto com o usuario. Padrao recomendado: true. Pode ser alterado.
+
+Conditions:
+  ShouldCreateProgrammaticAccess: !Equals [ !Ref CreateProgrammaticAccess, 'true' ]
+  ShouldRequirePasswordReset: !Equals [ !Ref RequirePasswordReset, 'true' ]
+  IsRecommendedStackName: !Equals [ !Ref 'AWS::StackName', !Ref RecommendedStackName ]
+
+Resources:
+  DiscoveryUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref UserName
+      LoginProfile:
+        Password: !Ref ConsolePassword
+        PasswordResetRequired: !If [ ShouldRequirePasswordReset, true, false ]
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Tags:
+      - Key: Purpose
+        Value: discovery-audit-and-cost-inventory
+      - Key: OwnerEmail
+        Value: !Ref UserEmail
+      - Key: ManagedBy
+        Value: cloudformation
+
+  DiscoveryAccessKey:
+    Type: AWS::IAM::AccessKey
+    Condition: ShouldCreateProgrammaticAccess
+    Properties:
+      UserName: !Ref DiscoveryUser
+      Status: Active
+
+  DiscoverySupplementalReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${AWS::StackName}-discovery-supplemental-read'
+      Description: >-
+        Permissoes complementares de leitura para billing, organizations e servicos de seguranca usados em auditoria de configuracao.
+      Users:
+      - !Ref DiscoveryUser
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: BillingAndCostReadOnly
+          Effect: Allow
+          Action:
+          - account:Get*
+          - account:List*
+          - aws-portal:ViewAccount
+          - aws-portal:ViewBilling
+          - aws-portal:ViewPaymentMethods
+          - aws-portal:ViewUsage
+          - billing:Get*
+          - billing:List*
+          - budgets:Describe*
+          - budgets:ViewBudget
+          - ce:Describe*
+          - ce:Get*
+          - ce:List*
+          - consolidatedbilling:List*
+          - consolidatedbilling:Get*
+          - cur:DescribeReportDefinitions
+          - freetier:Get*
+          - freetier:List*
+          - invoicing:Get*
+          - invoicing:List*
+          - payments:Get*
+          - payments:List*
+          - pricing:Describe*
+          - pricing:Get*
+          - pricing:List*
+          - purchase-orders:Get*
+          - purchase-orders:List*
+          - tax:Get*
+          - tax:List*
+          Resource: '*'
+        - Sid: OrganizationsAndAccountInventoryReadOnly
+          Effect: Allow
+          Action:
+          - organizations:Describe*
+          - organizations:List*
+          - iam:GenerateCredentialReport
+          - iam:Get*
+          - iam:List*
+          Resource: '*'
+        - Sid: SecurityAndGovernanceReadOnly
+          Effect: Allow
+          Action:
+          - access-analyzer:Get*
+          - access-analyzer:List*
+          - cloudtrail:Describe*
+          - cloudtrail:Get*
+          - cloudtrail:List*
+          - config:BatchGet*
+          - config:Describe*
+          - config:Get*
+          - config:List*
+          - detective:BatchGet*
+          - detective:Get*
+          - detective:List*
+          - guardduty:Describe*
+          - guardduty:Get*
+          - guardduty:List*
+          - inspector2:BatchGet*
+          - inspector2:Describe*
+          - inspector2:Get*
+          - inspector2:List*
+          - kms:Describe*
+          - kms:Get*
+          - kms:List*
+          - securityhub:BatchGet*
+          - securityhub:Describe*
+          - securityhub:Get*
+          - securityhub:List*
+          - shield:Describe*
+          - shield:Get*
+          - shield:List*
+          - ssm:Describe*
+          - tag:Get*
+          - tag:Describe*
+          Resource: '*'
+
+  DiscoveryDenyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${AWS::StackName}-discovery-deny-sensitive-access'
+      Description: >-
+        Bloqueia acesso a dados, execucao remota e autogerenciamento de credenciais, mesmo que futuras permissoes de leitura sejam anexadas ao usuario.
+      Users:
+      - !Ref DiscoveryUser
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: DenyStorageAndDatabaseDataAccess
+          Effect: Deny
+          Action:
+          - athena:GetQueryResults
+          - athena:GetQueryResultsStream
+          - athena:StartQueryExecution
+          - dynamodb:BatchGetItem
+          - dynamodb:GetItem
+          - dynamodb:PartiQLSelect
+          - dynamodb:Query
+          - dynamodb:Scan
+          - ebs:GetSnapshotBlock
+          - ebs:ListChangedBlocks
+          - ebs:ListSnapshotBlocks
+          - glacier:GetJobOutput
+          - kinesis:Get*
+          - kms:Decrypt
+          - kms:GenerateDataKey
+          - kms:GenerateDataKeyPair
+          - kms:GenerateDataKeyPairWithoutPlaintext
+          - kms:GenerateDataKeyWithoutPlaintext
+          - kms:ReEncryptFrom
+          - kms:ReEncryptTo
+          - logs:FilterLogEvents
+          - logs:GetLogEvents
+          - logs:GetQueryResults
+          - logs:StartQuery
+          - logs:StartLiveTail
+          - qldb:PartiQLSelect
+          - rds-data:BatchExecuteStatement
+          - rds-data:BeginTransaction
+          - rds-data:CommitTransaction
+          - rds-data:ExecuteStatement
+          - rds-data:RollbackTransaction
+          - rds-db:connect
+          - redshift-data:BatchExecuteStatement
+          - redshift-data:ExecuteStatement
+          - redshift-data:GetStatementResult
+          - redshift:GetClusterCredentials
+          - redshift:GetClusterCredentialsWithIAM
+          - s3:GetObject
+          - s3:GetObjectAcl
+          - s3:GetObjectAttributes
+          - s3:GetObjectLegalHold
+          - s3:GetObjectRetention
+          - s3:GetObjectTagging
+          - s3:GetObjectTorrent
+          - s3:GetObjectVersion
+          - s3:GetObjectVersionAcl
+          - s3:GetObjectVersionAttributes
+          - s3:GetObjectVersionForReplication
+          - s3:GetObjectVersionTagging
+          - s3:ListBucket
+          - s3:ListBucketMultipartUploads
+          - s3:ListBucketVersions
+          - s3-object-lambda:Get*
+          - s3-object-lambda:List*
+          - sagemaker:InvokeEndpoint
+          - secretsmanager:BatchGetSecretValue
+          - secretsmanager:GetSecretValue
+          - sqs:ReceiveMessage
+          - ssm:GetCommandInvocation
+          - ssm:GetDocument
+          - ssm:GetParameter
+          - ssm:GetParameters
+          - ssm:GetParametersByPath
+          - timestream:CancelQuery
+          - timestream:Select
+          Resource: '*'
+        - Sid: DenyComputeAndRemoteAccess
+          Effect: Deny
+          Action:
+          - bedrock:InvokeModel
+          - bedrock:InvokeModelWithResponseStream
+          - ec2:GetConsoleOutput
+          - ec2:GetConsoleScreenshot
+          - ec2:GetPasswordData
+          - ec2-instance-connect:OpenTunnel
+          - ec2-instance-connect:SendSSHPublicKey
+          - ec2-instance-connect:SendSerialConsoleSSHPublicKey
+          - lambda:InvokeFunction
+          - lambda:InvokeAsync
+          - lambda:InvokeFunctionUrl
+          - ssm:ResumeSession
+          - ssm:SendCommand
+          - ssm:StartSession
+          - ssm:TerminateSession
+          Resource: '*'
+        - Sid: DenyIamUserAdministration
+          Effect: Deny
+          Action:
+          - iam:AddUserToGroup
+          - iam:AttachGroupPolicy
+          - iam:AttachRolePolicy
+          - iam:AttachUserPolicy
+          - iam:CreateAccessKey
+          - iam:CreateGroup
+          - iam:CreateLoginProfile
+          - iam:CreatePolicy
+          - iam:CreatePolicyVersion
+          - iam:CreateRole
+          - iam:CreateUser
+          - iam:CreateVirtualMFADevice
+          - iam:DeactivateMFADevice
+          - iam:DeleteAccessKey
+          - iam:DeleteGroup
+          - iam:DeleteGroupPolicy
+          - iam:DeleteLoginProfile
+          - iam:DeletePolicy
+          - iam:DeletePolicyVersion
+          - iam:DeleteRole
+          - iam:DeleteRolePolicy
+          - iam:DeleteUser
+          - iam:DeleteUserPermissionsBoundary
+          - iam:DeleteUserPolicy
+          - iam:DeleteVirtualMFADevice
+          - iam:DetachGroupPolicy
+          - iam:DetachRolePolicy
+          - iam:DetachUserPolicy
+          - iam:EnableMFADevice
+          - iam:PassRole
+          - iam:PutGroupPolicy
+          - iam:PutRolePolicy
+          - iam:PutUserPermissionsBoundary
+          - iam:PutUserPolicy
+          - iam:RemoveUserFromGroup
+          - iam:ResyncMFADevice
+          - iam:SetDefaultPolicyVersion
+          - iam:TagPolicy
+          - iam:TagRole
+          - iam:TagUser
+          - iam:UntagPolicy
+          - iam:UntagRole
+          - iam:UntagUser
+          - iam:UpdateAccessKey
+          - iam:UpdateAssumeRolePolicy
+          - iam:UpdateGroup
+          - iam:UpdateLoginProfile
+          - iam:UpdateRole
+          - iam:UpdateRoleDescription
+          - iam:UpdateUser
+          Resource: '*'
+        - Sid: DenySelfCredentialManagement
+          Effect: Deny
+          Action:
+          - iam:CreateAccessKey
+          - iam:CreateLoginProfile
+          - iam:CreateServiceSpecificCredential
+          - iam:CreateVirtualMFADevice
+          - iam:DeactivateMFADevice
+          - iam:DeleteAccessKey
+          - iam:DeleteLoginProfile
+          - iam:DeleteServiceSpecificCredential
+          - iam:DeleteSigningCertificate
+          - iam:DeleteVirtualMFADevice
+          - iam:EnableMFADevice
+          - iam:ResyncMFADevice
+          - iam:UpdateAccessKey
+          - iam:UpdateLoginProfile
+          - iam:UpdateServiceSpecificCredential
+          - iam:UpdateSigningCertificate
+          - iam:UploadSigningCertificate
+          Resource:
+          - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${UserName}'
+          - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:mfa/${UserName}'
+
+Outputs:
+  StackNameInUse:
+    Description: Nome de stack efetivamente utilizado no deploy.
+    Value: !Ref 'AWS::StackName'
+  RecommendedStackName:
+    Description: Nome de stack recomendado para esta solucao.
+    Value: !Ref RecommendedStackName
+  StackNameConformsToRecommendation:
+    Description: Indica se o nome da stack implantada seguiu o padrao recomendado.
+    Value: !If [ IsRecommendedStackName, 'true', 'false' ]
+  UserName:
+    Description: Nome do usuario criado.
+    Value: !Ref DiscoveryUser
+  UserArn:
+    Description: ARN do usuario criado.
+    Value: !GetAtt DiscoveryUser.Arn
+  ConsoleLoginUrl:
+    Description: URL base para login no console AWS.
+    Value: !Sub 'https://${AWS::AccountId}.signin.aws.amazon.com/console'
+  AccessKeyId:
+    Condition: ShouldCreateProgrammaticAccess
+    Description: Access Key ID para uso na AWS CLI.
+    Value: !Ref DiscoveryAccessKey
+  SecretAccessKey:
+    Condition: ShouldCreateProgrammaticAccess
+    Description: >-
+      Secret Access Key exibida apenas na criacao da stack. Armazene com seguranca imediatamente apos o deploy.
+    Value: !GetAtt DiscoveryAccessKey.SecretAccessKey
+  ImportantNotes:
+    Description: Observacoes operacionais importantes.
+    Value: >-
+      Para visualizar faturamento no console, a conta precisa ter IAM Access to Billing habilitado. As chaves de acesso nao poderao ser recuperadas novamente apos a criacao.

@@ -132,12 +132,12 @@ for home_dir in /home/*; do
     if [ -d "$home_dir" ]; then
         username=$(basename "$home_dir")
         xmodmap_file="$home_dir/.Xmodmap"
-        
+
         # Criar .Xmodmap com as teclas críticas configuradas corretamente
         cat > "$xmodmap_file" << 'XEOF'
 ! Arquivo de configuração XKeyboard para layout US com ç
 ! Layout: US (padrão pc105) com AltGr+c = ç
-! 
+!
 ! Este arquivo garante que o teclado funcione corretamente
 ! Especialmente importante para acesso SSH onde o servidor
 ! pode remapear as teclas incorretamente
@@ -154,7 +154,7 @@ keycode  59 = comma less comma less ccedilla Ccedilla ccedilla
 ! keycode 61: slash (/) - CRÍTICO: deve permanecer como slash
 keycode  61 = slash question slash question questiondown dead_hook questiondown
 XEOF
-        
+
         # Ajustar permissões para o usuário
         owner=$(stat -c '%U:%G' "$home_dir" 2>/dev/null | cut -d: -f1)
         if [ ! -z "$owner" ] && [ "$owner" != "root" ]; then

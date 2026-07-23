@@ -2,7 +2,7 @@
 
 > Complete quick-start guide for setting up a production-ready Kubernetes cluster on Ubuntu 24.04 LTS
 
-**Latest Release**: v2.0 (March 6, 2026)  
+**Latest Release**: v2.0 (March 6, 2026)
 **Status**: ✅ Production Ready
 
 ---

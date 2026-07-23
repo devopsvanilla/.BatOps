@@ -63,7 +63,7 @@ check_result $? "Chave privada existe"
 if [ -f "$SCRIPT_DIR/certs/portainer.crt" ]; then
     openssl x509 -in "$SCRIPT_DIR/certs/portainer.crt" -noout -checkend 0 > /dev/null 2>&1
     check_result $? "Certificado ainda é válido"
-    
+
     echo ""
     echo "  Validade do certificado:"
     openssl x509 -in "$SCRIPT_DIR/certs/portainer.crt" -noout -dates | sed 's/^/    /'
@@ -103,7 +103,7 @@ echo -e "${BLUE}6. Testando Conectividade:${NC}"
 if command -v curl &> /dev/null; then
     curl -s -k https://127.0.0.1:443/ > /dev/null 2>&1
     check_result $? "Portainer HTTPS respondendo"
-    
+
     curl -s http://127.0.0.1:80/ > /dev/null 2>&1
     check_result $? "Nginx HTTP respondendo"
 else

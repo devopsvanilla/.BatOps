@@ -7,7 +7,7 @@ CREATE TABLE VendasRegioes (
 );
 
 -- Inserir dados de exemplo
-INSERT INTO VendasRegioes VALUES 
+INSERT INTO VendasRegioes VALUES
 ('Sudeste', 12500, 14800, 16200),
 ('Sul', 9800, 11200, 11900),
 ('Nordeste', 7500, 8200, 9100),
@@ -15,7 +15,7 @@ INSERT INTO VendasRegioes VALUES
 ('Centro-Oeste', 6800, 7400, 8500);
 
 -- Consulta simples para gráfico de barras (Vendas por Região - Total)
-SELECT 
+SELECT
     Regiao,
     (VendasJaneiro + VendasFevereiro + VendasMarco) as TotalVendas
 FROM VendasRegioes

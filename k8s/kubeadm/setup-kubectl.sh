@@ -17,7 +17,7 @@ echo "======================================"
 echo ""
 
 # Verifica se está rodando como usuário normal
-if [ "$EUID" -eq 0 ]; then 
+if [ "$EUID" -eq 0 ]; then
     echo "ℹ️  Script rodando como root"
     echo "   Usando root user para configuração"
     TARGET_HOME="/root"
@@ -69,7 +69,7 @@ else
     # Rodando como usuário normal
     sudo chmod 600 "$TARGET_HOME/.kube/config"
     echo "   sudo chmod 600 $TARGET_HOME/.kube/config"
-    
+
     # Ajustar ownership para o usuário atual
     sudo chown "$USER:$(id -g)" "$TARGET_HOME/.kube/config"
     echo "   sudo chown $USER:$(id -g) $TARGET_HOME/.kube/config"

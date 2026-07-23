@@ -136,7 +136,7 @@ opcao_dns() {
     echo ""
     read -p "Opção: " -n 1 -r
     echo ""
-    
+
     case "$REPLY" in
         1)
             clear_screen
@@ -164,7 +164,7 @@ opcao_dns() {
             bash "$SCRIPT_DIR/add-to-windows-hosts.sh" | head -50
             ;;
     esac
-    
+
     echo ""
     read -p "Pressione ENTER para continuar..."
 }
@@ -184,14 +184,14 @@ opcao_instrucoes() {
     echo "  3. Acesse: https://portainer.local no navegador Windows"
     echo "  4. Crie conta administratora"
     echo ""
-    
+
     echo -e "${CYAN}🌐 ACESSO:${NC}"
     echo ""
     echo "  URL: https://portainer.local"
     echo "  IP Local: $(hostname -I | awk '{print $1}')"
     echo "  WSL Hostname: $(hostname)"
     echo ""
-    
+
     echo -e "${CYAN}⚙️  CERTIFICADO:${NC}"
     echo ""
     echo "  Tipo: Auto-assinado (SSL/TLS)"
@@ -199,7 +199,7 @@ opcao_instrucoes() {
     echo "  Arquivo: certs/portainer.crt"
     echo "  Aviso: Navegador mostrará alerta de segurança (normal)"
     echo ""
-    
+
     echo -e "${CYAN}🐳 GERENCIAR:${NC}"
     echo ""
     echo "  Iniciar:   bash run-portainer.sh start"
@@ -208,7 +208,7 @@ opcao_instrucoes() {
     echo "  Logs:      bash run-portainer.sh logs"
     echo "  Status:    bash run-portainer.sh status"
     echo ""
-    
+
     echo -e "${CYAN}📁 ESTRUTURA:${NC}"
     echo ""
     echo "  docker-compose.yml      → Configuração dos containers"
@@ -216,7 +216,7 @@ opcao_instrucoes() {
     echo "  certs/                  → Certificados SSL"
     echo "  data/                   → Dados persistentes"
     echo ""
-    
+
     read -p "Pressione ENTER para continuar..."
 }
 
@@ -224,7 +224,7 @@ opcao_instrucoes() {
 while true; do
     menu_principal
     read -p "Selecione uma opção: " opcao
-    
+
     case "$opcao" in
         1) opcao_iniciar ;;
         2) opcao_dns ;;

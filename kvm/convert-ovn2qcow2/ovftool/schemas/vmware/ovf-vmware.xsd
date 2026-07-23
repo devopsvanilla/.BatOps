@@ -2,13 +2,13 @@
 <!--
     Copyright 2008 VMware, Inc.  All rights reserved.
 
-    Remark: The OVF Specification 1.0 Annex D defines a set of relaxations on how 
+    Remark: The OVF Specification 1.0 Annex D defines a set of relaxations on how
     this XML Schema 1.0 definition is to be interpreted.
 -->
 <xs:schema targetNamespace="http://www.vmware.com/schema/ovf"
     xmlns:vmw="http://www.vmware.com/schema/ovf"
     xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
-    xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
     attributeFormDefault="qualified"
     elementFormDefault="qualified">
 

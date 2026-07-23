@@ -12,8 +12,8 @@ The script was using outdated OWASP ZAP Docker image names that no longer exist:
 These images were causing Docker pull errors:
 
 ```text
-docker: Error response from daemon: pull access denied for owasp/zap2docker-stable, 
-repository does not exist or may require 'docker login': denied: requested access to 
+docker: Error response from daemon: pull access denied for owasp/zap2docker-stable,
+repository does not exist or may require 'docker login': denied: requested access to
 the resource is denied
 ```
 
@@ -48,4 +48,3 @@ If you were using the old image names in any custom scripts or configurations, u
 - `owasp/zap2docker-weekly` → `zaproxy/zap-weekly`
 
 The GHCR image name remains unchanged: `ghcr.io/zaproxy/zaproxy:stable`
-

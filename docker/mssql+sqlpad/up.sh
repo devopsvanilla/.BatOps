@@ -542,12 +542,12 @@ select_docker_context() {
 get_remote_context_info() {
     local context_name="${1:-$(get_docker_context)}"
     local endpoint=$(docker context inspect "$context_name" --format '{{.Endpoints.docker.Host}}' 2>/dev/null || echo "")
-    
+
     if [[ "$endpoint" == "ssh://"* ]]; then
         # Extrair usuário e host do endpoint SSH
         # Formato: ssh://user@host ou ssh://host
         local ssh_part="${endpoint#ssh://}"
-        
+
         if [[ "$ssh_part" == *"@"* ]]; then
             REMOTE_USER="${ssh_part%%@*}"
             REMOTE_HOST="${ssh_part#*@}"
@@ -555,13 +555,13 @@ get_remote_context_info() {
             REMOTE_USER="$(whoami)"
             REMOTE_HOST="$ssh_part"
         fi
-        
+
         # Remover porta se existir
         REMOTE_HOST="${REMOTE_HOST%%:*}"
-        
+
         return 0
     fi
-    
+
     return 1
 }
 
@@ -569,7 +569,7 @@ get_remote_context_info() {
 is_remote_context() {
     local context_name="${1:-$(get_docker_context)}"
     local endpoint=$(docker context inspect "$context_name" --format '{{.Endpoints.docker.Host}}' 2>/dev/null || echo "")
-    
+
     if [[ "$endpoint" == "unix://"* ]] || [[ -z "$endpoint" ]]; then
         return 1  # Local
     else
@@ -708,7 +708,7 @@ remote_exec() {
 copy_to_remote() {
     local local_file="$1"
     local remote_file="$2"
-    
+
     if [ "$IS_REMOTE" = true ] && [ -n "$REMOTE_HOST" ]; then
         info "Copiando $local_file para ${REMOTE_USER}@${REMOTE_HOST}:${remote_file}"
         scp "$local_file" "${REMOTE_USER}@${REMOTE_HOST}:${remote_file}"
@@ -736,7 +736,7 @@ copy_dir_to_remote() {
 copy_from_remote() {
     local remote_file="$1"
     local local_file="$2"
-    
+
     if [ "$IS_REMOTE" = true ] && [ -n "$REMOTE_HOST" ]; then
         info "Copiando ${REMOTE_USER}@${REMOTE_HOST}:${remote_file} para $local_file"
         scp "${REMOTE_USER}@${REMOTE_HOST}:${remote_file}" "$local_file"
@@ -749,22 +749,22 @@ detect_remote_path() {
         # Verificar se o docker-compose.yml existe em algum caminho padrão
         local current_dir="$(basename "$PWD")"
         local parent_dir="$(basename "$(dirname "$PWD")")"
-        
+
         # Tentar encontrar o arquivo docker-compose.yml no host remoto
         info "Procurando docker-compose.yml no host remoto..."
-        
+
         # Verificar se existe em ~/docker/mssql+sqlpad/
         if remote_exec "[ -f ~/docker/mssql+sqlpad/docker-compose.yml ]" 2>/dev/null; then
             REMOTE_PATH="~/docker/mssql+sqlpad"
             return 0
         fi
-        
+
         # Verificar se existe em ~/.BatOps/docker/mssql+sqlpad/
         if remote_exec "[ -f ~/.BatOps/docker/mssql+sqlpad/docker-compose.yml ]" 2>/dev/null; then
             REMOTE_PATH="~/.BatOps/docker/mssql+sqlpad"
             return 0
         fi
-        
+
         # Se não encontrou, perguntar ao usuário
         echo ""
         read -p "Digite o caminho completo do projeto no host remoto: " user_path
@@ -782,7 +782,7 @@ list_docker_networks() {
 # Função para criar nova rede se necessário
 create_network_if_needed() {
     local network_name=$1
-    
+
     if ! docker network inspect "$network_name" &>/dev/null; then
         info "Rede '$network_name' não existe. Criando..."
         docker network create "$network_name" --driver bridge
@@ -797,7 +797,7 @@ update_env_var() {
     local var_name="$1"
     local var_value="$2"
     local env_file="${3:-.env}"
-    
+
     if grep -q "^${var_name}=" "$env_file"; then
         # Atualizar variável existente
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -842,14 +842,14 @@ sync_env_to_remote() {
 sync_project_to_remote() {
     if [ "$IS_REMOTE" = true ] && [ -n "$REMOTE_HOST" ] && [ -n "$REMOTE_PATH" ]; then
         info "Sincronizando arquivos do projeto com host remoto..."
-        
+
         # Criar diretório remoto se não existir
         remote_exec "mkdir -p ${REMOTE_PATH}"
-        
+
         # Sincronizar arquivos necessários
         copy_to_remote "docker-compose.yml" "${REMOTE_PATH}/docker-compose.yml"
         copy_to_remote ".env" "${REMOTE_PATH}/.env"
-        
+
         # Copiar sample se existir
         if [ -f ".env-sample" ]; then
             copy_to_remote ".env-sample" "${REMOTE_PATH}/.env-sample"
@@ -859,7 +859,7 @@ sync_project_to_remote() {
         if [ -d "sqlpad" ]; then
             copy_dir_to_remote "sqlpad" "${REMOTE_PATH}"
         fi
-        
+
         success "Projeto sincronizado com host remoto!"
     fi
 }
@@ -871,7 +871,7 @@ select_network() {
     echo "  Seleção de Rede Docker"
     echo "======================================"
     echo ""
-    
+
     local current_env_network
     current_env_network=$(get_env_var "MSSQL_NETWORK")
 
@@ -889,7 +889,7 @@ select_network() {
 
     list_docker_networks
     echo ""
-    
+
     # Obter lista de redes disponíveis (ignorando padrões bridge/host/none)
     mapfile -t networks < <(docker network ls --format "{{.Name}}" | grep -Ev '^(bridge|host|none)$' || true)
 
@@ -905,7 +905,7 @@ select_network() {
             error "Nome da rede não pode ser vazio!"
         done
     fi
-    
+
     echo "Redes disponíveis:"
     for i in "${!networks[@]}"; do
         echo "  $((i+1)). ${networks[$i]}"
@@ -913,10 +913,10 @@ select_network() {
     echo "  $((${#networks[@]}+1)). Criar nova rede"
     echo "  $((${#networks[@]}+2)). Usar padrão (mssql-network)"
     echo ""
-    
+
     while true; do
         read -p "Selecione uma opção [1-$((${#networks[@]}+2))]: " choice
-        
+
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le $((${#networks[@]}+2)) ]; then
             if [ "$choice" -eq $((${#networks[@]}+1)) ]; then
                 # Criar nova rede
@@ -954,10 +954,10 @@ main() {
     echo "  MSSQL + SQLPad - Docker Compose"
     echo "======================================"
     echo ""
-    
+
     # Verificar arquivo .env
     check_env_file
-    
+
     # Selecionar contexto Docker
     CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "default")
     info "Contexto Docker atualmente ativo: $CURRENT_CONTEXT"
@@ -979,23 +979,23 @@ main() {
     local context
     context="$SELECTED_CONTEXT"
     info "Contexto Docker selecionado: $context"
-    
+
     if is_remote_context "$context"; then
         IS_REMOTE=true
         warning "Detectado contexto Docker REMOTO"
-        
+
         if get_remote_context_info "$context"; then
             local endpoint
             endpoint=$(docker context inspect "$context" --format '{{.Endpoints.docker.Host}}')
             info "Endpoint: $endpoint"
             info "Host remoto: ${REMOTE_USER}@${REMOTE_HOST}"
-            
+
             # Detectar caminho remoto do projeto
             detect_remote_path
-            
+
             if [ -n "$REMOTE_PATH" ]; then
                 info "Caminho remoto do projeto: $REMOTE_PATH"
-                
+
                 # Sincronizar arquivos com o host remoto
                 sync_project_to_remote
             else
@@ -1006,43 +1006,43 @@ main() {
     else
         info "Detectado contexto Docker LOCAL"
     fi
-    
+
     echo ""
-    
+
     # Selecionar rede
     SELECTED_NETWORK=""
     select_network
     selected_network="$SELECTED_NETWORK"
-    
+
     if [ -z "$selected_network" ]; then
         error "Nenhuma rede selecionada!"
         exit 1
     fi
-    
+
     info "Rede selecionada: $selected_network"
-    
+
     # Criar rede se não existir
     create_network_if_needed "$selected_network"
-    
+
     # Atualizar variáveis de ambiente no arquivo .env local
     update_env_var "MSSQL_NETWORK" "$selected_network"
     update_env_var "SQLPAD_NETWORK" "$selected_network"
     success "Variáveis de rede atualizadas no .env"
-    
+
     # Preparar volumes persistentes (executa no contexto selecionado)
     echo ""
     info "Preparando volumes persistentes..."
     prepare_persistent_volumes
-    
+
     # Se for contexto remoto, sincronizar .env atualizado
     if [ "$IS_REMOTE" = true ]; then
         sync_env_to_remote
     fi
-    
+
     echo ""
     info "Iniciando containers..."
     echo ""
-    
+
     # Iniciar docker-compose
     if [ "$IS_REMOTE" = true ]; then
         # Para contextos remotos, navegar até o diretório remoto e executar
@@ -1056,26 +1056,26 @@ main() {
     else
         run_local_compose up -d --build
     fi
-    
+
     echo ""
     success "Containers iniciados com sucesso!"
     echo ""
-    
+
     # Aguardar health checks
     info "Aguardando containers ficarem healthy..."
     sleep 5
-    
+
     # Exibir status
     echo ""
     run_local_compose ps
     echo ""
-    
+
     # Informações de acesso
     echo "======================================"
     echo "  Informações de Acesso"
     echo "======================================"
     echo ""
-    
+
     # Ler valores do .env sem executar comandos
     local sqlpad_port="$(get_env_var "SQLPAD_PORT")"
     local sqlpad_admin="$(get_env_var "SQLPAD_ADMIN")"
@@ -1084,7 +1084,7 @@ main() {
     sqlpad_port="${sqlpad_port:-3000}"
     sqlpad_admin="${sqlpad_admin:-admin@sqlpad.com}"
     mssql_port="${mssql_port:-1433}"
-    
+
     if [ "$IS_REMOTE" = true ] && [ -n "$REMOTE_HOST" ]; then
         echo "SQLPad (Interface Web):"
         echo "  URL: http://${REMOTE_HOST}:${sqlpad_port}"
@@ -1111,7 +1111,7 @@ main() {
         echo "  Usuário: sa"
         echo "  Senha: (conforme configurado no .env)"
     fi
-    
+
     echo ""
     echo "Rede Docker: $selected_network"
     echo "Contexto Docker: $(get_docker_context)"
@@ -1126,7 +1126,7 @@ main() {
     if [ -z "$remote_compose_display" ]; then
         remote_compose_display="$compose_display"
     fi
-    
+
     success "Setup concluído!"
     echo ""
     echo "Para ver os logs:"

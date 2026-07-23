@@ -14,7 +14,7 @@ echo "You can test it by running: curl http://localhost:$PORT or by opening http
 echo "Press Ctrl+C to stop the server"
 
 echo "
-Example of usage in another terminal or browser:" 
+Example of usage in another terminal or browser:"
 echo "  curl http://localhost:$PORT"
 echo "  or open http://localhost:$PORT in your browser
 "
