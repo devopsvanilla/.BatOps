@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.1.0](https://github.com/devopsvanilla/.BatOps/compare/v1.0.0...v1.1.0) (2026-07-23)
+
+
+### Features
+
+* add automated VirtIO driver management with legacy support for Windows EOL systems and generate conversion diagnostic reports. ([aaea2bc](https://github.com/devopsvanilla/.BatOps/commit/aaea2bc94712c10a583bb2a3f21455060865c095))
+* add changelog entries for version 1.1.0 release features and bug fixes ([de38fb7](https://github.com/devopsvanilla/.BatOps/commit/de38fb716e5386b7fb1fa5ba51326d31fdeca951))
+* add delete_contents_on_destroy option to BigQuery dataset resource ([e201901](https://github.com/devopsvanilla/.BatOps/commit/e201901eba0b433c6f3581530996bd0af6bc7e76))
+* add Docker installation script for Ubuntu ([7840b4d](https://github.com/devopsvanilla/.BatOps/commit/7840b4dc49c4df1209ded17eb12b8918e775fa5e))
+* add GCP billing report script and setup script for gcloud environment ([29641c7](https://github.com/devopsvanilla/.BatOps/commit/29641c77e9f03d312b9416bdf099686f220e94c0))
+* add installation script for Docker on Linux ([9ac0fcc](https://github.com/devopsvanilla/.BatOps/commit/9ac0fccbbffcf5f28c760aa2e46da4ca47c78456))
+* add MySQL portable client setup with Docker and build scripts ([63525ec](https://github.com/devopsvanilla/.BatOps/commit/63525ec90246b84db88221818602948b41dec986))
+* add optional Dockly installation to Docker setup script ([9965b7a](https://github.com/devopsvanilla/.BatOps/commit/9965b7a6b7e431ced031dee42634d442afc47673))
+* add support for Windows EOL migration with force flag and include additional system dependencies ([fc60132](https://github.com/devopsvanilla/.BatOps/commit/fc60132773bb3bea35b2cba4ac8f631d4d3a2328))
+* add sysbench performance testing script ([41dbcc7](https://github.com/devopsvanilla/.BatOps/commit/41dbcc7b880b1779e4752adced910a72fbb0d7da))
+* add Terraform configuration for GCP billing export to BigQuery ([05963b2](https://github.com/devopsvanilla/.BatOps/commit/05963b25907c4af059ebc812da83d61ea6961199))
+* add virt-v2v dependency and update conversion command to use environment variable for driver path ([b7ced16](https://github.com/devopsvanilla/.BatOps/commit/b7ced1639c5719eacb9a6c360a2b06c846ccc88c))
+* enhance OVF to QCOW2 conversion with virt-v2v optimizations and documentation for KVM import ([7e4801a](https://github.com/devopsvanilla/.BatOps/commit/7e4801ad2d0ad0e8cef3c95ec1fb265d029f2a1b))
+* enhance sysbench script with detailed output and improved readability ([ce53183](https://github.com/devopsvanilla/.BatOps/commit/ce531838e0df5ae63fcfc037990acb15e1bfe39e))
+* implement Docker secrets for Metabase and pgAdmin, enhance up.sh for password management ([b218138](https://github.com/devopsvanilla/.BatOps/commit/b218138ac132c93845f15a7226beef32f7accbce))
+* rename converted disk files to .qcow2 and update XML descriptors accordingly ([c793402](https://github.com/devopsvanilla/.BatOps/commit/c793402d7ba75e2dfc5e81190a871e2b81894199))
+* update CloudFormation template for IAM user creation with enhanced permissions and security policies ([b1e4ee8](https://github.com/devopsvanilla/.BatOps/commit/b1e4ee8855aa7ea11c5fe37d948094ff9faf17b3))
+* update sysbench file size for disk tests to 100mb ([9efc99f](https://github.com/devopsvanilla/.BatOps/commit/9efc99f53fd2cc1eaa9b260ea31eb85a0e006033))
+
+
+### Bug Fixes
+
+* remove private key markers from gcloud SDK documentation example ([6d2b3d1](https://github.com/devopsvanilla/.BatOps/commit/6d2b3d10a699f9270c0421dfbcbaf1e83b82b8e6))
+
 ## 1.1.0 (2026-04-02)
 
 ### Features
