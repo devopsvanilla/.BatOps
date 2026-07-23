@@ -1,175 +1,119 @@
 # Criação de usuário de discovery para auditoria AWS
 
-⏱️ Tempo de leitura: ~8 minutos
+⏱️ Tempo de execução: ~10 minutos
 
 ## Propósito
 
-Este material cria um usuário IAM chamado `devopsvanilla` com foco em:
+> Esse procedimento foi concebido exclusivamente para conceder acesso para o levantamento de ativos e configurações realizado por DevOps Vanilla. Ele poderá ser aproveitado para outras finalidades, porém tenha o cuidado de atualizar as informações de contato, acessos e identificadores para a sua necessidade
+
+Este procedimento cria um usuário IAM chamado `devopsvanilla` com foco em:
 
 - auditar configurações e provisionamento dos recursos da conta AWS;
 - inventariar serviços, topologia, proteções e configurações de segurança;
 - visualizar custos, faturamento e dados consolidados de billing;
 - acessar a conta pela interface web do console AWS e também pela AWS CLI.
 
-O perfil foi desenhado para **observabilidade administrativa** e **inventário**, sem permitir operação, alterações administrativas de IAM nem acesso ao conteúdo armazenado pelos workloads do cliente.
+O perfil foi elaborado para **observabilidade administrativa** e **inventário**, sem permitir operação, alterações administrativas de IAM nem acesso ao conteúdo armazenado pelos workloads do cliente.
 
 ## Permissões concedidas
 
-O manifesto entrega um usuário com:
+O manifesto cria um usuário com:
 
-- policy gerenciada AWS `ReadOnlyAccess` para leitura ampla de configurações e inventário;
-- permissões complementares de leitura para:
+- Policy gerenciada AWS `ReadOnlyAccess` para leitura ampla de configurações e inventário;
+- Policy gerenciada AWS `AWSBillingReadOnlyAccess` para acesso somente leitura ao console de Billing and Cost Management, acompanhando automaticamente as atualizações de permissões da AWS;
+- Permissões complementares de leitura para:
   - **AWS Organizations**;
   - **IAM e segurança** (`IAM`, `Access Analyzer`, `CloudTrail`, `AWS Config`, `GuardDuty`, `Security Hub`, `Inspector`, `KMS` em modo descritivo);
-  - **Billing e custos** (`Billing`, `Cost Explorer`, `Budgets`, `CUR`, `Pricing`, `Invoicing`, `Payments`, `Tax`, `Free Tier`);
-- acesso ao **AWS Management Console** via senha inicial definida no deploy;
-- acesso programático via **AWS CLI** com `AccessKeyId` e `SecretAccessKey`.
+  - **catálogo de preços** (`Pricing`);
+- Acesso ao **AWS Management Console** via senha inicial definida no deploy;
+- Possibilidade de acesso programático via **AWS CLI** após criação manual de `AccessKeyId` e `SecretAccessKey` para o usuário.
 
 ### Restrições aplicadas
 
 Também são aplicados bloqueios explícitos para reduzir risco de exposição de dados:
 
-- não pode criar, alterar ou remover usuários, policies, roles ou credenciais IAM;
-- não pode criar/remover access key, alterar login profile ou administrar MFA por conta própria;
-- não pode abrir sessão remota em instâncias por `SSM Session Manager` ou `EC2 Instance Connect`;
-- não pode ler segredos do `Secrets Manager` ou valores do `Parameter Store`;
-- não pode consultar dados de bancos via `RDS Data API`, `Redshift Data API`, `DynamoDB`, `Athena` ou serviços similares;
-- não pode ler objetos de `S3`, listar chaves de objetos em buckets nem acessar blocos de snapshots EBS;
-- não pode invocar funções `Lambda`, modelos `Bedrock` ou endpoints de inferência do `SageMaker`;
-- não pode ler eventos de log detalhados do `CloudWatch Logs`.
+- Não poderá criar, alterar ou remover usuários, policies, roles ou credenciais IAM;
+- Não poderá criar/remover access key, alterar login profile ou administrar MFA por conta própria;
+- Não poderá abrir sessão remota em instâncias por `SSM Session Manager` ou `EC2 Instance Connect`;
+- Não poderá ler segredos do `Secrets Manager` ou valores do `Parameter Store`;
+- Não poderá consultar dados de bancos via `RDS Data API`, `Redshift Data API`, `DynamoDB`, `Athena` ou serviços similares;
+- Não poderá ler objetos de `S3`, listar chaves de objetos em buckets nem acessar blocos de snapshots EBS;
+- Não poderá invocar funções `Lambda`, modelos `Bedrock` ou endpoints de inferência do `SageMaker`;
+- Não poderá ler eventos de log detalhados do `CloudWatch Logs`.
 
 ## Como executar
 
-> 📂 **Estrutura do Projeto**: esta solução está em `clouds/aws/create-discovery-user/`. Execute os passos a partir desse diretório para evitar confusão.
-
 ### 1. Pre-requisitos
 
-Antes de iniciar, o analista deve ter:
+Antes de iniciar, o executor deste procedimento deve ter acesso a uma conta na AWS com permissão para:
 
-- acesso a uma conta AWS com permissão para criar usuário IAM, login profile, access key e managed policies ou `AWS CLI` instalada e autenticada com uma identidade administrativa;
-- permissão para abrir o **CloudFormation** no console ou usar a CLI;
-- confirmação de que o recurso **IAM access to Billing** está habilitado na conta, caso o usuário precise ver faturamento no console.
+- Criar usuários no IAM
+- Permissões para acessar o **CloudFormation** no console da AWS.
+
+> **Importante sobre Billing:** a AWS exige um passo adicional feito com o **usuário root da conta** para liberar o acesso de usuários IAM ao console de faturamento. Esse ajuste não é automatizável por este manifesto CloudFormation.
 
 ### 2. Faça o download do manifesto CloudFormation para o seu computador
 
-- Faça o download do [manifesto CloudFormation](https://raw.githubusercontent.com/devopsvanilla/.BatOps/refs/heads/main/clouds/setup-gcloud.sh) no seu computador em arquivo nomeado como *devopsvanilla-create-discovery-user.yaml*
+- Faça o download do [manifesto CloudFormation](https://raw.githubusercontent.com/devopsvanilla/.BatOps/refs/heads/main/clouds/aws/create-discovery-user/devopsvanilla-create-discovery-user.yaml) no seu computador em arquivo nomeado como **devopsvanilla-create-discovery-user.yaml**
 
-### 3. Escolher a forma de implantação
-
-Você pode implantar de duas maneiras:
-
-- **Console AWS**: melhor para quem está começando;
-- **AWS CLI**: melhor para automação e repetibilidade.
-
-### 4. Implantação pelo Console AWS
+### 3. Implantação pelo Console AWS
 
 1. Abra o console AWS com uma conta administrativa.
 2. Pesquise por **CloudFormation**.
-3. Clique em **Create stack** > **With new resources (standard)**.
-4. Em **Specify template**, escolha **Upload a template file**.
-5. Envie o arquivo `devopsvanilla-create-discovery-user.yaml` salvo no seu computador.
-6. Clique em **Next**.
-7. Em **Stack name**, informe `devopsvanilla-discovery-user` (recomendado).
-8. Preencha os parâmetros:
+3. Clique em **Criar pilha**
+4. Escolha **Escolher um modelo existente**, **Fazer upload de um arquivo de modelo** e clique em **Escolher arquivo**. Aponte para o arquivo **devopsvanilla-create-discovery-user.yaml** no local em que salvou no seu disco
+5. Clique no botão **Próximo**
+6. Envie o arquivo `devopsvanilla-create-discovery-user.yaml` salvo no seu computador.
+7. Clique em **Next**.
+8. Em **Nome da pilha**, informe `devopsvanilla-discovery-user` (recomendado).
+9. Preencha os parâmetros:
    - `UserName`: mantenha `devopsvanilla`;
    - `UserEmail`: mantenha `devopsvanilla@outlook.com` ou ajuste se necessário;
-   - `ConsolePassword`: defina uma senha inicial forte;
-   - `RequirePasswordReset`: recomenda-se `true`;
-   - `CreateProgrammaticAccess`: recomenda-se `true`.
-9. Clique em **Next**.
-10. Em **Configure stack options**, pode seguir com os padrões.
-11. Clique em **Next** novamente.
-12. Revise as informações.
-13. Marque a confirmação de que o CloudFormation criará recursos IAM.
-14. Clique em **Submit**.
-15. Aguarde o status `CREATE_COMPLETE`.
+   - `ConsolePassword`: defina uma senha inicial forte.
+10. Clique em **Próximo**.
+11. Em **Capacidades**, marque a opção: **Entendo que o AWS CloudFormation pode criar recursos do IAM com nomes personalizados**.
+12. Clique em **Próximo** novamente.
+13. Revise as informações.
+14. Clique em **Enviar**.
+15. Acesse a aba **Recursos** e aguarde o status `CREATE_COMPLETE`de todos os itens exibidos na lista. A página será atualizada automaticamente, mas se tiver a impressão que está demorando muito, force a atualização da página pelo navegador.
+16. Acesse a aba **Saídas** e e copie para um Bloco de Notas o conteúdo da tabela.
 
-### 5. Implantação pela AWS CLI
+### 4. Crie manualmente a access key para uso na AWS CLI
 
-Execute o deploy com uma identidade administrativa já autenticada:
+Como medida de segurança, este manifesto **não cria** `AccessKeyId` nem `SecretAccessKey` no CloudFormation.
 
-```bash
-aws cloudformation deploy \
-  --stack-name devopsvanilla-discovery-user \
-  --template-file devopsvanilla-create-discovery-user.yaml \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides \
-    RecommendedStackName=devopsvanilla-discovery-user \
-    UserName=devopsvanilla \
-    UserEmail=devopsvanilla@outlook.com \
-    ConsolePassword='Troque-Essa-Senha-Agora-123!' \
-    RequirePasswordReset=true \
-    CreateProgrammaticAccess=true
-```
+1. Abra o serviço **IAM** no console AWS com uma conta administrativa.
+2. Acesse **Usuários do IAM**.
+3. Clique no usuário criado pela stack, `devopsvanilla`.
+4. Abra a aba **Credenciais de Segurança**.
+5. Na seção **Chaves de acesso**, clique em **Criar chave de acesso**.
+6. Escolha o caso de uso **Command Line Interface (CLI)**.
+7. No fim da página, marque a opção **Compreendo a recomendação acima e quero prosseguir para criar uma chave de acesso**.
+8. Clique no botão **Próximo**.
+9. Clique no botão **Criar chave de acesso**.
+10. Copie e armazene em um Bloco de notas imediatamente:
+    - `Chave de acesso`
+    - `Chave de acesso secreta`
+11. Clique no botão Baixar arquivo .csv e selecione uma área no seu computador para salvá-lo
 
-### 6. Capturar as saídas da stack
+> A `Chave de acesso secreta` é exibida apenas no momento da criação. Depois disso, ela não poderá ser consultada novamente.
 
-Se o deploy foi feito por CLI, obtenha os outputs assim:
+### 5. Habilite o acesso de usuários IAM ao Billing (obrigatório para o console de faturamento)
 
-```bash
-aws cloudformation describe-stacks \
-  --stack-name devopsvanilla-discovery-user \
-  --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
-  --output table
-```
+Sem esta etapa, o usuário criado verá a mensagem de falta de permissão no console de faturamento, mesmo com as policies corretas.
 
-### 7. Padrões recomendados e comunicação de exceções
+1. Entre na Console da AWS com o **usuário root** da conta caso a sua conta não seja (solicite ao seu intermediário de suporte técnico se for o caso).
+2. Acesse a opção **Account**.
+3. Role a página até a seção **Acesso do perfil e usuário do IAM a informações de faturamento**.
+4. Clique em **Editar**.
+5. Marque **Ativar acesso ao IAM**.
+6. Clique em **Atualizar**.
 
-Para padronização operacional, recomenda-se manter estes valores:
+> Depois disso, o usuário `devopsvanilla` passa a poder abrir as páginas de Billing and Cost Management compatíveis com a policy `AWSBillingReadOnlyAccess`.
 
-- nome da stack: `devopsvanilla-discovery-user`;
-- `RecommendedStackName=devopsvanilla-discovery-user`;
-- `UserName=devopsvanilla`;
-- `UserEmail=devopsvanilla@outlook.com`;
-- `RequirePasswordReset=true`;
-- `CreateProgrammaticAccess=true`.
-
-Se qualquer um desses valores for alterado, a mudança deve ser comunicada formalmente ao time responsável pela auditoria (incluindo valor antigo, valor novo, justificativa e data da alteração).
-
-## Senha inicial: como funciona
-
-A senha inicial **sempre** é definida por quem executa o deploy (campo `ConsolePassword`).
-
-Se `RequirePasswordReset=true` (recomendado), o usuário será obrigado a trocar a senha no primeiro login.
-
-### Como o usuário troca a senha no primeiro acesso (console AWS)
-
-1. Acesse a URL de login do console (`ConsoleLoginUrl`).
-2. Informe o usuário criado (padrão: `devopsvanilla`).
-3. Digite a senha inicial fornecida pelo analista.
-4. O console exibirá a tela obrigatória de troca de senha.
-5. Informe a senha antiga (inicial) e a nova senha.
-6. Conclua a alteração e faça login novamente.
-7. Com a nova senha, execute os testes de acesso antes da liberação final da conta.
-
-> ✅ Isso permite testar os acessos normalmente antes de entregar a conta, sem precisar redefinir a senha por fora do fluxo do console.
-
-## Como verificar a implantação
+### 6. Como verificar a implantação
 
 Depois da criação, valide os pontos abaixo.
-
-### Verificação no CloudFormation
-
-- a stack deve estar com status `CREATE_COMPLETE`;
-- não deve haver eventos de erro ou rollback;
-- os outputs devem exibir pelo menos:
-  - `UserName`;
-  - `UserArn`;
-  - `ConsoleLoginUrl`;
-  - `AccessKeyId` e `SecretAccessKey` (se `CreateProgrammaticAccess=true`).
-
-### Verificação no IAM
-
-No console AWS:
-
-1. Abra **IAM**.
-2. Acesse **Users**.
-3. Confirme que o usuário definido no parâmetro `UserName` existe (padrão: `devopsvanilla`).
-4. Abra o usuário e valide:
-   - existe acesso ao console;
-   - existe ao menos uma access key ativa, se solicitado;
-   - a policy AWS `ReadOnlyAccess` está anexada;
-   - existem as policies gerenciadas criadas pela stack para complemento de leitura e deny explícito.
 
 ### Verificação funcional no console
 
@@ -180,52 +124,22 @@ Com as credenciais do novo usuário:
 3. Confirme que o usuário consegue:
    - abrir `EC2`, `VPC`, `RDS`, `S3`, `Lambda`, `CloudTrail`, `Config`, `GuardDuty`, `Security Hub`, `Organizations` e `Billing`;
    - listar recursos e visualizar configurações.
+   - abrir a página inicial de `Billing and Cost Management` sem a mensagem `You need a new IAM permission to view the full list of recommended actions`.
 4. Confirme também que o usuário **não** consegue:
    - baixar objetos de um bucket S3;
    - abrir sessão via `Session Manager`;
    - visualizar um segredo do `Secrets Manager`;
    - criar nova access key ou alterar login profile/MFA sem autorização.
 
-### Verificação funcional na AWS CLI
+## Envie o e-mail com os dados de acesso
 
-Configure a CLI com a access key entregue e valide:
+* Salve o conteúdo das informações copiadas para o Bloco de Notas nos passos anteriores em um arquivo chamado acessos.txt no mesmo local em que salvou o arquivo da Chave de Acesso.
+* Compacte o diretório com senha e envie-o para [sandro@devopsvanilla.com.br](mailto:sandro@devopsvanilla.com.br)
+* A senha para descompactar o arquivo deverá ser enviada por WhatsApp para 11 98895-4887
 
-```bash
-aws sts get-caller-identity
-aws ec2 describe-regions
-aws organizations describe-organization
-aws ce get-cost-and-usage \
-  --time-period Start=2026-07-01,End=2026-07-31 \
-  --granularity MONTHLY \
-  --metrics UnblendedCost
-```
+## Problemas ou dúvidas?
 
-Depois, teste um acesso que deve falhar, por exemplo:
+Contatos:
 
-```bash
-aws s3 cp s3://NOME-DO-BUCKET/algum-arquivo.txt -
-```
-
-O comportamento esperado é receber erro de `AccessDenied`.
-
-## Dados a serem fornecidos após a execução
-
-Ao final da implantação, o analista deve entregar **somente por canal seguro** os seguintes dados:
-
-- `Account ID` da conta AWS onde o usuário foi criado;
-- `UserName` efetivo (padrão: `devopsvanilla`);
-- URL de login do console (`ConsoleLoginUrl`);
-- senha inicial definida no deploy;
-- `AccessKeyId`;
-- `SecretAccessKey` (lembrando que ela aparece apenas na criação da stack);
-- confirmação se `RequirePasswordReset` foi configurado como `true` ou `false`;
-- confirmação se a visualização de billing para usuários IAM está habilitada na conta;
-- nome da stack criada no CloudFormation;
-- confirmação se os valores padrão foram mantidos; caso não, listar todas as alterações aplicadas;
-- data e hora da implantação.
-
-> 🔐 **Boas práticas**:
->
-> - nunca envie credenciais por e-mail sem criptografia;
-> - prefira cofre de senhas, canal corporativo seguro ou compartilhamento temporário controlado;
-> - após a entrega, registre internamente quem recebeu as credenciais e quando.
+- [sandro@devopsvanilla.com.br](sandro@devopsvanilla.com.br)
+- WhatsApp (11) 98895-4887

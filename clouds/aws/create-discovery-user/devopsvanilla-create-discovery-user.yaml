@@ -15,8 +15,6 @@ Metadata:
         default: Acesso inicial e operacao
       Parameters:
       - ConsolePassword
-      - RequirePasswordReset
-      - CreateProgrammaticAccess
     ParameterLabels:
       RecommendedStackName:
         default: Nome recomendado da stack
@@ -26,10 +24,6 @@ Metadata:
         default: Email de referencia do usuario
       ConsolePassword:
         default: Senha inicial de console
-      RequirePasswordReset:
-        default: Exigir troca de senha no primeiro login
-      CreateProgrammaticAccess:
-        default: Criar access key para AWS CLI
 
 Parameters:
   RecommendedStackName:
@@ -55,26 +49,8 @@ Parameters:
     MinLength: 12
     Description: >-
       Senha inicial do console AWS para o usuario. Deve obedecer a politica de senha vigente da conta.
-  RequirePasswordReset:
-    Type: String
-    Default: 'true'
-    AllowedValues:
-    - 'true'
-    - 'false'
-    Description: >-
-      Campo recomendado. Define se o usuario sera obrigado a trocar a senha no primeiro login. Padrao recomendado: true. Pode ser alterado.
-  CreateProgrammaticAccess:
-    Type: String
-    Default: 'true'
-    AllowedValues:
-    - 'true'
-    - 'false'
-    Description: >-
-      Campo recomendado. Define se uma access key para AWS CLI sera criada junto com o usuario. Padrao recomendado: true. Pode ser alterado.
 
 Conditions:
-  ShouldCreateProgrammaticAccess: !Equals [ !Ref CreateProgrammaticAccess, 'true' ]
-  ShouldRequirePasswordReset: !Equals [ !Ref RequirePasswordReset, 'true' ]
   IsRecommendedStackName: !Equals [ !Ref 'AWS::StackName', !Ref RecommendedStackName ]
 
 Resources:
@@ -84,9 +60,10 @@ Resources:
       UserName: !Ref UserName
       LoginProfile:
         Password: !Ref ConsolePassword
-        PasswordResetRequired: !If [ ShouldRequirePasswordReset, true, false ]
+        PasswordResetRequired: false
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/ReadOnlyAccess
+      - arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess
       Tags:
       - Key: Purpose
         Value: discovery-audit-and-cost-inventory
@@ -95,56 +72,23 @@ Resources:
       - Key: ManagedBy
         Value: cloudformation
 
-  DiscoveryAccessKey:
-    Type: AWS::IAM::AccessKey
-    Condition: ShouldCreateProgrammaticAccess
-    Properties:
-      UserName: !Ref DiscoveryUser
-      Status: Active
-
   DiscoverySupplementalReadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Sub '${AWS::StackName}-discovery-supplemental-read'
       Description: >-
-        Permissoes complementares de leitura para billing, organizations e servicos de seguranca usados em auditoria de configuracao.
+        Permissoes complementares de leitura para organizations, catalogo de precos e servicos de seguranca usados em auditoria de configuracao.
       Users:
       - !Ref DiscoveryUser
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Sid: BillingAndCostReadOnly
+        - Sid: PricingCatalogReadOnly
           Effect: Allow
           Action:
-          - account:Get*
-          - account:List*
-          - aws-portal:ViewAccount
-          - aws-portal:ViewBilling
-          - aws-portal:ViewPaymentMethods
-          - aws-portal:ViewUsage
-          - billing:Get*
-          - billing:List*
-          - budgets:Describe*
-          - budgets:ViewBudget
-          - ce:Describe*
-          - ce:Get*
-          - ce:List*
-          - consolidatedbilling:List*
-          - consolidatedbilling:Get*
-          - cur:DescribeReportDefinitions
-          - freetier:Get*
-          - freetier:List*
-          - invoicing:Get*
-          - invoicing:List*
-          - payments:Get*
-          - payments:List*
           - pricing:Describe*
           - pricing:Get*
           - pricing:List*
-          - purchase-orders:Get*
-          - purchase-orders:List*
-          - tax:Get*
-          - tax:List*
           Resource: '*'
         - Sid: OrganizationsAndAccountInventoryReadOnly
           Effect: Allow
@@ -388,16 +332,7 @@ Outputs:
   ConsoleLoginUrl:
     Description: URL base para login no console AWS.
     Value: !Sub 'https://${AWS::AccountId}.signin.aws.amazon.com/console'
-  AccessKeyId:
-    Condition: ShouldCreateProgrammaticAccess
-    Description: Access Key ID para uso na AWS CLI.
-    Value: !Ref DiscoveryAccessKey
-  SecretAccessKey:
-    Condition: ShouldCreateProgrammaticAccess
-    Description: >-
-      Secret Access Key exibida apenas na criacao da stack. Armazene com seguranca imediatamente apos o deploy.
-    Value: !GetAtt DiscoveryAccessKey.SecretAccessKey
   ImportantNotes:
     Description: Observacoes operacionais importantes.
     Value: >-
-      Para visualizar faturamento no console, a conta precisa ter IAM Access to Billing habilitado. As chaves de acesso nao poderao ser recuperadas novamente apos a criacao.
+      Para visualizar faturamento no console, o usuario root da conta deve ativar manualmente IAM User and Role Access to Billing Information em Account > IAM User and Role Access to Billing Information > Edit > Activate IAM Access. A senha inicial do console nao e exibida nos Outputs nem pode ser recuperada pelo CloudFormation. A access key para AWS CLI deve ser criada manualmente apos o deploy, pois este manifesto nao cria nem publica credenciais programaticas.
