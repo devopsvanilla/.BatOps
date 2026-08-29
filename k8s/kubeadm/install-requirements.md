@@ -261,6 +261,6 @@ Este script faz parte do repositório BatOps - DevOps Vanilla
 
 ---
 
-**Autor**: DevOps Vanilla  
-**Data**: 05/03/2026  
+**Autor**: DevOps Vanilla
+**Data**: 05/03/2026
 **Versão**: 1.0

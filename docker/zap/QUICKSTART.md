@@ -25,12 +25,12 @@ grep finops-hom.sondahybrid.com /etc/hosts
 
 ## O que foi corrigido?
 
-✅ **Arquitetura simplificada** - Removido container intermediário desnecessário  
-✅ **Detecção automática de DNS** - Lê `/etc/hosts` e propaga para container ZAP  
-✅ **Sem erro de sintaxe** - Correção do `docker: invalid reference format`  
-✅ **Performance melhorada** - Execução direta sem camadas extras  
-✅ **Modo Local/Dummy** - Suporte a URLs locais com `--network host`  
-✅ **Permissões corrigidas** - Ajuste automático de permissões em `zap-results/`  
+✅ **Arquitetura simplificada** - Removido container intermediário desnecessário
+✅ **Detecção automática de DNS** - Lê `/etc/hosts` e propaga para container ZAP
+✅ **Sem erro de sintaxe** - Correção do `docker: invalid reference format`
+✅ **Performance melhorada** - Execução direta sem camadas extras
+✅ **Modo Local/Dummy** - Suporte a URLs locais com `--network host`
+✅ **Permissões corrigidas** - Ajuste automático de permissões em `zap-results/`
 
 ## ⚠️  Avisos Conhecidos (Podem ser Ignorados)
 
@@ -38,9 +38,9 @@ grep finops-hom.sondahybrid.com /etc/hosts
 2025-11-19 03:04:11,748 Unable to copy yaml file to /zap/wrk/zap.yaml [Errno 13] Permission denied: '/zap/wrk/zap.yaml'
 ```
 
-**Impacto:** Nenhum - O relatório HTML é gerado corretamente.  
-**Causa:** Arquivo interno temporário do ZAP que não afeta o resultado.  
-**Status:** Corrigido automaticamente para novos scans (v202511190304+).  
+**Impacto:** Nenhum - O relatório HTML é gerado corretamente.
+**Causa:** Arquivo interno temporário do ZAP que não afeta o resultado.
+**Status:** Corrigido automaticamente para novos scans (v202511190304+).
 
 ## 🌐 Modos de Acesso
 
@@ -55,7 +55,7 @@ grep finops-hom.sondahybrid.com /etc/hosts
 - URL local (serviço rodando no host)
 - Container ZAP usa `--network host`
 - Acessa diretamente o `/etc/hosts` do host
-- **Ideal para:** Serviços rodando em localhost, 127.0.0.1, ou IPs privados  
+- **Ideal para:** Serviços rodando em localhost, 127.0.0.1, ou IPs privados
 
 ## Exemplo de Saída Esperada
 
