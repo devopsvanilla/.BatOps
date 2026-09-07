@@ -1,0 +1,74 @@
+# Template de GitHub Actions para execução periódica do Legitify.
+#
+# Copie este arquivo para ".github/workflows/legitify-audit.yml" no repositório
+# onde deseja rodar a auditoria periódica (normalmente um repositório interno
+# da organização, ex.: ".github" ou um repo dedicado a compliance/segurança).
+#
+# Pré-requisitos:
+#   1. Crie um PAT do GitHub com os escopos: admin:org, read:enterprise,
+#      admin:org_hook, read:org, repo, read:repo_hook.
+#   2. Salve o token como secret do repositório/organização: PAT_FOR_LEGITIFY.
+#   3. Ajuste "org_slug" abaixo para o nome da sua organização.
+
+name: Legitify Audit
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Toda segunda-feira às 08:00 UTC
+    - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    env:
+      org_slug: minha-organizacao
+    steps:
+      - name: Legitify Action (SARIF + resumo no job)
+        uses: Legit-Labs/legitify@main
+        with:
+          github_token: ${{ secrets.PAT_FOR_LEGITIFY }}
+          organization: ${{ env.org_slug }}
+          output_format: sarif
+          output_file: legitify-results.sarif
+          # Exemplo de políticas ignoradas (opcional)
+          # ignore-policies: |
+          #    non_admins_can_create_public_repositories
+          #    requires_status_checks
+
+      - name: Upload resultado SARIF como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legitify-sarif-${{ github.run_id }}
+          path: legitify-results.sarif
+          retention-days: 90
+
+      - name: Checkout (para usar o script com geração de PDF)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            security/legitify
+
+      - name: Instalar dependências para geração de PDF
+        run: sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
+
+      - name: Rodar auditoria completa com relatório em PDF
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_LEGITIFY }}
+          GITHUB_ORG: ${{ env.org_slug }}
+          LEGITIFY_OUTPUT_DIR: ./reports
+        run: |
+          chmod +x security/legitify/install-legitify.sh security/legitify/audit-github.sh
+          security/legitify/audit-github.sh --non-interactive
+
+      - name: Upload relatório em PDF/JSON/TXT
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legitify-report-${{ github.run_id }}
+          path: reports/
+          retention-days: 90

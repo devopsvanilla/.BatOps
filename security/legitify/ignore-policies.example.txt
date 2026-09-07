@@ -1,0 +1,6 @@
+# Exemplo de arquivo de políticas ignoradas pelo Legitify.
+# Uma política por linha. Remova o "#" e ajuste conforme sua necessidade.
+# Lista completa de políticas: https://legitify.dev/
+
+# non_admins_can_create_public_repositories
+# requires_status_checks
