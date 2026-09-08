@@ -12,7 +12,10 @@
 .PARAMETER Email
     E-mail a ser usado nos commits.
 .PARAMETER Force
-    Sobrescreve valores já configurados, mesmo que já existam.
+    Pula a confirmação e solicita novos valores mesmo já configurado.
+.PARAMETER Yes
+    Modo não interativo: mantém os valores já configurados sem perguntar
+    (ou usa -Name/-Email se informados).
 .EXAMPLE
     ./Set-GitProfile.ps1
 .EXAMPLE
@@ -22,10 +25,24 @@
 param(
     [string]$Name,
     [string]$Email,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Confirm-Action {
+    param(
+        [string]$Question,
+        [ValidateSet('S', 'N')]
+        [string]$Default = 'S'
+    )
+    if ($Yes) { return $Default -eq 'S' }
+    $suffix = if ($Default -eq 'N') { '[s/N]' } else { '[S/n]' }
+    $reply = Read-Host "$Question $suffix"
+    if ([string]::IsNullOrWhiteSpace($reply)) { $reply = $Default }
+    return $reply -match '^[Ss]'
+}
 
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if (-not $gitCmd) {
@@ -36,22 +53,34 @@ if (-not $gitCmd) {
 $currentName = git config --global user.name 2>$null
 $currentEmail = git config --global user.email 2>$null
 
-if ($currentName -and $currentEmail -and -not $Force) {
-    Write-Host "✅ Perfil Git já configurado:" -ForegroundColor Green
+if ($currentName -and $currentEmail -and -not $Name -and -not $Email -and -not $Force) {
+    Write-Host "ℹ️  Perfil Git atual:" -ForegroundColor Cyan
     Write-Host "   user.name  = $currentName"
     Write-Host "   user.email = $currentEmail"
-    Write-Host "   (use -Force para alterar)"
-    exit 0
+    if (-not (Confirm-Action -Question "Deseja alterar esses valores?" -Default 'N')) {
+        Write-Host "✅ Mantendo perfil atual." -ForegroundColor Green
+        exit 0
+    }
 }
 
 if (-not $Name) {
-    $Name = Read-Host "Nome completo para commits [$currentName]"
-    if (-not $Name) { $Name = $currentName }
+    if ($Yes) {
+        $Name = $currentName
+    }
+    else {
+        $Name = Read-Host "Nome completo para commits [$currentName]"
+        if (-not $Name) { $Name = $currentName }
+    }
 }
 
 if (-not $Email) {
-    $Email = Read-Host "E-mail para commits [$currentEmail]"
-    if (-not $Email) { $Email = $currentEmail }
+    if ($Yes) {
+        $Email = $currentEmail
+    }
+    else {
+        $Email = Read-Host "E-mail para commits [$currentEmail]"
+        if (-not $Email) { $Email = $currentEmail }
+    }
 }
 
 if (-not $Name -or -not $Email) {

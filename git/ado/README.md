@@ -14,9 +14,35 @@ quebrar o acesso já configurado ao **GitHub**.
 | `install-azcli.sh` | `Install-AZCLI.ps1` | Instala/valida o Azure CLI (`az`) e a extensão `azure-devops` |
 | `configure-ado-access.sh` | `Configure-ADOAccess.ps1` | Configura o Git Credential Manager (GCM) com helpers **escopados** para `dev.azure.com` e `*.visualstudio.com`, e os defaults do `az devops` |
 | `set-git-profile.sh` | `Set-GitProfile.ps1` | Garante que `user.name` e `user.email` globais do Git estejam configurados |
-| `fix-github-ado-conflict.sh` | `Fix-GitHubADOConflict.ps1` | Diagnostica (e corrige com `--fix`/`-Fix`) conflitos entre o helper de credencial do GitHub CLI e helpers genéricos que possam interceptar essas credenciais |
+| `fix-github-ado-conflict.sh` | `Fix-GitHubADOConflict.ps1` | Diagnostica (e corrige) conflitos entre o helper de credencial do GitHub CLI e helpers genéricos que possam interceptar essas credenciais |
 
 Convenção de nomes: **(ação)-(contexto)**, ex.: `install-azcli.sh` / `Install-AZCLI.ps1`.
+
+### 💬 Comportamento interativo
+
+Todos os scripts seguem a mesma regra:
+
+- **Item já configurado?** O script mostra o valor atual e **pergunta** se
+  você quer mantê-lo ou alterá-lo (nunca altera silenciosamente).
+- **Parâmetro obrigatório não informado** (ex.: organização/projeto do Azure
+  DevOps, nome/e-mail do Git)? O script **pergunta** interativamente,
+  sugerindo o valor atual (se houver) como padrão — basta pressionar Enter
+  para aceitá-lo.
+- **Modo automação/CI:** todos aceitam `--yes` (Bash) / `-Yes` (PowerShell)
+  para aceitar os padrões sem perguntar (ou passe os parâmetros explícitos:
+  `--org`/`-Organization`, `--project`/`-Project`, `--name`/`-Name`,
+  `--email`/`-Email`). Quando executados sem um terminal interativo (ex.: em
+  pipelines), o comportamento padrão também é assumido automaticamente.
+
+| Flag | Bash | PowerShell | Efeito |
+|---|---|---|---|
+| Não perguntar, aceitar padrões | `--yes` | `-Yes` | Todos os 4 scripts |
+| Forçar instalação nativa do az no Linux | `--force-native` | — | `install-azcli.sh` |
+| Forçar reinstalação do az | — | `-Force` | `Install-AZCLI.ps1` |
+| Instalar GCM sem perguntar | `--install-gcm` | — | `configure-ado-access.sh` |
+| Organização/Projeto do Azure DevOps | `--org URL` / `--project NOME` | `-Organization` / `-Project` | `configure-ado-access.sh` / `Configure-ADOAccess.ps1` |
+| Nome/e-mail do Git | `--name` / `--email` | `-Name` / `-Email` | `set-git-profile.sh` / `Set-GitProfile.ps1` |
+| Corrigir sem perguntar | `--fix` | `-Fix` | `fix-github-ado-conflict.sh` / `Fix-GitHubADOConflict.ps1` |
 
 ---
 
@@ -106,11 +132,13 @@ de entrada é avaliado pelo Git para **qualquer** host, inclusive
 `--fix`/`-Fix`, o script só diagnostica (somente leitura). Com a flag, ele
 faz backup do `~/.gitconfig` (ou `.gitconfig` do usuário no Windows) antes de
 remover o helper genérico e reafirmar os helpers escopados do GitHub (via
-`gh auth setup-git`) e do Azure DevOps.
+`gh auth setup-git`) e do Azure DevOps. Sem a flag, ao detectar um conflito o
+script pergunta interativamente se deve corrigir agora (padrão: não corrigir).
 
 > ⚠️ Se você usa um `credential.helper` genérico para **outro** serviço (ex.:
-> AWS CodeCommit), revise o diagnóstico antes de rodar com `--fix`/`-Fix`,
-> pois a correção automática remove *todos* os helpers genéricos.
+> AWS CodeCommit), revise o diagnóstico antes de confirmar a correção
+> (`--fix`/`-Fix` ou responder "s" ao prompt), pois ela remove *todos* os
+> helpers genéricos.
 
 ### Dependências
 

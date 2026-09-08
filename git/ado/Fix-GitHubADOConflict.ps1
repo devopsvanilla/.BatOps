@@ -9,8 +9,11 @@
     helper escopado usado pelo 'gh' e quebrar a autenticação com o GitHub.
     Este script identifica esse cenário e, com -Fix, corrige mantendo backup.
 .PARAMETER Fix
-    Remove helpers genéricos conflitantes e faz backup do arquivo de config
-    global do Git antes de alterar. Sem esta flag, o script apenas diagnostica.
+    Corrige automaticamente sem perguntar (faz backup do arquivo de config
+    global do Git antes de alterar).
+.PARAMETER Yes
+    Modo não interativo: se um conflito for encontrado e -Fix não for
+    informado, assume "não corrigir" (apenas diagnostica).
 .EXAMPLE
     ./Fix-GitHubADOConflict.ps1
 .EXAMPLE
@@ -18,10 +21,24 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$Fix
+    [switch]$Fix,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Confirm-Action {
+    param(
+        [string]$Question,
+        [ValidateSet('S', 'N')]
+        [string]$Default = 'S'
+    )
+    if ($Yes) { return $Default -eq 'S' }
+    $suffix = if ($Default -eq 'N') { '[s/N]' } else { '[S/n]' }
+    $reply = Read-Host "$Question $suffix"
+    if ([string]::IsNullOrWhiteSpace($reply)) { $reply = $Default }
+    return $reply -match '^[Ss]'
+}
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Error "❌ Git não encontrado."
@@ -71,7 +88,7 @@ else {
 Write-Host ""
 
 if ($conflict) {
-    if ($Fix) {
+    if ($Fix -or (Confirm-Action -Question "Deseja corrigir agora (remove helpers genéricos, com backup do .gitconfig)?" -Default 'N')) {
         $gitConfigPath = Join-Path $HOME ".gitconfig"
         $backup = "$gitConfigPath.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
         Copy-Item $gitConfigPath $backup
@@ -99,7 +116,7 @@ if ($conflict) {
         git config --global --list | Select-String -Pattern '^credential\.' | ForEach-Object { Write-Host "  $_" }
     }
     else {
-        Write-Host "ℹ️  Rode novamente com '-Fix' para corrigir automaticamente (com backup do .gitconfig)." -ForegroundColor Cyan
+        Write-Host "ℹ️  Nenhuma alteração feita. Rode novamente (ou responda 's' ao prompt, ou use '-Fix') para corrigir." -ForegroundColor Cyan
         exit 1
     }
 }

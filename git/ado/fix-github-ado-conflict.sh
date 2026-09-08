@@ -15,22 +15,41 @@ set -euo pipefail
 # GitHub configurada anteriormente.
 #
 # Uso:
-#   ./fix-github-ado-conflict.sh [--fix]
+#   ./fix-github-ado-conflict.sh [--fix] [--yes]
 #
-#   --fix   Remove helpers genéricos (não escopados) que conflitem e faz
-#           backup do ~/.gitconfig antes de alterar. Sem essa flag, o
-#           script apenas diagnostica (somente leitura).
+#   --fix   Corrige automaticamente sem perguntar (faz backup do ~/.gitconfig
+#           antes de alterar).
+#   --yes   Modo não interativo: se um conflito for encontrado e --fix não
+#           for informado, assume "não corrigir" (apenas diagnostica).
+#
+# Sem --fix, ao detectar um conflito o script pergunta interativamente se
+# deve corrigir agora.
 
 FIX=false
+ASSUME_YES=false
 for arg in "$@"; do
   case "$arg" in
     --fix) FIX=true ;;
+    --yes) ASSUME_YES=true ;;
     -h|--help)
-      echo "Uso: $0 [--fix]"
+      echo "Uso: $0 [--fix] [--yes]"
       exit 0
       ;;
   esac
 done
+
+# Pergunta s/n ao usuário. $1=pergunta, $2=padrão ("S" ou "N").
+confirm() {
+  local question="$1" default="${2:-S}" reply suffix
+  if [ "$default" = "N" ]; then suffix="[s/N]"; else suffix="[S/n]"; fi
+  if [ "$ASSUME_YES" = true ] || [ ! -t 0 ]; then
+    reply="$default"
+  else
+    read -r -p "$question $suffix " reply || reply="$default"
+    reply="${reply:-$default}"
+  fi
+  [[ "$reply" =~ ^[Ss]$ ]]
+}
 
 if ! command -v git >/dev/null 2>&1; then
   echo "❌ Git não encontrado." >&2
@@ -80,7 +99,7 @@ fi
 echo ""
 
 if [ "$CONFLICT" = true ]; then
-  if [ "$FIX" = true ]; then
+  if [ "$FIX" = true ] || confirm "Deseja corrigir agora (remove helpers genéricos, com backup do ~/.gitconfig)?" "N"; then
     BACKUP="$HOME/.gitconfig.bak-$(date +%Y%m%d%H%M%S)"
     cp "$HOME/.gitconfig" "$BACKUP"
     echo "🛟 Backup criado em: $BACKUP"
@@ -105,7 +124,7 @@ if [ "$CONFLICT" = true ]; then
     echo "✅ Conflito corrigido. Configuração final relevante:"
     git config --global --list | grep -E '^credential\.' | sed 's/^/  /'
   else
-    echo "ℹ️  Rode novamente com '--fix' para corrigir automaticamente (com backup do ~/.gitconfig)."
+    echo "ℹ️  Nenhuma alteração feita. Rode novamente (ou responda 's' ao prompt, ou use '--fix') para corrigir."
     exit 1
   fi
 else

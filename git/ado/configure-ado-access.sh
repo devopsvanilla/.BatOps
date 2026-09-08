@@ -13,14 +13,20 @@ set -euo pipefail
 # fix-github-ado-conflict.sh.
 #
 # Uso:
-#   ./configure-ado-access.sh [--install-gcm] [--org URL] [--project NOME]
+#   ./configure-ado-access.sh [--install-gcm] [--org URL] [--project NOME] [--yes]
 #
-#   --install-gcm   Tenta instalar automaticamente a última versão do Git
-#                    Credential Manager (via .deb, quando disponível).
+#   --install-gcm   Instala automaticamente a última versão do Git Credential
+#                    Manager (via .deb) sem perguntar antes.
 #   --org URL        Organização padrão do Azure DevOps (ex.: https://dev.azure.com/minhaorg)
 #   --project NOME   Projeto padrão do Azure DevOps
+#   --yes            Modo não interativo: aceita os padrões/valores atuais
+#                    sem perguntar (útil em automação/CI).
+#
+# Se --org/--project não forem informados, o script pergunta interativamente,
+# sugerindo o valor já configurado (se houver) como padrão.
 
 INSTALL_GCM=false
+ASSUME_YES=false
 ORG=""
 PROJECT=""
 
@@ -29,8 +35,9 @@ while [ $# -gt 0 ]; do
     --install-gcm) INSTALL_GCM=true; shift ;;
     --org) ORG="${2:-}"; shift 2 ;;
     --project) PROJECT="${2:-}"; shift 2 ;;
+    --yes) ASSUME_YES=true; shift ;;
     -h|--help)
-      echo "Uso: $0 [--install-gcm] [--org URL] [--project NOME]"
+      echo "Uso: $0 [--install-gcm] [--org URL] [--project NOME] [--yes]"
       exit 0
       ;;
     *)
@@ -39,6 +46,30 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+# Pergunta s/n ao usuário. $1=pergunta, $2=padrão ("S" ou "N").
+confirm() {
+  local question="$1" default="${2:-S}" reply suffix
+  if [ "$default" = "N" ]; then suffix="[s/N]"; else suffix="[S/n]"; fi
+  if [ "$ASSUME_YES" = true ] || [ ! -t 0 ]; then
+    reply="$default"
+  else
+    read -r -p "$question $suffix " reply || reply="$default"
+    reply="${reply:-$default}"
+  fi
+  [[ "$reply" =~ ^[Ss]$ ]]
+}
+
+# Pergunta um valor de texto. $1=pergunta, $2=valor atual/padrão.
+ask_value() {
+  local question="$1" default="${2:-}" reply
+  if [ "$ASSUME_YES" = true ] || [ ! -t 0 ]; then
+    printf '%s\n' "$default"
+    return
+  fi
+  read -r -p "$question [${default:-nenhum}]: " reply || reply=""
+  printf '%s\n' "${reply:-$default}"
+}
 
 if ! command -v git >/dev/null 2>&1; then
   echo "❌ Git não encontrado. Instale o git antes de continuar." >&2
@@ -53,7 +84,7 @@ if gcm_available; then
   echo "✅ Git Credential Manager já disponível: $(command -v git-credential-manager || command -v git-credential-manager-core)"
 else
   echo "⚠️ Git Credential Manager (GCM) não encontrado."
-  if [ "$INSTALL_GCM" = true ]; then
+  if [ "$INSTALL_GCM" = true ] || confirm "Deseja instalar o Git Credential Manager agora?" "S"; then
     if ! command -v curl >/dev/null 2>&1 || ! command -v dpkg >/dev/null 2>&1; then
       echo "❌ Instalação automática requer 'curl' e 'dpkg' (Debian/Ubuntu). Instale manualmente: https://github.com/git-ecosystem/git-credential-manager/releases" >&2
     else
@@ -72,8 +103,7 @@ else
       fi
     fi
   else
-    echo "   Rode novamente com '--install-gcm' para instalar automaticamente,"
-    echo "   ou instale manualmente: https://github.com/git-ecosystem/git-credential-manager/releases"
+    echo "   Instale manualmente quando quiser: https://github.com/git-ecosystem/git-credential-manager/releases"
   fi
 fi
 
@@ -90,6 +120,16 @@ echo "⏳ Configurando helpers de credencial escopados para Azure DevOps..."
 configure_scoped_helper "https://dev.azure.com"
 configure_scoped_helper "https://*.visualstudio.com"
 
+CURRENT_ORG="$(az devops configure -l 2>/dev/null | awk -F'= *' '/^organization/{print $2}')"
+CURRENT_PROJECT="$(az devops configure -l 2>/dev/null | awk -F'= *' '/^project/{print $2}')"
+
+if [ -z "$ORG" ]; then
+  ORG="$(ask_value "Organização padrão do Azure DevOps (ex.: https://dev.azure.com/minhaorg)" "$CURRENT_ORG")"
+fi
+if [ -z "$PROJECT" ]; then
+  PROJECT="$(ask_value "Projeto padrão do Azure DevOps" "$CURRENT_PROJECT")"
+fi
+
 if [ -n "$ORG" ] || [ -n "$PROJECT" ]; then
   echo "⏳ Atualizando defaults do az devops..."
   ARGS=()
@@ -98,8 +138,7 @@ if [ -n "$ORG" ] || [ -n "$PROJECT" ]; then
   az devops configure --defaults "${ARGS[@]}"
   echo "✅ Defaults do az devops atualizados."
 else
-  echo "ℹ️  Defaults atuais do az devops:"
-  az devops configure -l 2>/dev/null || echo "   (nenhum default configurado ainda; use --org e --project)"
+  echo "ℹ️  Nenhum default de organização/projeto configurado (informe via --org/--project ou responda ao prompt)."
 fi
 
 echo ""

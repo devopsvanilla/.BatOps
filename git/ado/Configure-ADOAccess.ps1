@@ -12,6 +12,9 @@
     URL da organização padrão do Azure DevOps (ex.: https://dev.azure.com/minhaorg)
 .PARAMETER Project
     Projeto padrão do Azure DevOps.
+.PARAMETER Yes
+    Modo não interativo: aceita os valores/padrões atuais sem perguntar
+    (útil em automação/CI).
 .EXAMPLE
     ./Configure-ADOAccess.ps1
 .EXAMPLE
@@ -20,10 +23,47 @@
 [CmdletBinding()]
 param(
     [string]$Organization,
-    [string]$Project
+    [string]$Project,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Confirm-Action {
+    param(
+        [string]$Question,
+        [ValidateSet('S', 'N')]
+        [string]$Default = 'S'
+    )
+    if ($Yes) { return $Default -eq 'S' }
+    $suffix = if ($Default -eq 'N') { '[s/N]' } else { '[S/n]' }
+    $reply = Read-Host "$Question $suffix"
+    if ([string]::IsNullOrWhiteSpace($reply)) { $reply = $Default }
+    return $reply -match '^[Ss]'
+}
+
+function Read-ValueWithDefault {
+    param([string]$Question, [string]$DefaultValue)
+    if ($Yes) { return $DefaultValue }
+    $label = if ($DefaultValue) { $DefaultValue } else { 'nenhum' }
+    $reply = Read-Host "$Question [$label]"
+    if ([string]::IsNullOrWhiteSpace($reply)) { return $DefaultValue }
+    return $reply
+}
+
+# Roda 'az' capturando stderr sem deixar $ErrorActionPreference='Stop' abortar o
+# script (comum ao rodar de um caminho UNC do WSL, onde o az.cmd emite avisos).
+function Invoke-AzQuiet {
+    param([string[]]$ArgumentList)
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        az @ArgumentList 2>$null
+    }
+    finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
 
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if (-not $gitCmd) {
@@ -37,8 +77,20 @@ if ($gcmVersion) {
     Write-Host "✅ Git Credential Manager disponível: $gcmVersion" -ForegroundColor Green
 }
 else {
-    Write-Host "⚠️ Git Credential Manager não encontrado. Reinstale/atualize o Git for Windows:" -ForegroundColor Yellow
-    Write-Host "   https://gitforwindows.org/ (ou 'winget install --id Git.Git')" -ForegroundColor Yellow
+    Write-Host "⚠️ Git Credential Manager não encontrado." -ForegroundColor Yellow
+    if (Confirm-Action -Question "Deseja instalar/atualizar o Git for Windows agora (via winget) para obter o GCM?" -Default 'S') {
+        $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+        if ($wingetCmd) {
+            winget install --id Git.Git --exact --silent --accept-package-agreements --accept-source-agreements
+            Write-Host "✅ Git for Windows instalado/atualizado. Reabra o terminal para atualizar o PATH." -ForegroundColor Green
+        }
+        else {
+            Write-Host "❌ winget não encontrado. Instale manualmente: https://gitforwindows.org/" -ForegroundColor Red
+        }
+    }
+    else {
+        Write-Host "   Instale manualmente quando quiser: https://gitforwindows.org/" -ForegroundColor Cyan
+    }
 }
 
 function Set-ScopedCredentialHelper {
@@ -62,8 +114,24 @@ if ($Organization -or $Project) {
     Write-Host "✅ Defaults do az devops atualizados." -ForegroundColor Green
 }
 else {
-    Write-Host "ℹ️  Defaults atuais do az devops:" -ForegroundColor Cyan
-    az devops configure -l 2>$null
+    $currentDefaults = Invoke-AzQuiet -ArgumentList @('devops', 'configure', '-l')
+    $currentOrg = ($currentDefaults | Select-String -Pattern '^organization\s*=\s*(.+)$').Matches.Groups[1].Value
+    $currentProject = ($currentDefaults | Select-String -Pattern '^project\s*=\s*(.+)$').Matches.Groups[1].Value
+
+    $Organization = Read-ValueWithDefault -Question "Organização padrão do Azure DevOps (ex.: https://dev.azure.com/minhaorg)" -DefaultValue $currentOrg
+    $Project = Read-ValueWithDefault -Question "Projeto padrão do Azure DevOps" -DefaultValue $currentProject
+
+    if ($Organization -or $Project) {
+        Write-Host "⏳ Atualizando defaults do az devops..." -ForegroundColor Yellow
+        $defaultArgs = @()
+        if ($Organization) { $defaultArgs += "organization=$Organization" }
+        if ($Project) { $defaultArgs += "project=$Project" }
+        az devops configure --defaults @defaultArgs
+        Write-Host "✅ Defaults do az devops atualizados." -ForegroundColor Green
+    }
+    else {
+        Write-Host "ℹ️  Nenhum default de organização/projeto configurado." -ForegroundColor Cyan
+    }
 }
 
 Write-Host ""
