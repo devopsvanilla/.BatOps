@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Instala (ou valida) o Azure CLI (az) e a extensão "azure-devops" no Windows.

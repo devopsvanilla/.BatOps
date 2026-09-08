@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Configura o acesso Git para contribuir no Azure DevOps (Repos/PRs) a partir
