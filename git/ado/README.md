@@ -109,6 +109,22 @@ cd git\ado
 > Unblock-File .\Install-AZCLI.ps1
 > ```
 
+> ⚠️ **Erro comum:** `az login` (ou `az login --allow-no-subscriptions`) falha
+> apenas para um dos seus tenants com `AADSTS50076: ... you must use
+> multi-factor authentication ...` enquanto os demais tenants funcionam
+> normalmente. Isso ocorre porque o `az login` sem `--tenant` faz uma
+> varredura de todos os tenants acessíveis, e essa varredura não executa o
+> desafio interativo de MFA exigido por aquele tenant específico.
+>
+> Solução: autentique diretamente nesse tenant, o que dispara o fluxo
+> interativo/MFA correto:
+>
+> ```powershell
+> az login --tenant TENANT_ID --allow-no-subscriptions
+> ```
+>
+> Repita o comando para cada tenant que exigir MFA, se necessário.
+
 ---
 
 ## 🛠️ Detalhes e Requisitos
