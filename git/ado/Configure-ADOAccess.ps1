@@ -115,8 +115,14 @@ if ($Organization -or $Project) {
 }
 else {
     $currentDefaults = Invoke-AzQuiet -ArgumentList @('devops', 'configure', '-l')
-    $currentOrg = ($currentDefaults | Select-String -Pattern '^organization\s*=\s*(.+)$').Matches.Groups[1].Value
-    $currentProject = ($currentDefaults | Select-String -Pattern '^project\s*=\s*(.+)$').Matches.Groups[1].Value
+
+    $currentOrg = ''
+    $orgMatch = $currentDefaults | Select-String -Pattern '^organization\s*=\s*(.+)$' | Select-Object -First 1
+    if ($orgMatch) { $currentOrg = $orgMatch.Matches[0].Groups[1].Value }
+
+    $currentProject = ''
+    $projMatch = $currentDefaults | Select-String -Pattern '^project\s*=\s*(.+)$' | Select-Object -First 1
+    if ($projMatch) { $currentProject = $projMatch.Matches[0].Groups[1].Value }
 
     $Organization = Read-ValueWithDefault -Question "Organização padrão do Azure DevOps (ex.: https://dev.azure.com/minhaorg)" -DefaultValue $currentOrg
     $Project = Read-ValueWithDefault -Question "Projeto padrão do Azure DevOps" -DefaultValue $currentProject
