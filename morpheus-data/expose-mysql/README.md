@@ -1,6 +1,8 @@
-# Acesso Remoto ao MySQL Embarcado do HPE Morpheus Data Enterprise
+# Acesso Remoto ao MySQL/Percona do HPE Morpheus Data Enterprise
 
-Este diretório scripts de automação em Shell Script desenvolvida para permitir de forma segura, rastreável e controlada o acesso de rede ao banco de dados MySQL/Percona Galera embarcado em appliances **HPE Morpheus Data Enterprise** (compatível com arquiteturas *Single-Node* e clusters de alta disponibilidade *3-Node HA*).
+Automação em Shell Script desenvolvida para permitir de forma segura, rastreável e controlada o acesso de rede ao banco de dados MySQL/Percona em cluster embarcado em appliances **HPE Morpheus Data Enterprise**.
+
+Compatível nativamente com arquiteturas **Single-Node (Omnibus / `morpheus.rb`)** e **Three-Node HA (Percona XtraDB Cluster / `morpheus-node`)**.
 
 ---
 
@@ -9,6 +11,7 @@ Este diretório scripts de automação em Shell Script desenvolvida para permiti
 - [Visão Geral](#-visão-geral)
 - [Arquivos do Pacote](#-arquivos-do-pacote)
 - [Pré-requisitos](#-pré-requisitos)
+- [Topologias Suportadas](#-topologias-suportadas)
 - [Fluxo de Funcionamento](#-fluxo-de-funcionamento)
 - [Script de Configuração (`configure-...sh`)](#-script-de-configuração-configure-morpheus-mysql-remote-accesssh)
   - [Opções e Parâmetros](#opções-e-parâmetros)
@@ -19,7 +22,7 @@ Este diretório scripts de automação em Shell Script desenvolvida para permiti
   - [Opções e Parâmetros](#opções-e-parâmetros-1)
   - [Exemplos de Restauração](#exemplos-de-restauração)
 - [Estrutura de Backups e Metadados](#-estrutura-de-backups-e-metadados)
-- [Comportamento em Cluster 3-Node HA (Galera)](#-comportamento-em-cluster-3-node-ha-galera)
+- [Comportamento em Cluster 3-Node HA (Percona Cluster)](#-comportamento-em-cluster-3-node-ha-percona-cluster)
 - [Como Conectar ao Banco Remotamente](#-como-conectar-ao-banco-remotamente)
 - [Boas Práticas de Segurança e Dicas](#-boas-práticas-de-segurança-e-dicas)
 
@@ -27,15 +30,17 @@ Este diretório scripts de automação em Shell Script desenvolvida para permiti
 
 ## 🎯 Visão Geral
 
-Por padrão, a instalação do HPE Morpheus Data Enterprise restringe o acesso ao banco de dados MySQL/Percona em execução no nó para conexões locais (socket/localhost) e para tráfego interno de replicação entre nós do cluster.
+Por padrão, as instalações do HPE Morpheus Data Enterprise restringem o tráfego do banco de dados MySQL/Percona aos limites locais do host (`localhost` / Unix socket) ou exclusivamente para comunicação interna entre nós do cluster.
 
 Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
-1. **Snapshot de Backup Automático** de todas as configurações existentes (`morpheus.rb` e regras de firewall) antes de qualquer alteração.
-2. **Ajuste de Escuta de Rede** nas diretivas do appliance Morpheus.
-3. **Liberação Granular de Firewall** apenas para o IP ou sub-rede CIDR desejada (compatível com `firewalld`, `ufw` e `iptables`).
-4. **Criação de Usuário Dedicado no MySQL** com senha forte gerada aleatoriamente (ou informada via CLI) e privilégios granulares (completo ou *somente leitura*).
-5. **Bateria de Testes Automatizados** que valida o status do serviço, a escuta da porta `3306/tcp`, a autenticação TCP e a integridade das tabelas do catálogo.
-6. **Rollback Seguro e Descomplicado** via script de restauração que desfaz todas as alterações e ainda gera um backup de segurança pré-restauração (*safety backup*).
+
+1. **Detecção Automática de Topologia**: Identifica se o ambiente é Single-Node (Appliance com `morpheus.rb`) ou Three-Node HA (com Percona XtraDB Cluster / `morpheus-node`).
+2. **Snapshot de Backup Automático**: Salva o estado do firewall e cópia das configurações antes de qualquer modificação.
+3. **Ajuste de Escuta de Rede**: Garante que o MySQL escute em `0.0.0.0:3306`, evitando reinicializações desnecessárias caso a porta já esteja em modo de escuta de rede.
+4. **Liberação Granular de Firewall**: Libera a porta 3306 apenas para a sub-rede ou IP de origem desejado (`firewalld`, `ufw` ou `iptables`).
+5. **Criação de Usuário Dedicado no MySQL**: Concede privilégios restritos à base `morpheus.*` (completo ou *somente leitura*), replicando automaticamente entre os nós do cluster Percona.
+6. **Bateria de Testes Automatizados**: Valida processo ativo, escuta de porta, autenticação TCP e catálogo de tabelas.
+7. **Rollback Seguro**: Restaura configurações anteriores, remove regras de firewall e desfaz o usuário criado.
 
 ---
 
@@ -43,8 +48,8 @@ Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 
 | Arquivo | Descrição |
 | :--- | :--- |
-| `configure-morpheus-mysql-remote-access.sh` | Script principal para habilitar o acesso remoto, gerar backup, configurar firewall, criar usuário no MySQL e rodar testes de validação em 4 etapas. |
-| `restore-morpheus-mysql-remote-access.sh` | Script de reversão completa que desfaz as alterações, restaura configurações, remove regras de firewall e exclui o usuário criado. |
+| `configure-morpheus-mysql-remote-access.sh` | Script principal para habilitar o acesso remoto, gerar backup, configurar firewall, criar usuário no MySQL/Percona e rodar testes de validação em 4 etapas. |
+| `restore-morpheus-mysql-remote-access.sh` | Script de reversão completa que desfaz as alterações, restaura configurações originais, remove regras de firewall e exclui o usuário criado. |
 | `README.md` | Documentação técnica detalhada, parâmetros, topologias e exemplos práticos de conexão. |
 
 ---
@@ -52,9 +57,34 @@ Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 ## ⚙️ Pré-requisitos
 
 - Execução com privilégios de **superusuário (`root` / `sudo`)**.
-- Appliance HPE Morpheus Data Enterprise operacional.
-- Binários utilitários comuns do Linux: `bash` (v4+), `openssl`, `ss` ou `netstat`, `ip` ou `hostname`.
-- Um dos gerenciadores de firewall: `firewalld` (RHEL/Alma/Rocky/CentOS), `ufw` (Ubuntu) ou `iptables`.
+- Appliance HPE Morpheus Data Enterprise ou nó de banco operacional.
+- Utilitários comuns do Linux: `bash` (v4+), `openssl`, `ss` ou `netstat`, `ip` ou `hostname`.
+- Um dos gerenciadores de firewall: `firewalld` (RHEL/Alma/Rocky), `ufw` (Ubuntu) ou `iptables`.
+
+---
+
+## 🌐 Topologias Suportadas
+
+O pacote detecta e ajusta seu comportamento automaticamente conforme o tipo de nó:
+
+```mermaid
+flowchart TD
+    Node[Nó Morpheus / Servidor de Banco] --> Check{Possui /etc/morpheus/morpheus.rb?}
+    Check -- Sim --> ModeApp[Modo Appliance: morpheus.rb + morpheus-ctl reconfigure]
+    Check -- Não --> CheckNode{Possui morpheus-node.conf, /opt/morpheus-node ou Percona?}
+    CheckNode -- Sim --> ModeHA[Modo 3-Node HA / Percona: my.cnf / systemd + Replicação do Cluster]
+    CheckNode -- Não --> ModeGen[Modo Percona Genérico: my.cnf / systemd]
+```
+
+### 1. Single-Node Appliance (Omnibus)
+- **Arquivos**: `/etc/morpheus/morpheus.rb`, `/etc/morpheus/morpheus-secrets.json`
+- **Controle de Serviço**: `morpheus-ctl reconfigure` / `morpheus-ctl status mysql`
+- **Comportamento**: Altera `mysql['bind_address'] = '0.0.0.0'` em `morpheus.rb` e reconfigura o appliance.
+
+### 2. Three-Node HA Cluster (Percona XtraDB Cluster / `morpheus-node`)
+- **Arquivos**: `/etc/morpheus/morpheus-node.conf`, `/opt/morpheus-node/conf/config.yml`, `/etc/mysql/` ou `/etc/percona-xtradb-cluster.conf.d/`
+- **Controle de Serviço**: `systemctl` (`mysql`, `mysqld`, `percona-xtradb-cluster`)
+- **Comportamento**: Valida se a porta 3306 já está aberta em todas as interfaces. Se já estiver, não altera arquivos nem reinicia o serviço; apenas abre o firewall e cria o usuário, que replica instantaneamente para os outros nós do cluster.
 
 ---
 
@@ -64,14 +94,14 @@ Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 flowchart TD
     A[Início: configure script] --> B{É Root?}
     B -- Não --> C[Aborta com Erro]
-    B -- Sim --> D[Detecta Rede, Binários MySQL, Senha Root em secrets]
-    D --> E[1. Gera Backup Completo: morpheus.rb + Regras de Firewall]
-    E --> F[2. Ajusta morpheus.rb]
-    F --> G[3. morpheus-ctl reconfigure]
-    G --> H[4. Aplica Rich Rule no Firewall para Sub-rede]
-    H --> I[5. Cria Usuário e Privilégios no MySQL]
-    I --> J[6. Executa 4 Testes de Validação]
-    J --> K[7. Exibe Resumo com Credenciais e Exemplos de Conexão]
+    B -- Sim --> D[Detecta Topologia: Appliance vs 3-Node HA Percona]
+    D --> E[Detecta Binários MySQL, Socket e Credenciais Administrativas]
+    E --> F[1. Ajusta Rede: morpheus.rb ou verifica bind 0.0.0.0 no Percona]
+    F --> G[2. Gera Backup: Configurações + Regras de Firewall]
+    G --> H[3. Aplica Regra de Firewall para Sub-rede]
+    H --> I[4. Cria Usuário e Privilégios no MySQL/Percona]
+    I --> J[5. Executa 4 Testes de Validação]
+    J --> K[6. Exibe Resumo com Credenciais e Exemplos de Conexão]
 ```
 
 ---
@@ -85,56 +115,46 @@ flowchart TD
 | `-s` | `--subnet <CIDR\|IP>` | Sub-rede ou IP de origem autorizado (ex: `192.168.1.0/24`, `10.0.0.50`, `%`). | Auto-detecta rede local |
 | `-u` | `--db-user <USUÁRIO>` | Nome do usuário MySQL a ser criado/atualizado. | `morpheus_remote` |
 | `-p` | `--db-password <SENHA>` | Senha do usuário MySQL. Se omitida, gera uma senha segura randômica. | *(Gerada aleatoriamente)* |
+| `-R` | `--root-password <SENHA>` | Senha de root/admin do MySQL/Percona (opcional; tenta auto-detecção). | *(Auto-detectada)* |
 | `-d` | `--db-name <BANCO>` | Nome da base de dados Morpheus a ser concedida. | `morpheus` |
 | | `--read-only` | Concede somente permissões de leitura (`SELECT`, `SHOW VIEW`). | `false` (ALL PRIVILEGES) |
-| | `--skip-reconfigure` | Não executa `morpheus-ctl reconfigure` (útil para dry-run ou testes). | `false` |
+| | `--skip-reconfigure` | Não executa `morpheus-ctl reconfigure` (aplicável ao modo Appliance). | `false` |
 | `-b` | `--backup-dir <DIR>` | Diretório base para armazenar os backups gerados. | `/var/opt/morpheus/backups/mysql-remote-access` |
-| `-c` | `--config <ARQUIVO>` | Caminho do arquivo de configuração do Morpheus. | `/etc/morpheus/morpheus.rb` |
+| `-c` | `--config <ARQUIVO>` | Caminho do arquivo de configuração morpheus.rb. | `/etc/morpheus/morpheus.rb` |
 | `-h` | `--help` | Exibe a tela de ajuda com os parâmetros e encerra. | - |
 
 ---
 
 ### Exemplos de Uso
 
-#### 1. Modo Interativo / Automático
-Detecta a sub-rede local pela interface de rede primária e gera uma senha forte de 16 caracteres com alta entropia:
+#### 1. Modo Automático / Interativo
+Detecta a sub-rede local pela interface primária, localiza o MySQL/Percona e gera senha forte automaticamente:
 ```bash
 sudo ./configure-morpheus-mysql-remote-access.sh
 ```
 
-#### 2. Definindo uma Sub-rede e Usuário Específicos
+#### 2. Definindo Sub-rede e Usuário Dedicado
 ```bash
 sudo ./configure-morpheus-mysql-remote-access.sh \
   --subnet 192.168.1.0/24 \
   --db-user relatorios_bi
 ```
 
-> [!IMPORTANT]
-> **O que acontece com o usuário MySQL neste exemplo:**
-> - **Criação Efetiva no MySQL**: O script conecta no banco local como administrador e executa `CREATE USER IF NOT EXISTS 'relatorios_bi'@'192.168.1.%'` (e `ALTER USER` caso já exista).
-> - **Padrão de Host Restrito**: A sub-rede CIDR `192.168.1.0/24` é convertida para `'192.168.1.%'`, garantindo que apenas máquinas dessa faixa consigam autenticar com esse usuário.
-> - **Geração Automática de Senha**: Como `-p` não foi informado, uma senha segura e randômica de 16 caracteres é gerada automaticamente e exibida no painel final do terminal para você copiar.
-> - **Concessão de Privilégios**: É aplicado `GRANT ALL PRIVILEGES ON \`morpheus\`.* TO 'relatorios_bi'@'192.168.1.%'`.
-> - **Replicação Galera (3-Node HA)**: Por ser um cluster Galera, o usuário e seus privilégios são **automaticamente replicados para os nós 2 e 3**.
->
-> *Caso deseje que esse usuário tenha apenas permissão de consulta (ideal para BI/Dashboards), adicione a flag `--read-only`.*
-
-#### 3. Acesso Somente Leitura (*Read-Only*) para Análise ou BI
-Ideal para conectar ferramentas de BI (PowerBI, Metabase, Tableau, Superset) sem risco de alteração acidental de dados. O usuário receberá apenas privilégios de leitura (`SELECT, SHOW VIEW`):
+#### 3. Acesso Somente Leitura (*Read-Only*) para BI / Dashboards
+Aplica apenas permissões de `SELECT` e `SHOW VIEW`:
 ```bash
 sudo ./configure-morpheus-mysql-remote-access.sh \
-  --subnet 10.20.0.0/16 \
-  --db-user bi_reader \
-  --db-password 'Morpheus#Bi2026!Sec' \
+  --subnet 10.10.0.0/16 \
+  --db-user powerbi_ro \
   --read-only
 ```
 
-#### 4. Liberando Apenas um Único Host (IP Fixo)
-O script converte o IP para notação exata (`192.168.1.150` sem wildcard `%`), liberando o firewall e o MySQL apenas para essa estação de trabalho:
+#### 4. Fornecendo Senha Administrativa de Root Explicitamente
+Útil caso o MySQL/Percona exija senha de root e não utilize `auth_socket` do SO:
 ```bash
 sudo ./configure-morpheus-mysql-remote-access.sh \
-  --subnet 192.168.1.150/32 \
-  --db-user dev_dba
+  --subnet 192.168.1.0/24 \
+  --root-password 'MinhaSenhaRootPercona#2026'
 ```
 
 ---
@@ -143,10 +163,10 @@ sudo ./configure-morpheus-mysql-remote-access.sh \
 
 Ao final da execução, o script executa 4 testes automatizados para garantir que a liberação está totalmente funcional:
 
-1. **Teste 1/4 - Serviço Ativo**: Verifica via `morpheus-ctl status mysql` e processos do SO se o daemon `mysqld` está em execução.
-2. **Teste 2/4 - Escuta de Porta**: Valida via `ss` ou `netstat` se a porta `3306/tcp` está ouvindo conexões de rede.
-3. **Teste 3/4 - Autenticação TCP de Rede**: Realiza uma tentativa de login real via cliente MySQL conectando na interface TCP (`<IP>:3306`) com o usuário e a senha gerados.
-4. **Teste 4/4 - Integridade do Esquema**: Executa uma query no catálogo (`information_schema.tables`) confirmando o acesso às tabelas da base `morpheus`.
+1. **Teste 1/4 - Serviço Ativo**: Verifica via `systemctl`, `morpheus-ctl` ou processos do SO se o daemon `mysqld` está em execução.
+2. **Teste 2/4 - Escuta de Porta**: Valida via `ss` ou `netstat` se a porta `3306/tcp` está ouvindo conexões externas (`0.0.0.0` ou `*`).
+3. **Teste 3/4 - Autenticação TCP de Rede**: Realiza tentativa de login real via cliente MySQL conectando na interface TCP (`<IP>:3306`) com o usuário e a senha gerados.
+4. **Teste 4/4 - Integridade do Esquema**: Executa query no catálogo (`information_schema.tables`) confirmando o acesso às tabelas da base `morpheus`.
 
 ---
 
@@ -162,7 +182,7 @@ O usuário remoto criado pelo script possui **acesso total aos dados do catálog
 | **Acessar bases de sistema** (`mysql`, `sys`, `performance_schema`) | Sim | ❌ **NÃO (Bloqueado)** | Restrito exclusivamente ao banco `morpheus`.* |
 | **Criar ou excluir outros usuários** (`CREATE USER, DROP USER`) | Sim | ❌ **NÃO (Bloqueado)** | Criado sem cláusula `WITH GRANT OPTION` |
 | **Alterar variáveis globais do MySQL** (`SET GLOBAL`) | Sim | ❌ **NÃO (Bloqueado)** | Sem privilégio `SUPER` / `SYSTEM_VARIABLES_ADMIN` |
-| **Gerenciar o Cluster Galera** (nós, descarte de réplicas) | Sim | ❌ **NÃO (Bloqueado)** | Impede desestabilização da topologia HA |
+| **Gerenciar o cluster de banco** (nós, descarte de réplicas) | Sim | ❌ **NÃO (Bloqueado)** | Impede desestabilização da topologia HA |
 | **Desligar o daemon MySQL** (`SHUTDOWN`) | Sim | ❌ **NÃO (Bloqueado)** | Sem permissão de shutdown |
 | **Ver processos de outros usuários** (`PROCESSLIST`) | Sim | ❌ **NÃO (Bloqueado)** | Enxerga unicamente suas próprias consultas ativas |
 
@@ -170,21 +190,23 @@ O usuário remoto criado pelo script possui **acesso total aos dados do catálog
 
 ## ⏪ Script de Restauração (`restore-morpheus-mysql-remote-access.sh`)
 
-Permite desfazer integralmente as alterações e retornar o appliance ao estado de isolamento original.
+Permite desfazer integralmente as alterações e retornar o appliance ou nó Percona ao estado de isolamento original.
 
 ```mermaid
 flowchart TD
     R1[Início: restore script] --> R2[Localiza Diretório de Backup 'latest' ou informado]
-    R2 --> R3[Lê backup-metadata.env]
+    R2 --> R3[Lê backup-metadata.env: Topologia, Usuário, Sub-rede]
     R3 --> R4[Gera Backup de Segurança Pré-Restauração]
-    R4 --> R5[Restaura /etc/morpheus/morpheus.rb original]
-    R5 --> R6[Remove Regra de Firewall criada]
-    R6 --> R7{Manter Usuário? --keep-db-user}
-    R7 -- Não --> R8[Executa DROP USER no MySQL]
-    R7 -- Sim --> R9[Mantém Usuário]
-    R8 --> R10[Executa morpheus-ctl reconfigure]
-    R9 --> R10
-    R10 --> R11[Resumo de Restauração Concluída]
+    R4 --> R5{Topologia?}
+    R5 -- Appliance --> R6[Restaura morpheus.rb e roda reconfigure]
+    R5 -- Percona Node --> R7[Restaura/remove drop-in do MySQL se modificado]
+    R6 --> R8[Remove Regra de Firewall]
+    R7 --> R8
+    R8 --> R9{Manter Usuário? --keep-db-user}
+    R9 -- Não --> R10[Executa DROP USER no MySQL]
+    R9 -- Sim --> R11[Mantém Usuário no Banco]
+    R10 --> R12[Fim: Restauração Concluída]
+    R11 --> R12
 ```
 
 ### Opções e Parâmetros
@@ -193,7 +215,8 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | `-b` | `--backup-dir <DIR>` | Caminho do backup específico a ser restaurado. Se omitido, utiliza o link `latest`. | `/var/opt/morpheus/backups/mysql-remote-access/latest` |
 | | `--keep-db-user` | Mantém o usuário MySQL no banco (não executa `DROP USER`). | `false` (remove o usuário) |
-| | `--skip-reconfigure` | Não executa `morpheus-ctl reconfigure` após a restauração. | `false` |
+| | `--skip-reconfigure` | Não executa `morpheus-ctl reconfigure` (aplicável ao modo Appliance). | `false` |
+| `-R` | `--root-password <SENHA>` | Senha de root/admin do MySQL (opcional). | *(Auto-detectada)* |
 | `-c` | `--config <ARQUIVO>` | Caminho do arquivo de configuração do Morpheus. | `/etc/morpheus/morpheus.rb` |
 | `-h` | `--help` | Exibe a tela de ajuda da restauração. | - |
 
@@ -228,9 +251,10 @@ Os backups são centralizados por padrão em `/var/opt/morpheus/backups/mysql-re
 /var/opt/morpheus/backups/mysql-remote-access/
 ├── latest -> /var/opt/morpheus/backups/mysql-remote-access/backup-20260910_041500
 ├── backup-20260910_041500/
-│   ├── morpheus.rb.bak            # Cópia idêntica do morpheus.rb antes da alteração
-│   ├── firewalld-state.txt        # Snapshot das zonas e rich rules do firewall
-│   └── backup-metadata.env        # Metadados com sub-rede, usuário, backend e flags
+│   ├── morpheus.rb.bak            # Presente em modo Appliance
+│   ├── mysql-config.bak           # Presente em modo Percona se arquivo alterado
+│   ├── firewalld-state.txt        # Snapshot das regras do firewall
+│   └── backup-metadata.env        # Metadados com topologia, sub-rede, usuário e flags
 └── pre-restore-20260910_043500/   # Backup de segurança gerado ANTES de restaurar
     ├── morpheus.rb.current.bak
     └── firewalld-pre-restore.txt
@@ -240,27 +264,33 @@ Os backups são centralizados por padrão em `/var/opt/morpheus/backups/mysql-re
 Armazena as variáveis usadas no provisionamento para que a restauração seja 100% autônoma, sem necessidade de reinserir dados:
 ```bash
 BACKUP_TIMESTAMP="20260910_041500"
+NODE_MODE="percona_node"
 MORPHEUS_CONFIG="/etc/morpheus/morpheus.rb"
+MYSQL_CONFIG_FILE=""
+MYSQL_CONFIG_MODIFIED="false"
+IS_DROPIN_CONFIG="false"
 DB_NAME="morpheus"
 DB_USER="morpheus_remote"
 SUBNET="192.168.1.0/24"
 MYSQL_HOST_PATTERN="192.168.1.%"
-FIREWALL_BACKEND="firewalld"
+FIREWALL_BACKEND="ufw"
 READ_ONLY="false"
 ```
 
 ---
 
-## 🏛️ Comportamento em Cluster 3-Node HA (Galera)
+## 🏛️ Comportamento em Cluster 3-Node HA (Percona Cluster)
 
-Se o seu ambiente for uma topologia **3-Node High Availability (HA)** do Morpheus:
+Se o seu ambiente for uma topologia **3-Node High Availability (HA)** com Percona Cluster:
 
 1. **Replicação Automática de Usuários**:
-   O MySQL do appliance opera via **Galera Cluster**. Portanto, comandos DDL/DCL como `CREATE USER`, `GRANT` ou `DROP USER` executados em um dos nós são **automaticamente replicados** para os outros 2 nós do cluster.
-2. **Configuração de Host e Firewall Individual**:
-   As regras de firewall do sistema operacional (`firewalld`/`ufw`/`iptables`) e o arquivo `/etc/morpheus/morpheus.rb` pertencem à máquina local de cada nó.
-   - Caso deseje que as máquinas clientes consigam conectar diretamente no IP de **qualquer um dos 3 nós**, execute o script de configuração em cada um dos nós com a mesma `--subnet` e `--db-user`.
-   - Se os nós estiverem atrás de um Balanceador de Carga de banco de dados (ex: HAProxy interno do Morpheus ou VIP externo), certifique-se de liberar a porta no balanceador e aponte o cliente para o IP do VIP.
+   O banco opera com replicação síncrona nativa em **cluster multi-master**. Comandos DDL/DCL como `CREATE USER`, `GRANT` ou `DROP USER` executados em qualquer um dos nós são **automaticamente replicados** para os outros 2 nós do cluster.
+2. **Escuta de Porta no Percona**:
+   Nessa arquitetura de cluster, os nós já costumam escutar em todas as interfaces (`0.0.0.0:3306`) para comunicação entre si e com os nós da aplicação Morpheus. O script detecta isso de forma inteligente e evita paradas ou reinicializações do serviço.
+3. **Firewall do SO Individual por Nó**:
+   As regras de firewall (`firewalld`/`ufw`/`iptables`) são locais de cada nó.
+   - Para conectar diretamente no IP de qualquer um dos 3 nós, execute o script em cada um deles com o mesmo `--subnet` e `--db-user`.
+   - Se os nós estiverem atrás de um Balanceador de Carga ou VIP (ex: HAProxy ou Keepalived), libere a porta no balanceador e aponte os clientes para o IP do VIP.
 
 ---
 
@@ -272,21 +302,21 @@ Após a execução bem-sucedida do script `configure-...sh`, os dados de conexã
 
 - **Linux / macOS**:
   ```bash
-  nc -zv <IP_DO_APPLIANCE> 3306
+  nc -zv <IP_DO_NO> 3306
   ```
 - **Windows PowerShell**:
   ```powershell
-  Test-NetConnection -ComputerName <IP_DO_APPLIANCE> -Port 3306
+  Test-NetConnection -ComputerName <IP_DO_NO> -Port 3306
   ```
 
 ### 2. Conexão via Cliente MySQL CLI
 ```bash
-mysql -h <IP_DO_APPLIANCE> -P 3306 -u morpheus_remote -p morpheus
+mysql -h <IP_DO_NO> -P 3306 -u morpheus_remote -p morpheus
 ```
 
 ### 3. Conexão via Ferramentas Gráficas (DBeaver, DataGrip, HeidiSQL, MySQL Workbench)
 - **Driver**: MySQL ou MariaDB
-- **Host**: `<IP_DO_APPLIANCE>`
+- **Host**: `<IP_DO_NO>`
 - **Porta**: `3306`
 - **Database**: `morpheus`
 - **Usuário**: `morpheus_remote` (ou o usuário definido em `-u`)
@@ -295,7 +325,7 @@ mysql -h <IP_DO_APPLIANCE> -P 3306 -u morpheus_remote -p morpheus
 
 ### 4. String de Conexão JDBC
 ```text
-jdbc:mysql://<IP_DO_APPLIANCE>:3306/morpheus?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+jdbc:mysql://<IP_DO_NO>:3306/morpheus?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
 ```
 
 ---
