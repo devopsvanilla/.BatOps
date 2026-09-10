@@ -97,32 +97,101 @@ check_root() {
 }
 
 # ------------------------------------------------------------------------------
-# Detecção do Modo de Implantação do Nó
+# Validação de Ambiente e Topologia do Morpheus Data
 # ------------------------------------------------------------------------------
-detect_node_mode() {
-    # 1. Modo Appliance (Omnibus clássico com morpheus.rb)
-    if [[ -f "${morpheus_config}" ]]; then
-        echo "appliance"
+check_morpheus_environment() {
+    # Verifica arquivos de configuração e diretórios canônicos do HPE Morpheus Data
+    if [[ -f "${morpheus_config}" || -f "${DEFAULT_SECRETS_FILE}" || -f "/etc/morpheus/morpheus-node.conf" ]]; then
         return 0
     fi
-
-    # 2. Modo Three-Node HA / Percona / Morpheus Node
-    if [[ -f "/etc/morpheus/morpheus-node.conf" || -d "/opt/morpheus-node" ]]; then
-        echo "percona_node"
+    if [[ -d "/opt/morpheus" || -d "/opt/morpheus-node" || -d "/var/opt/morpheus" || -d "/etc/morpheus" ]]; then
         return 0
     fi
-
-    if [[ -d "/etc/percona-xtradb-cluster.conf.d" || -d "/etc/mysql" || -f "/etc/my.cnf" ]]; then
-        echo "percona_node"
+    if command -v morpheus-ctl >/dev/null 2>&1 || command -v morpheus-node-ctl >/dev/null 2>&1; then
         return 0
     fi
+    return 1
+}
 
+is_mysql_running_locally() {
+    # 1. Processo mysqld ativo
     if pgrep -f "mysqld" >/dev/null 2>&1; then
+        return 0
+    fi
+    # 2. Serviço ativo no systemd
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl is-active --quiet mysql 2>/dev/null || systemctl is-active --quiet mysqld 2>/dev/null || systemctl is-active --quiet percona-xtradb-cluster 2>/dev/null; then
+            return 0
+        fi
+    fi
+    # 3. Serviço ativo no morpheus-ctl
+    if command -v morpheus-ctl >/dev/null 2>&1; then
+        if morpheus-ctl status mysql 2>&1 | grep -qi "run: mysql"; then
+            return 0
+        fi
+    fi
+    # 4. Porta TCP 3306 em escuta local
+    if is_port_listening_all_interfaces "${DEFAULT_PORT}" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+extract_morpheus_db_hosts() {
+    local config_file="$1"
+    if [[ ! -f "${config_file}" ]]; then
+        return 0
+    fi
+    awk '
+        /mysql\[.*host.*\]/ { flag=1; print; next }
+        flag && /}/ { print; flag=0 }
+        flag && /\]/ { print; flag=0 }
+        flag { print }
+    ' "${config_file}" | grep -oE "([0-9]{1,3}\.){3}[0-9]{1,3}|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" | sort -u || true
+}
+
+detect_node_mode() {
+    # 1. Validação obrigatória de ambiente Morpheus
+    if ! check_morpheus_environment; then
+        echo "not_morpheus"
+        return 0
+    fi
+
+    # 2. Se morpheus.rb existe (Modo Appliance)
+    if [[ -f "${morpheus_config}" ]]; then
+        # Se mysql['enable'] = false, trata-se de um nó de aplicação Morpheus com banco externo!
+        if grep -qE "^\s*mysql\s*\[\s*['\"]enable['\"]\s*\]\s*=\s*false" "${morpheus_config}"; then
+            echo "morpheus_app_external_db"
+            return 0
+        fi
+
+        # Se mysql['enable'] não for false, verifica se o MySQL local está ativo
+        if is_mysql_running_locally; then
+            echo "appliance"
+            return 0
+        else
+            echo "appliance_mysql_down"
+            return 0
+        fi
+    fi
+
+    # 3. Modo Nó de Cluster Percona / Morpheus Node
+    if [[ -f "/etc/morpheus/morpheus-node.conf" || -d "/opt/morpheus-node" || -d "/etc/percona-xtradb-cluster.conf.d" || -d "/etc/mysql" || -f "/etc/my.cnf" ]]; then
+        if is_mysql_running_locally; then
+            echo "percona_node"
+            return 0
+        else
+            echo "percona_node_stopped"
+            return 0
+        fi
+    fi
+
+    if is_mysql_running_locally; then
         echo "percona_node"
         return 0
     fi
 
-    echo "unknown"
+    echo "not_morpheus"
 }
 
 # ------------------------------------------------------------------------------
@@ -153,37 +222,129 @@ find_mysql_bin() {
 }
 
 find_mysql_socket() {
+    # 1. Lista de sockets conhecidos do Morpheus e do Percona/MySQL
     local sockets=(
+        "/var/run/morpheus/mysqld/mysqld.sock"
+        "/var/run/morpheus/mysql/mysql.sock"
+        "/run/morpheus/mysqld/mysqld.sock"
+        "/run/morpheus/mysql/mysql.sock"
+        "/var/opt/morpheus/mysql/mysql.sock"
+        "/var/opt/morpheus/mysql/mysqld.sock"
+        "/var/opt/morpheus/mysql/data/mysql.sock"
+        "/var/opt/morpheus/percona/percona.sock"
+        "/var/opt/morpheus/percona/mysql.sock"
+        "/var/opt/morpheus/percona/data/mysql.sock"
         "/var/run/mysqld/mysqld.sock"
         "/run/mysqld/mysqld.sock"
-        "/var/opt/morpheus/mysql/mysql.sock"
+        "/var/run/percona/mysql.sock"
+        "/var/run/percona-xtradb-cluster/mysqld.sock"
         "/var/lib/mysql/mysql.sock"
         "/tmp/mysql.sock"
+        "/var/tmp/mysql.sock"
     )
+
     for s in "${sockets[@]}"; do
         if [[ -S "${s}" ]]; then
             echo "${s}"
             return 0
         fi
     done
+
+    # 2. Busca dinâmica em sockets abertos por processos mysqld
+    if command -v ss >/dev/null 2>&1; then
+        local ss_sock
+        ss_sock=$(ss -xlp 2>/dev/null | grep -E "mysqld|percona" | grep -oP '/\S+\.sock' | head -n1 || true)
+        if [[ -n "${ss_sock}" && -S "${ss_sock}" ]]; then
+            echo "${ss_sock}"
+            return 0
+        fi
+    fi
+
+    if command -v lsof >/dev/null 2>&1; then
+        local lsof_sock
+        lsof_sock=$(lsof -c mysqld -a -U 2>/dev/null | grep -oP '/\S+\.sock' | head -n1 || true)
+        if [[ -n "${lsof_sock}" && -S "${lsof_sock}" ]]; then
+            echo "${lsof_sock}"
+            return 0
+        fi
+    fi
+
+    # 3. Busca rápida no filesystem em diretórios comuns
+    local find_sock
+    find_sock=$(find /var/opt/morpheus /var/run /run /tmp /var/lib -maxdepth 3 -type s \( -name "*mysql*.sock" -o -name "*percona*.sock" \) 2>/dev/null | head -n1 || true)
+    if [[ -n "${find_sock}" && -S "${find_sock}" ]]; then
+        echo "${find_sock}"
+        return 0
+    fi
+
     echo ""
 }
 
 # ------------------------------------------------------------------------------
-# Descoberta e Validação de Credenciais Administrativas do MySQL
+# Teste de Autenticação com Fallback Socket / TCP 127.0.0.1
+# ------------------------------------------------------------------------------
+test_mysql_auth() {
+    local bin="$1"
+    local sock="$2"
+    local user="$3"
+    local pass="$4"
+
+    # 1. Se socket foi detectado e existe, tenta via Unix socket
+    if [[ -n "${sock}" && -S "${sock}" ]]; then
+        local cmd_sock=("${bin}" "-u" "${user}")
+        if [[ -n "${pass}" ]]; then
+            cmd_sock+=("-p${pass}")
+        fi
+        cmd_sock+=("-S" "${sock}" "--batch" "-e" "SELECT 1;")
+        if "${cmd_sock[@]}" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    # 2. Tenta via TCP em 127.0.0.1 na porta do serviço
+    local cmd_tcp=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_tcp+=("-p${pass}")
+    fi
+    cmd_tcp+=("-h" "127.0.0.1" "-P" "${DEFAULT_PORT}" "--batch" "-e" "SELECT 1;")
+    if "${cmd_tcp[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # 3. Tenta via localhost com protocolo TCP explícito
+    local cmd_proto=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_proto+=("-p${pass}")
+    fi
+    cmd_proto+=("-h" "localhost" "--protocol=TCP" "-P" "${DEFAULT_PORT}" "--batch" "-e" "SELECT 1;")
+    if "${cmd_proto[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # 4. Tenta invocação direta padrão do cliente MySQL
+    local cmd_def=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_def+=("-p${pass}")
+    fi
+    cmd_def+=("--batch" "-e" "SELECT 1;")
+    if "${cmd_def[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    return 1
+}
+
+# ------------------------------------------------------------------------------
+# Descoberta e Validação de Credenciais Administrativas do MySQL/Percona
 # ------------------------------------------------------------------------------
 get_mysql_admin_auth() {
     local mysql_bin="$1"
     local socket="$2"
     local provided_pwd="$3"
 
-    # 1. Se fornecida explicitamente via parâmetro
+    # 1. Se fornecida explicitamente via parâmetro --root-password
     if [[ -n "${provided_pwd}" ]]; then
-        local test_args=("${mysql_bin}" "-u" "root" "-p${provided_pwd}")
-        if [[ -n "${socket}" ]]; then
-            test_args+=("-S" "${socket}")
-        fi
-        if "${test_args[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
+        if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${provided_pwd}"; then
             log_ok "Autenticação MySQL root via senha fornecida validada com sucesso."
             echo "${provided_pwd}"
             return 0
@@ -191,107 +352,158 @@ get_mysql_admin_auth() {
         log_warn "Senha informada em --root-password falhou no teste de autenticação."
     fi
 
-    # 2. Testa conexão via Unix socket sem senha (padrão auth_socket no Ubuntu/Debian)
-    local test_socket=("${mysql_bin}" "-u" "root")
-    if [[ -n "${socket}" ]]; then
-        test_socket+=("-S" "${socket}")
-    fi
-    if "${test_socket[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
-        log_ok "Autenticação local do MySQL root via socket autenticada (sem senha necessária)."
+    # 2. Testa conexão sem senha (auth_socket / peer auth no socket Unix)
+    if test_mysql_auth "${mysql_bin}" "${socket}" "root" ""; then
+        log_ok "Autenticação local do MySQL root autorizada sem senha (auth_socket)."
         echo ""
         return 0
     fi
 
-    # 3. Verifica /root/.my.cnf
-    if [[ -f "/root/.my.cnf" ]]; then
-        local cnf_pwd
-        cnf_pwd=$(grep -E "^\s*password\s*=" /root/.my.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
-        if [[ -n "${cnf_pwd}" ]]; then
-            local test_cnf=("${mysql_bin}" "-u" "root" "-p${cnf_pwd}")
-            if [[ -n "${socket}" ]]; then
-                test_cnf+=("-S" "${socket}")
-            fi
-            if "${test_cnf[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
-                log_ok "Credenciais de MySQL root recuperadas com sucesso de '/root/.my.cnf'."
-                echo "${cnf_pwd}"
-                return 0
-            fi
-        fi
-    fi
+    # 3. Extração automática de senha dos arquivos de segredos do Morpheus
+    local secrets_candidates=(
+        "${DEFAULT_SECRETS_FILE}"
+        "/var/opt/morpheus/morpheus-secrets.json"
+        "/var/opt/morpheus/package-secrets.json"
+        "/etc/morpheus/package-secrets.json"
+    )
 
-    # 4. Verifica /etc/morpheus/morpheus-secrets.json (Modo Appliance)
-    if [[ -f "${DEFAULT_SECRETS_FILE}" ]]; then
-        local sec_pwd=""
-        if command -v python3 >/dev/null 2>&1; then
-            sec_pwd=$(python3 -c "
+    for sf in "${secrets_candidates[@]}"; do
+        if [[ -f "${sf}" ]]; then
+            local discovered_passwords=()
+
+            # Extração estruturada via python3 se disponível
+            if command -v python3 >/dev/null 2>&1; then
+                while IFS= read -r pwd_entry; do
+                    if [[ -n "${pwd_entry}" ]]; then
+                        discovered_passwords+=("${pwd_entry}")
+                    fi
+                done < <(python3 -c "
 import json
 try:
-    with open('${DEFAULT_SECRETS_FILE}') as f:
-        data = json.load(f)
-    print(data.get('mysql', {}).get('root_password') or data.get('mysql', {}).get('morpheus_password') or '')
+    with open('${sf}') as f:
+        d = json.load(f)
+    keys_to_check = []
+    # 1. Chaves prioritárias de Percona e MySQL
+    for sec in ['percona', 'percona_cluster', 'percona_xtradb_cluster', 'pxc', 'mysql']:
+        if sec in d and isinstance(d[sec], dict):
+            for k in ['root_password', 'admin_password', 'password', 'cluster_password', 'morpheus_password', 'ops_password']:
+                v = d[sec].get(k)
+                if v and v not in keys_to_check:
+                    keys_to_check.append(v)
+    # 2. Chaves de primeiro nível
+    for k in ['percona_root_password', 'mysql_root_password', 'root_password', 'admin_password', 'db_root_password', 'morpheus_password']:
+        v = d.get(k)
+        if v and v not in keys_to_check:
+            keys_to_check.append(v)
+    for p in keys_to_check:
+        print(p)
 except Exception:
     pass
 " 2>/dev/null || true)
-        elif command -v jq >/dev/null 2>&1; then
-            sec_pwd=$(jq -r '.mysql.root_password // .mysql.morpheus_password // empty' "${DEFAULT_SECRETS_FILE}" 2>/dev/null || true)
-        fi
-
-        if [[ -n "${sec_pwd}" ]]; then
-            local test_sec=("${mysql_bin}" "-u" "root" "-p${sec_pwd}")
-            if [[ -n "${socket}" ]]; then
-                test_sec+=("-S" "${socket}")
             fi
-            if "${test_sec[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
-                log_ok "Senha do MySQL root recuperada de '${DEFAULT_SECRETS_FILE}'."
-                echo "${sec_pwd}"
+
+            # Fallback direto com grep/awk no JSON (sem dependência de python)
+            if [[ ${#discovered_passwords[@]} -eq 0 ]]; then
+                while IFS= read -r pwd_entry; do
+                    if [[ -n "${pwd_entry}" ]]; then
+                        discovered_passwords+=("${pwd_entry}")
+                    fi
+                done < <(grep -E '"(root_password|admin_password|percona_password|morpheus_password|ops_password)"\s*:' "${sf}" 2>/dev/null | awk -F'"' '{print $4}' | grep -v '^$' || true)
+            fi
+
+            # Testa as senhas descobertas para o usuário 'root'
+            for candidate_pwd in "${discovered_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
+                    log_ok "Senha de root do MySQL/Percona recuperada com sucesso de '${sf}'."
+                    echo "${candidate_pwd}"
+                    return 0
+                fi
+            done
+
+            # Se root falhar, testa para o usuário 'morpheus' (administrador do esquema)
+            for candidate_pwd in "${discovered_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "morpheus" "${candidate_pwd}"; then
+                    log_ok "Credenciais de administrador do banco validadas via usuário 'morpheus' (${sf})."
+                    echo "__USER__:morpheus:${candidate_pwd}"
+                    return 0
+                fi
+            done
+        fi
+    done
+
+    # 4. Extração a partir do morpheus.rb (diretivas percona/mysql)
+    if [[ -f "${morpheus_config}" ]]; then
+        local rb_passwords=()
+        while IFS= read -r pwd_entry; do
+            if [[ -n "${pwd_entry}" ]]; then
+                rb_passwords+=("${pwd_entry}")
+            fi
+        done < <(grep -E "^\s*(percona|mysql|database)(\[[^]]*\])?\s*\[\s*['\"](root_password|admin_password|password|morpheus_password)['\"]\s*\]\s*=" "${morpheus_config}" 2>/dev/null | awk -F'=' '{print $2}' | tr -d " '\";" || true)
+
+        for candidate_pwd in "${rb_passwords[@]}"; do
+            if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
+                log_ok "Senha de root do MySQL/Percona recuperada de '${morpheus_config}'."
+                echo "${candidate_pwd}"
                 return 0
             fi
+            if test_mysql_auth "${mysql_bin}" "${socket}" "morpheus" "${candidate_pwd}"; then
+                log_ok "Credenciais de administrador do banco validadas via usuário 'morpheus' (${morpheus_config})."
+                echo "__USER__:morpheus:${candidate_pwd}"
+                return 0
+            fi
+        done
+    fi
+
+    # 5. Verifica /root/.my.cnf
+    if [[ -f "/root/.my.cnf" ]]; then
+        local cnf_pwd
+        cnf_pwd=$(grep -E "^\s*password\s*=" /root/.my.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
+        if [[ -n "${cnf_pwd}" ]] && test_mysql_auth "${mysql_bin}" "${socket}" "root" "${cnf_pwd}"; then
+            log_ok "Credenciais de MySQL root recuperadas com sucesso de '/root/.my.cnf'."
+            echo "${cnf_pwd}"
+            return 0
         fi
     fi
 
-    # 5. Verifica /etc/mysql/debian.cnf (Debian/Ubuntu sys-maint)
+    # 6. Verifica /etc/mysql/debian.cnf (Debian/Ubuntu sys-maint)
     if [[ -f "/etc/mysql/debian.cnf" ]]; then
         local deb_pwd
         deb_pwd=$(grep -E "^\s*password\s*=" /etc/mysql/debian.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
         local deb_user
         deb_user=$(grep -E "^\s*user\s*=" /etc/mysql/debian.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
-        if [[ -n "${deb_pwd}" && -n "${deb_user}" ]]; then
-            local test_deb=("${mysql_bin}" "-u" "${deb_user}" "-p${deb_pwd}")
-            if [[ -n "${socket}" ]]; then
-                test_deb+=("-S" "${socket}")
-            fi
-            if "${test_deb[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
-                log_ok "Acesso administrativo ao MySQL validado via '${deb_user}' (/etc/mysql/debian.cnf)."
-                echo "__USER__:${deb_user}:${deb_pwd}"
-                return 0
-            fi
+        if [[ -n "${deb_pwd}" && -n "${deb_user}" ]] && test_mysql_auth "${mysql_bin}" "${socket}" "${deb_user}" "${deb_pwd}"; then
+            log_ok "Acesso administrativo ao MySQL validado via '${deb_user}' (/etc/mysql/debian.cnf)."
+            echo "__USER__:${deb_user}:${deb_pwd}"
+            return 0
         fi
     fi
 
-    # 6. Verifica se morpheus-node.conf ou config.yml contêm senhas de banco
+    # 7. Verifica se morpheus-node.conf ou config.yml contêm senhas de banco
     local node_conf_candidates=(
         "/opt/morpheus-node/conf/config.yml"
+        "/opt/morpheus-node/conf/config.yaml"
         "/etc/morpheus/morpheus-node.conf"
     )
     for cf in "${node_conf_candidates[@]}"; do
         if [[ -f "${cf}" ]]; then
-            local extracted_pwd
-            extracted_pwd=$(grep -iE "(mysql|password|db)" "${cf}" 2>/dev/null | grep -iE "password|pwd" | head -n1 | awk -F'[:=]' '{print $2}' | tr -d ' "' || true)
-            if [[ -n "${extracted_pwd}" ]]; then
-                local test_node=("${mysql_bin}" "-u" "root" "-p${extracted_pwd}")
-                if [[ -n "${socket}" ]]; then
-                    test_node+=("-S" "${socket}")
+            local node_passwords=()
+            while IFS= read -r pwd_entry; do
+                if [[ -n "${pwd_entry}" ]]; then
+                    node_passwords+=("${pwd_entry}")
                 fi
-                if "${test_node[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
+            done < <(grep -iE "(mysql|percona|password|root)" "${cf}" 2>/dev/null | grep -iE "password|pwd" | awk -F'[:=]' '{print $2}' | tr -d " '\";" || true)
+
+            for candidate_pwd in "${node_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
                     log_ok "Senha do MySQL root recuperada de '${cf}'."
-                    echo "${extracted_pwd}"
+                    echo "${candidate_pwd}"
                     return 0
                 fi
-            fi
+            done
         fi
     done
 
-    # 7. Solicitação interativa caso nada tenha funcionado
+    # 8. Solicitação interativa caso nada tenha funcionado
     if [[ -t 0 ]]; then
         echo -n "Informe a senha do usuário root/admin do MySQL/Percona: " >&2
         local prompt_pwd
@@ -322,12 +534,16 @@ run_mysql_admin() {
     fi
 
     local cmd=("${mysql_bin}" "-u" "${admin_user}")
-    if [[ -n "${socket}" ]]; then
-        cmd+=("-S" "${socket}")
-    fi
     if [[ -n "${admin_pwd}" ]]; then
         cmd+=("-p${admin_pwd}")
     fi
+
+    if [[ -n "${socket}" && -S "${socket}" ]]; then
+        cmd+=("-S" "${socket}")
+    else
+        cmd+=("-h" "127.0.0.1" "-P" "${DEFAULT_PORT}")
+    fi
+
     cmd+=("--batch" "--skip-column-names" "-e" "${sql}")
 
     "${cmd[@]}"
@@ -868,19 +1084,79 @@ main() {
 
     check_root
 
-    # Detecção da topologia do nó
+    # Detecção e validação rigorosa da topologia do nó
     local detected_mode
     detected_mode="$(detect_node_mode)"
     node_mode="${detected_mode}"
 
-    if [[ "${node_mode}" == "appliance" ]]; then
-        log_info "Modo de implantação detectado: Appliance Morpheus (morpheus.rb)."
-    elif [[ "${node_mode}" == "percona_node" ]]; then
-        log_info "Modo de implantação detectado: Three-Node HA com Percona Cluster (morpheus-node)."
-    else
-        log_warn "Estrutura padrão de configuração não encontrada de imediato. Prosseguindo em modo Percona/MySQL genérico."
-        node_mode="percona_node"
-    fi
+    case "${node_mode}" in
+        not_morpheus)
+            log_error "=============================================================================="
+            log_error "FALHA DE VALIDAÇÃO: AMBIENTE MORPHEUS DATA NÃO DETECTADO!"
+            log_error "=============================================================================="
+            log_error "Este servidor não foi identificado como um ambiente HPE Morpheus Data Enterprise."
+            log_error "Nenhum arquivo de configuração ou diretório de instalação do Morpheus foi encontrado:"
+            log_error "  • ${morpheus_config}"
+            log_error "  • ${DEFAULT_SECRETS_FILE}"
+            log_error "  • /etc/morpheus/morpheus-node.conf"
+            log_error "  • /opt/morpheus ou /opt/morpheus-node"
+            log_error "  • /var/opt/morpheus"
+            log_error ""
+            log_error "Execução abortada por segurança para evitar alterações indevidas neste host."
+            log_error "=============================================================================="
+            exit 1
+            ;;
+        morpheus_app_external_db)
+            log_error "=============================================================================="
+            log_error "ERRO: EXECUTADO EM UM NÓ DE APLICAÇÃO MORPHEUS COM BANCO DE DADOS EXTERNO!"
+            log_error "=============================================================================="
+            log_error "O arquivo '${morpheus_config}' define: mysql['enable'] = false."
+            log_error "Este servidor ($(hostname)) atua como Nó de Aplicação/Interface (morpheus-ui / workers),"
+            log_error "portanto o daemon MySQL/Percona NÃO é executado localmente aqui."
+            log_error ""
+            log_error "O script de liberação de acesso remoto ao MySQL deve ser executado diretamente"
+            log_error "em um dos NÓS DO CLUSTER PERCONA XTRADB ou em um Appliance Single-Node com banco local."
+
+            local detected_db_hosts
+            detected_db_hosts="$(extract_morpheus_db_hosts "${morpheus_config}")"
+            if [[ -n "${detected_db_hosts}" ]]; then
+                log_error ""
+                log_error "Nós de banco de dados Percona configurados na diretiva mysql['host']:"
+                while IFS= read -r db_h; do
+                    log_error "  -> ${db_h}"
+                done <<< "${detected_db_hosts}"
+            fi
+            log_error ""
+            log_error "Conecte-se via SSH a um dos nós de banco de dados acima e execute o script lá."
+            log_error "=============================================================================="
+            exit 1
+            ;;
+        appliance_mysql_down)
+            log_error "=============================================================================="
+            log_error "ERRO: SERVIÇO MYSQL LOCAL NÃO ESTÁ EM EXECUÇÃO NO APPLIANCE!"
+            log_error "=============================================================================="
+            log_error "O arquivo '${morpheus_config}' foi detectado, mas o daemon MySQL não está ativo."
+            log_error "Inicie o serviço com 'morpheus-ctl start mysql' e execute o script novamente."
+            log_error "=============================================================================="
+            exit 1
+            ;;
+        percona_node_stopped)
+            log_error "=============================================================================="
+            log_error "ERRO: SERVIÇO MYSQL/PERCONA NÃO ESTÁ EM EXECUÇÃO NESTE NÓ DE CLUSTER!"
+            log_error "=============================================================================="
+            log_error "Arquivos de configuração do Percona/Morpheus foram encontrados, mas o daemon"
+            log_error "mysqld não está rodando nem escutando na porta ${DEFAULT_PORT} deste host."
+            log_error "Inicie o serviço (ex.: 'systemctl start mysql' ou 'percona-xtradb-cluster') e tente novamente."
+            log_error "=============================================================================="
+            exit 1
+            ;;
+        appliance)
+            log_info "Modo de implantação detectado: Single-Node Morpheus Appliance com banco local."
+            ;;
+        percona_node)
+            log_info "Modo de implantação detectado: Nó de Cluster Morpheus Data (Percona XtraDB Cluster / morpheus-node)."
+            ;;
+    esac
 
     # Resolução da sub-rede se não fornecida
     if [[ -z "${client_subnet}" ]]; then

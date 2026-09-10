@@ -34,13 +34,14 @@ Por padrão, as instalações do HPE Morpheus Data Enterprise restringem o tráf
 
 Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 
-1. **Detecção Automática de Topologia**: Identifica se o ambiente é Single-Node (Appliance com `morpheus.rb`) ou Three-Node HA (com Percona XtraDB Cluster / `morpheus-node`).
-2. **Snapshot de Backup Automático**: Salva o estado do firewall e cópia das configurações antes de qualquer modificação.
-3. **Ajuste de Escuta de Rede**: Garante que o MySQL escute em `0.0.0.0:3306`, evitando reinicializações desnecessárias caso a porta já esteja em modo de escuta de rede.
-4. **Liberação Granular de Firewall**: Libera a porta 3306 apenas para a sub-rede ou IP de origem desejado (`firewalld`, `ufw` ou `iptables`).
-5. **Criação de Usuário Dedicado no MySQL**: Concede privilégios restritos à base `morpheus.*` (completo ou *somente leitura*), replicando automaticamente entre os nós do cluster Percona.
-6. **Bateria de Testes Automatizados**: Valida processo ativo, escuta de porta, autenticação TCP e catálogo de tabelas.
-7. **Rollback Seguro**: Restaura configurações anteriores, remove regras de firewall e desfaz o usuário criado.
+1. **Validação Obrigatória e Proteção de Ambiente**: Detecta se o host é um nó genuíno do Morpheus Data (Single-Node Appliance ou Nó de Cluster Percona). Caso seja executado em um servidor alheio ou em um **Nó de Aplicação** (onde `mysql['enable'] = false`), **aborta imediatamente com erro**, prevenindo alterações indevidas e apontando os IPs dos nós de banco corretos.
+2. **Auto-Descoberta de Senha de Root do Percona/MySQL**: Extrai automaticamente a senha de root administrativa a partir dos arquivos de configuração do Morpheus (`morpheus-secrets.json`, `morpheus.rb`, `morpheus-node.conf`), testando autenticação local via socket Unix com fallback TCP (`127.0.0.1:3306`), eliminando a necessidade de prompts manuais.
+3. **Snapshot de Backup Automático**: Salva o estado do firewall e cópia das configurações antes de qualquer modificação.
+4. **Ajuste de Escuta de Rede**: Garante que o MySQL escute em `0.0.0.0:3306`, evitando reinicializações desnecessárias caso a porta já esteja em modo de escuta de rede.
+5. **Liberação Granular de Firewall**: Libera a porta 3306 apenas para a sub-rede ou IP de origem desejado (`firewalld`, `ufw` ou `iptables`).
+6. **Criação de Usuário Dedicado no MySQL**: Concede privilégios restritos à base `morpheus.*` (completo ou *somente leitura*), replicando automaticamente entre os nós do cluster Percona.
+7. **Bateria de Testes Automatizados**: Valida processo ativo, escuta de porta, autenticação TCP e catálogo de tabelas.
+8. **Rollback Seguro**: Restaura configurações anteriores, remove regras de firewall e desfaz o usuário criado.
 
 ---
 
@@ -48,7 +49,7 @@ Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 
 | Arquivo | Descrição |
 | :--- | :--- |
-| `configure-morpheus-mysql-remote-access.sh` | Script principal para habilitar o acesso remoto, gerar backup, configurar firewall, criar usuário no MySQL/Percona e rodar testes de validação em 4 etapas. |
+| `configure-morpheus-mysql-remote-access.sh` | Script principal para validar ambiente, obter senha do Percona automaticamente, habilitar acesso remoto, gerar backup, configurar firewall, criar usuário e rodar testes. |
 | `restore-morpheus-mysql-remote-access.sh` | Script de reversão completa que desfaz as alterações, restaura configurações originais, remove regras de firewall e exclui o usuário criado. |
 | `README.md` | Documentação técnica detalhada, parâmetros, topologias e exemplos práticos de conexão. |
 
@@ -57,34 +58,42 @@ Estes scripts automatizam com alta confiabilidade e tolerância a falhas:
 ## ⚙️ Pré-requisitos
 
 - Execução com privilégios de **superusuário (`root` / `sudo`)**.
-- Appliance HPE Morpheus Data Enterprise ou nó de banco operacional.
+- Servidor correspondente a um **Nó de Banco de Dados** do HPE Morpheus Data (Single-Node com MySQL local ou Nó de Cluster Percona XtraDB).
 - Utilitários comuns do Linux: `bash` (v4+), `openssl`, `ss` ou `netstat`, `ip` ou `hostname`.
 - Um dos gerenciadores de firewall: `firewalld` (RHEL/Alma/Rocky), `ufw` (Ubuntu) ou `iptables`.
 
 ---
 
-## 🌐 Topologias Suportadas
+## 🌐 Topologias e Comportamento por Tipo de Nó
 
-O pacote detecta e ajusta seu comportamento automaticamente conforme o tipo de nó:
+O pacote valida rigorosamente o tipo de nó antes de realizar qualquer alteração:
 
 ```mermaid
 flowchart TD
-    Node[Nó Morpheus / Servidor de Banco] --> Check{Possui /etc/morpheus/morpheus.rb?}
-    Check -- Sim --> ModeApp[Modo Appliance: morpheus.rb + morpheus-ctl reconfigure]
-    Check -- Não --> CheckNode{Possui morpheus-node.conf, /opt/morpheus-node ou Percona?}
-    CheckNode -- Sim --> ModeHA[Modo 3-Node HA / Percona: my.cnf / systemd + Replicação do Cluster]
-    CheckNode -- Não --> ModeGen[Modo Percona Genérico: my.cnf / systemd]
+    Start[Início da Execução] --> CheckEnv{Ambiente Morpheus Data Detectado?}
+    CheckEnv -- Não --> Abort1[ABORTA: Servidor Não-Morpheus]
+    CheckEnv -- Sim --> CheckApp{morpheus.rb possui mysql enable = false?}
+    CheckApp -- Sim --> Abort2[ABORTA: Nó de Aplicação UI / Exibe IPs do Cluster Percona]
+    CheckApp -- Não --> CheckLocal{MySQL/Percona em execução local?}
+    CheckLocal -- Não --> Abort3[ABORTA: Serviço MySQL parado no host]
+    CheckLocal -- Sim --> CheckTopo{Possui morpheus.rb com banco local?}
+    CheckTopo -- Sim --> ModeApp[Modo Appliance Single-Node: morpheus.rb + morpheus-ctl reconfigure]
+    CheckTopo -- Não --> ModeHA[Modo Nó de Cluster Percona HA: my.cnf / systemd + Replicação]
 ```
 
 ### 1. Single-Node Appliance (Omnibus)
 - **Arquivos**: `/etc/morpheus/morpheus.rb`, `/etc/morpheus/morpheus-secrets.json`
-- **Controle de Serviço**: `morpheus-ctl reconfigure` / `morpheus-ctl status mysql`
-- **Comportamento**: Altera `mysql['bind_address'] = '0.0.0.0'` em `morpheus.rb` e reconfigura o appliance.
+- **Condição**: `mysql['enable']` não é `false` e o serviço MySQL roda localmente.
+- **Comportamento**: Altera `mysql['bind_address'] = '0.0.0.0'` em `morpheus.rb` e reconfigura o appliance via `morpheus-ctl reconfigure`.
 
-### 2. Three-Node HA Cluster (Percona XtraDB Cluster / `morpheus-node`)
-- **Arquivos**: `/etc/morpheus/morpheus-node.conf`, `/opt/morpheus-node/conf/config.yml`, `/etc/mysql/` ou `/etc/percona-xtradb-cluster.conf.d/`
-- **Controle de Serviço**: `systemctl` (`mysql`, `mysqld`, `percona-xtradb-cluster`)
-- **Comportamento**: Valida se a porta 3306 já está aberta em todas as interfaces. Se já estiver, não altera arquivos nem reinicia o serviço; apenas abre o firewall e cria o usuário, que replica instantaneamente para os outros nós do cluster.
+### 2. Nó de Cluster Percona HA (Percona XtraDB Cluster / `morpheus-node`)
+- **Arquivos**: `/etc/morpheus/morpheus-secrets.json`, `/etc/morpheus/morpheus-node.conf`, `/opt/morpheus-node/conf/config.yml`, `/etc/percona-xtradb-cluster.conf.d/`
+- **Condição**: Daemon `mysqld` em execução local escutando na porta 3306.
+- **Comportamento**: Extrai a senha de root do arquivo de segredos, valida que o Percona já escuta em `0.0.0.0:3306`, abre o firewall local e provisiona o usuário no MySQL, o qual é replicado automaticamente para os outros nós do cluster.
+
+### 3. Nó de Aplicação Morpheus com Banco Externo (Ex: UI / Workers)
+- **Condição**: O arquivo `morpheus.rb` possui `mysql['enable'] = false`.
+- **Ação**: O script **aborta imediatamente com erro** e exibe a lista de hosts/IPs configurados na diretiva `mysql['host']`, instruindo o operador a executar o script diretamente em um dos nós de banco do cluster Percona.
 
 ---
 
@@ -93,15 +102,17 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Início: configure script] --> B{É Root?}
-    B -- Não --> C[Aborta com Erro]
-    B -- Sim --> D[Detecta Topologia: Appliance vs 3-Node HA Percona]
-    D --> E[Detecta Binários MySQL, Socket e Credenciais Administrativas]
-    E --> F[1. Ajusta Rede: morpheus.rb ou verifica bind 0.0.0.0 no Percona]
-    F --> G[2. Gera Backup: Configurações + Regras de Firewall]
-    G --> H[3. Aplica Regra de Firewall para Sub-rede]
-    H --> I[4. Cria Usuário e Privilégios no MySQL/Percona]
-    I --> J[5. Executa 4 Testes de Validação]
-    J --> K[6. Exibe Resumo com Credenciais e Exemplos de Conexão]
+    B -- Não --> C[Aborta com Erro: requer root]
+    B -- Sim --> D[Valida se é Nó de Banco Morpheus ou Single-Node]
+    D -- Inválido / App Node --> E[Aborta com Erro Explicativo]
+    D -- Válido --> F[Auto-descoberta de Senha: morpheus-secrets.json / morpheus.rb]
+    F --> G[Testa Conexão Local: Socket Unix + Fallback TCP 127.0.0.1:3306]
+    G --> H[1. Ajusta Rede: morpheus.rb ou valida bind 0.0.0.0 no Percona]
+    H --> I[2. Gera Backup: Configurações + Regras de Firewall]
+    I --> J[3. Aplica Regra de Firewall para Sub-rede]
+    J --> K[4. Cria Usuário e Privilégios no MySQL/Percona]
+    K --> L[5. Executa 4 Testes de Validação]
+    L --> M[6. Exibe Resumo com Credenciais e Exemplos de Conexão]
 ```
 
 ---

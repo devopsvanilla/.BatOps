@@ -106,11 +106,23 @@ find_mysql_bin() {
 
 find_mysql_socket() {
     local sockets=(
+        "/var/run/morpheus/mysqld/mysqld.sock"
+        "/var/run/morpheus/mysql/mysql.sock"
+        "/run/morpheus/mysqld/mysqld.sock"
+        "/run/morpheus/mysql/mysql.sock"
+        "/var/opt/morpheus/mysql/mysql.sock"
+        "/var/opt/morpheus/mysql/mysqld.sock"
+        "/var/opt/morpheus/mysql/data/mysql.sock"
+        "/var/opt/morpheus/percona/percona.sock"
+        "/var/opt/morpheus/percona/mysql.sock"
+        "/var/opt/morpheus/percona/data/mysql.sock"
         "/var/run/mysqld/mysqld.sock"
         "/run/mysqld/mysqld.sock"
-        "/var/opt/morpheus/mysql/mysql.sock"
+        "/var/run/percona/mysql.sock"
+        "/var/run/percona-xtradb-cluster/mysqld.sock"
         "/var/lib/mysql/mysql.sock"
         "/tmp/mysql.sock"
+        "/var/tmp/mysql.sock"
     )
     for s in "${sockets[@]}"; do
         if [[ -S "${s}" ]]; then
@@ -118,11 +130,87 @@ find_mysql_socket() {
             return 0
         fi
     done
+
+    if command -v ss >/dev/null 2>&1; then
+        local ss_sock
+        ss_sock=$(ss -xlp 2>/dev/null | grep -E "mysqld|percona" | grep -oP '/\S+\.sock' | head -n1 || true)
+        if [[ -n "${ss_sock}" && -S "${ss_sock}" ]]; then
+            echo "${ss_sock}"
+            return 0
+        fi
+    fi
+
+    if command -v lsof >/dev/null 2>&1; then
+        local lsof_sock
+        lsof_sock=$(lsof -c mysqld -a -U 2>/dev/null | grep -oP '/\S+\.sock' | head -n1 || true)
+        if [[ -n "${lsof_sock}" && -S "${lsof_sock}" ]]; then
+            echo "${lsof_sock}"
+            return 0
+        fi
+    fi
+
+    local find_sock
+    find_sock=$(find /var/opt/morpheus /var/run /run /tmp /var/lib -maxdepth 3 -type s \( -name "*mysql*.sock" -o -name "*percona*.sock" \) 2>/dev/null | head -n1 || true)
+    if [[ -n "${find_sock}" && -S "${find_sock}" ]]; then
+        echo "${find_sock}"
+        return 0
+    fi
+
     echo ""
 }
 
 # ------------------------------------------------------------------------------
-# Obtenção de Credenciais Administrativas do MySQL
+# Teste de Autenticação com Fallback Socket / TCP 127.0.0.1
+# ------------------------------------------------------------------------------
+test_mysql_auth() {
+    local bin="$1"
+    local sock="$2"
+    local user="$3"
+    local pass="$4"
+
+    if [[ -n "${sock}" && -S "${sock}" ]]; then
+        local cmd_sock=("${bin}" "-u" "${user}")
+        if [[ -n "${pass}" ]]; then
+            cmd_sock+=("-p${pass}")
+        fi
+        cmd_sock+=("-S" "${sock}" "--batch" "-e" "SELECT 1;")
+        if "${cmd_sock[@]}" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    local cmd_tcp=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_tcp+=("-p${pass}")
+    fi
+    cmd_tcp+=("-h" "127.0.0.1" "-P" "${DEFAULT_PORT}" "--batch" "-e" "SELECT 1;")
+    if "${cmd_tcp[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local cmd_proto=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_proto+=("-p${pass}")
+    fi
+    cmd_proto+=("-h" "localhost" "--protocol=TCP" "-P" "${DEFAULT_PORT}" "--batch" "-e" "SELECT 1;")
+    if "${cmd_proto[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local cmd_def=("${bin}" "-u" "${user}")
+    if [[ -n "${pass}" ]]; then
+        cmd_def+=("-p${pass}")
+    fi
+    cmd_def+=("--batch" "-e" "SELECT 1;")
+    if "${cmd_def[@]}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    return 1
+}
+
+# ------------------------------------------------------------------------------
+# Obtenção de Credenciais Administrativas do MySQL/Percona
 # ------------------------------------------------------------------------------
 get_mysql_admin_auth() {
     local mysql_bin="$1"
@@ -130,45 +218,104 @@ get_mysql_admin_auth() {
     local provided_pwd="$3"
 
     if [[ -n "${provided_pwd}" ]]; then
-        echo "${provided_pwd}"
+        if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${provided_pwd}"; then
+            echo "${provided_pwd}"
+            return 0
+        fi
+    fi
+
+    if test_mysql_auth "${mysql_bin}" "${socket}" "root" ""; then
+        echo ""
         return 0
     fi
 
-    local test_socket=("${mysql_bin}" "-u" "root")
-    if [[ -n "${socket}" ]]; then
-        test_socket+=("-S" "${socket}")
-    fi
-    if "${test_socket[@]}" --batch -e "SELECT 1;" >/dev/null 2>&1; then
-        echo ""
-        return 0
+    local secrets_candidates=(
+        "${DEFAULT_SECRETS_FILE}"
+        "/var/opt/morpheus/morpheus-secrets.json"
+        "/var/opt/morpheus/package-secrets.json"
+        "/etc/morpheus/package-secrets.json"
+    )
+
+    for sf in "${secrets_candidates[@]}"; do
+        if [[ -f "${sf}" ]]; then
+            local discovered_passwords=()
+            if command -v python3 >/dev/null 2>&1; then
+                while IFS= read -r pwd_entry; do
+                    if [[ -n "${pwd_entry}" ]]; then
+                        discovered_passwords+=("${pwd_entry}")
+                    fi
+                done < <(python3 -c "
+import json
+try:
+    with open('${sf}') as f:
+        d = json.load(f)
+    keys_to_check = []
+    for sec in ['percona', 'percona_cluster', 'percona_xtradb_cluster', 'pxc', 'mysql']:
+        if sec in d and isinstance(d[sec], dict):
+            for k in ['root_password', 'admin_password', 'password', 'cluster_password', 'morpheus_password', 'ops_password']:
+                v = d[sec].get(k)
+                if v and v not in keys_to_check:
+                    keys_to_check.append(v)
+    for k in ['percona_root_password', 'mysql_root_password', 'root_password', 'admin_password', 'db_root_password', 'morpheus_password']:
+        v = d.get(k)
+        if v and v not in keys_to_check:
+            keys_to_check.append(v)
+    for p in keys_to_check:
+        print(p)
+except Exception:
+    pass
+" 2>/dev/null || true)
+            fi
+
+            if [[ ${#discovered_passwords[@]} -eq 0 ]]; then
+                while IFS= read -r pwd_entry; do
+                    if [[ -n "${pwd_entry}" ]]; then
+                        discovered_passwords+=("${pwd_entry}")
+                    fi
+                done < <(grep -E '"(root_password|admin_password|percona_password|morpheus_password|ops_password)"\s*:' "${sf}" 2>/dev/null | awk -F'"' '{print $4}' | grep -v '^$' || true)
+            fi
+
+            for candidate_pwd in "${discovered_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
+                    echo "${candidate_pwd}"
+                    return 0
+                fi
+            done
+
+            for candidate_pwd in "${discovered_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "morpheus" "${candidate_pwd}"; then
+                    echo "__USER__:morpheus:${candidate_pwd}"
+                    return 0
+                fi
+            done
+        fi
+    done
+
+    if [[ -f "${morpheus_config}" ]]; then
+        local rb_passwords=()
+        while IFS= read -r pwd_entry; do
+            if [[ -n "${pwd_entry}" ]]; then
+                rb_passwords+=("${pwd_entry}")
+            fi
+        done < <(grep -E "^\s*(percona|mysql|database)(\[[^]]*\])?\s*\[\s*['\"](root_password|admin_password|password|morpheus_password)['\"]\s*\]\s*=" "${morpheus_config}" 2>/dev/null | awk -F'=' '{print $2}' | tr -d " '\";" || true)
+
+        for candidate_pwd in "${rb_passwords[@]}"; do
+            if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
+                echo "${candidate_pwd}"
+                return 0
+            fi
+            if test_mysql_auth "${mysql_bin}" "${socket}" "morpheus" "${candidate_pwd}"; then
+                echo "__USER__:morpheus:${candidate_pwd}"
+                return 0
+            fi
+        done
     fi
 
     if [[ -f "/root/.my.cnf" ]]; then
         local cnf_pwd
         cnf_pwd=$(grep -E "^\s*password\s*=" /root/.my.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
-        if [[ -n "${cnf_pwd}" ]]; then
+        if [[ -n "${cnf_pwd}" ]] && test_mysql_auth "${mysql_bin}" "${socket}" "root" "${cnf_pwd}"; then
             echo "${cnf_pwd}"
-            return 0
-        fi
-    fi
-
-    if [[ -f "${DEFAULT_SECRETS_FILE}" ]]; then
-        local sec_pwd=""
-        if command -v python3 >/dev/null 2>&1; then
-            sec_pwd=$(python3 -c "
-import json
-try:
-    with open('${DEFAULT_SECRETS_FILE}') as f:
-        data = json.load(f)
-    print(data.get('mysql', {}).get('root_password') or data.get('mysql', {}).get('morpheus_password') or '')
-except Exception:
-    pass
-" 2>/dev/null || true)
-        elif command -v jq >/dev/null 2>&1; then
-            sec_pwd=$(jq -r '.mysql.root_password // .mysql.morpheus_password // empty' "${DEFAULT_SECRETS_FILE}" 2>/dev/null || true)
-        fi
-        if [[ -n "${sec_pwd}" ]]; then
-            echo "${sec_pwd}"
             return 0
         fi
     fi
@@ -178,7 +325,7 @@ except Exception:
         deb_pwd=$(grep -E "^\s*password\s*=" /etc/mysql/debian.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
         local deb_user
         deb_user=$(grep -E "^\s*user\s*=" /etc/mysql/debian.cnf 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d ' "' || true)
-        if [[ -n "${deb_pwd}" && -n "${deb_user}" ]]; then
+        if [[ -n "${deb_pwd}" && -n "${deb_user}" ]] && test_mysql_auth "${mysql_bin}" "${socket}" "${deb_user}" "${deb_pwd}"; then
             echo "__USER__:${deb_user}:${deb_pwd}"
             return 0
         fi
@@ -186,16 +333,24 @@ except Exception:
 
     local node_conf_candidates=(
         "/opt/morpheus-node/conf/config.yml"
+        "/opt/morpheus-node/conf/config.yaml"
         "/etc/morpheus/morpheus-node.conf"
     )
     for cf in "${node_conf_candidates[@]}"; do
         if [[ -f "${cf}" ]]; then
-            local extracted_pwd
-            extracted_pwd=$(grep -iE "(mysql|password|db)" "${cf}" 2>/dev/null | grep -iE "password|pwd" | head -n1 | awk -F'[:=]' '{print $2}' | tr -d ' "' || true)
-            if [[ -n "${extracted_pwd}" ]]; then
-                echo "${extracted_pwd}"
-                return 0
-            fi
+            local node_passwords=()
+            while IFS= read -r pwd_entry; do
+                if [[ -n "${pwd_entry}" ]]; then
+                    node_passwords+=("${pwd_entry}")
+                fi
+            done < <(grep -iE "(mysql|percona|password|root)" "${cf}" 2>/dev/null | grep -iE "password|pwd" | awk -F'[:=]' '{print $2}' | tr -d " '\";" || true)
+
+            for candidate_pwd in "${node_passwords[@]}"; do
+                if test_mysql_auth "${mysql_bin}" "${socket}" "root" "${candidate_pwd}"; then
+                    echo "${candidate_pwd}"
+                    return 0
+                fi
+            done
         fi
     done
 
@@ -226,12 +381,16 @@ run_mysql_admin() {
     fi
 
     local cmd=("${mysql_bin}" "-u" "${admin_user}")
-    if [[ -n "${socket}" ]]; then
-        cmd+=("-S" "${socket}")
-    fi
     if [[ -n "${admin_pwd}" ]]; then
         cmd+=("-p${admin_pwd}")
     fi
+
+    if [[ -n "${socket}" && -S "${socket}" ]]; then
+        cmd+=("-S" "${socket}")
+    else
+        cmd+=("-h" "127.0.0.1" "-P" "${DEFAULT_PORT}")
+    fi
+
     cmd+=("--batch" "--skip-column-names" "-e" "${sql}")
 
     "${cmd[@]}"
