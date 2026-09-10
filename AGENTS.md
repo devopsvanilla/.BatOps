@@ -10,7 +10,7 @@ O repositório possui ganchos (*hooks*) configurados via `pre-commit` (`.pre-com
 
 ### 1. Espaços em Branco e Fim de Arquivo
 
-- **`trailing-whitespace`**: Não deixe espaços em branco no final de linhas de nenhum arquivo (`.sh`, `.md`, `.yaml`, etc.).
+- **`trailing-whitespace`**: Não deixe espaços em branco no final de linhas de nenhum arquivo (`.sh`, `.md`, `.yaml`, etc.). Tenha atenção redobrada com blocos *heredoc* (`cat <<EOF`), banners ASCII e quebras de linha em Markdown — nunca termine linhas com espaços vazios residuais.
 - **`end-of-file-fixer`**: Todos os arquivos de texto devem terminar com exatamente uma quebra de linha (`\n`).
 
 ### 2. Segurança e Detecção de Segredos
@@ -21,6 +21,12 @@ O repositório possui ganchos (*hooks*) configurados via `pre-commit` (`.pre-com
 ### 3. Shell Scripts (`shellcheck` e `shfmt`)
 
 - **`shellcheck`**:
+  - **Separação de declaração e atribuição (SC2155)**: NUNCA declare e atribua o retorno de comando na mesma instrução usando `local`, `readonly` ou `export` (ex.: `readonly timestamp="$(date ...)"` ou `local res="$(cmd)"`). Esses comandos built-in retornam status zero e mascaram falhas do comando executado. Declare primeiro e atribua em seguida:
+    ```bash
+    local timestamp
+    timestamp="$(date +"%Y%m%d_%H%M%S")"
+    readonly timestamp
+    ```
   - Remova quaisquer variáveis não utilizadas ou não exportadas (aviso `SC2034`).
   - Declare e use variáveis de forma segura (`set -euo pipefail`).
   - Sempre valide a sintaxe com `shellcheck --severity=warning <arquivo.sh>`.
@@ -51,10 +57,16 @@ O repositório possui ganchos (*hooks*) configurados via `pre-commit` (`.pre-com
 
 ## 🧪 Procedimento de Verificação Pré-Finalização
 
-Sempre que gerar ou editar arquivos, execute a verificação dos hooks antes de encerrar o turno:
+Sempre que gerar ou editar arquivos, execute OBRIGATORIAMENTE a verificação dos hooks antes de encerrar o turno ou antes de efetuar commits:
 
 ```bash
 pre-commit run --files <arquivos_alterados>
 ```
 
-Se algum hook reportar falha ou modificar arquivos (como `trailing-whitespace` ou `markdownlint`), revise as alterações, corrija os avisos e execute novamente até que todos os hooks retornem `Passed`.
+Se algum hook reportar falha ou modificar arquivos (como `trailing-whitespace` ou `markdownlint` aplicando autofix):
+
+1. Revise as correções aplicadas automaticamente pelo hook (`git diff`).
+2. Adicione as alterações corrigidas ao stage do git (`git add <arquivos_alterados>`).
+3. Corrija quaisquer avisos restantes apontados pelo linter (ex.: avisos do `shellcheck`).
+4. Execute novamente `pre-commit run --files <arquivos_alterados>`.
+5. Somente finalize a resposta ou realize o commit quando **todos** os hooks reportarem `Passed` (ou `Skipped` para tipos sem arquivos).
